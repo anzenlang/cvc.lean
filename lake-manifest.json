@@ -1,0 +1,15 @@
+{"version": "1.1.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/anzenlang/lean-cvc5",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "3bc9e7a690c9f90f0d0f5fc5a5901bed6c85a006",
+   "name": "cvc5",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "test_framework",
+   "inherited": false,
+   "configFile": "lakefile.lean"}],
+ "name": "cvc",
+ "lakeDir": ".lake"}
