@@ -5,10 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import cvc5
-
-
-namespace cvc5
+namespace Cvc
 
 namespace Logic
 
@@ -294,35 +291,3 @@ def qf_nra := nra.qf
 def qf_nira := nira.qf
 
 end Logic
-
-
-
--- section test
--- open Test (check!)
--- open Logic
-
--- /-- info: -/
--- #guard_msgs in #eval do
---   check! "LIA" lia.toSmtLib
---   check! "LRA" lra.toSmtLib
---   check! "LIRA" lira.toSmtLib
-
---   check! "NIA" nia.toSmtLib
---   check! "NRA" nra.toSmtLib
---   check! "NIRA" nira.toSmtLib
-
---   check! "QF_LIA" qf_lia.toSmtLib
---   check! "QF_LRA" qf_lra.toSmtLib
---   check! "QF_LIRA" qf_lira.toSmtLib
-
---   check! "QF_NIA" qf_nia.toSmtLib
---   check! "QF_NRA" qf_nra.toSmtLib
---   check! "QF_NIRA" qf_nira.toSmtLib
-
---   check! "QF_AX" mk.qf.array.toSmtLib
-
---   check! "ALIA" lia.array.toSmtLib
---   check! "QF_ALIA" qf_lia.array.toSmtLib
-
---   check! "AUFNIRA" nira.array.uf.toSmtLib
--- end test
