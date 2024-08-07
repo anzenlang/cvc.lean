@@ -126,6 +126,15 @@ def run [MonadLiftT BaseIO m]
   let tm ← Term.Manager.mk
   code.runWith tm
 
+/-- Runs `SmtT` code, panics on errors by default. -/
+def run! [MonadLiftT BaseIO m] [Inhabited α]
+  (code : SmtT m α)
+  (handleError : Error → m α := fun e => panic! s!"{e}")
+: m α := do
+  match ← run code with
+  | .ok res => return res
+  | .error e => handleError e
+
 end SmtT
 
 namespace Smt
@@ -135,5 +144,8 @@ protected def runWith := @SmtT.runWith
 
 @[inherit_doc SmtT.run]
 protected def run := @SmtT.run
+
+@[inherit_doc SmtT.run]
+protected def run! := @SmtT.run!
 
 end Smt
