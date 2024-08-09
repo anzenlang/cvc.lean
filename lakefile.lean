@@ -14,7 +14,7 @@ package cvc {
 }
 
 require cvc5 from
-  git "https://github.com/anzenlang/lean-cvc5" @ "test_framework"
+  git "https://github.com/anzenlang/lean-cvc5" @ "exception_handling"
 
 @[default_target]
 lean_lib Cvc {}

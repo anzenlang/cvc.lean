@@ -12,20 +12,34 @@ import Cvc.Basic.Srt
 /-! # Terms -/
 namespace Cvc.Term
 
+-- @[inherit_doc cvc5.Term.toString]
+protected def toString : Term → String :=
+  cvc5.Term.toString ∘ ULift.down
 
 /-! ### Constructors from `cvc5` -/
 
 variable [Monad m]
 
+def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerT m Term := fun tm => do
+  let res := code tm.down |> ULift.up
+  return (.ok res, tm)
+
+def termLift?
+  (code : cvc5.TermManager → Except cvc5.Error cvc5.Term)
+: Term.ManagerT m Term := fun tm => do
+  match code tm.down with
+  | .ok res => return (.ok (ULift.up res), tm)
+  | .error e => return (.error (Error.ofCvc5 e), tm)
+
 -- @[inherit_doc cvc5.TermManager.mkBoolean]
 def mkBool (b : Bool) : ManagerT m Term :=
-  (cvc5.TermManager.mkBoolean · b) <$> get
+  termLift? (cvc5.TermManager.mkBoolean · b)
 
 instance : ToTerm Bool := ⟨mkBool⟩
 
 -- @[inherit_doc cvc5.TermManager.mkInteger]
 def mkInt (i : Int) : ManagerT m Term :=
-  (cvc5.TermManager.mkInteger · i) <$> get
+  termLift? (cvc5.TermManager.mkInteger · i)
 
 instance : ToTerm Int := ⟨mkInt⟩
 
@@ -33,7 +47,11 @@ instance : ToTerm Nat := ⟨mkInt ∘ Int.ofNat⟩
 
 @[inherit_doc cvc5.TermManager.mkTerm]
 def mk (kind : Kind) (children : Array Term := #[]) : ManagerT m Term :=
-  (cvc5.TermManager.mkTerm · kind children) <$> get
+  termLift? (cvc5.TermManager.mkTerm · kind (children.map ULift.down))
+
+-- @[inherit_doc cvc5.Proof.getResult]
+def ofProof : Proof → Term :=
+  ULift.up ∘ cvc5.Proof.getResult
 
 
 

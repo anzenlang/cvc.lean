@@ -22,29 +22,43 @@ variable [Monad m]
 
 
 
--- @[inherit_doc Solver.parse]
+@[inherit_doc Solver.parse]
 def parseSmtLib (smtLib : String) : SmtT m Unit :=
   Solver.parse (m := m) smtLib
 
 
 
-/-! ### Information extraction -/
+/-! ### Getters -/
 
--- @[inherit_doc Solver.getVersion]
+@[inherit_doc Solver.getVersion]
 def getVersion : SmtT m String :=
   Solver.getVersion (m := m)
 
-/-! ### Options -/
+/-! ### Setters -/
 
--- @[inherit_doc Solver.setOption]
+@[inherit_doc Solver.setOption]
 def setOption (key val : String) : SmtT m Unit :=
   Solver.setOption (m := m) key val
 
+@[inherit_doc Solver.setLogic]
+def setLogic (logic : Logic) : SmtT m Unit :=
+  Solver.setLogic (m := m) logic.toSmtLib
+
+/-! ### Declare/define -/
+
+@[inherit_doc Solver.declareFun]
+def declareFun (symbol : String) (sorts : Array Srt) (codomain : Srt) : SmtT m Term :=
+  ULift.up <$> Solver.declareFun symbol (sorts.map ULift.down) codomain.down false (m := m)
+
+@[inherit_doc Solver.declareSort]
+def declareSort (symbol : String) (arity : Nat) : SmtT m Srt :=
+  ULift.up <$> Solver.declareSort symbol arity false (m := m)
+
 /-! ### Assert-like -/
 
--- @[inherit_doc Solver.assertFormula]
+@[inherit_doc Solver.assertFormula]
 def assert (formula : Term) : SmtT m Unit :=
-  Solver.assertFormula (m := m) formula
+  Solver.assertFormula (m := m) formula.down
 
 /-! ### Check-sat-like -/
 

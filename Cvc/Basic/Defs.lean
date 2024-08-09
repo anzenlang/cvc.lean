@@ -9,57 +9,92 @@ import Cvc.Init
 
 
 
+/-! # Basic definitions -/
 namespace Cvc
-
-
-
-/-! ## Basic definitions -/
 
 
 
 export cvc5 (Kind)
 
 /-- Type for cvc5 terms. -/
-def Term := cvc5.Term
+def Term : Type u := ULift cvc5.Term
 
 /-- Type for cvc5 sorts. -/
-def Srt := cvc5.Sort
+def Srt : Type u := ULift cvc5.Sort
+
+-- @[inherit_doc cvc5.Proof]
+abbrev Proof := cvc5.Proof
+
+@[inherit_doc cvc5.ProofRule]
+abbrev Proof.Rule := cvc5.ProofRule
+
+@[inherit_doc cvc5.ProofRewriteRule]
+abbrev Proof.RewriteRule := cvc5.ProofRewriteRule
 
 
 
-/-! ### Term Manager -/
+/-! ## Proofs -/
+namespace Proof
+
+export cvc5.Proof (
+  beq
+  getArguments getChildren getResult getRewriteRule getRule
+  hash null
+)
+
+end Proof
+
+
+
+/-! ## Term Manager -/
 namespace Term
 
 /-- Cvc5 term manager. -/
-def Manager := cvc5.TermManager
+def Manager : Type u := ULift cvc5.TermManager
 
 def Manager.mk := cvc5.TermManager.new
 
 /-- `Manager` error/state-monad transformer. -/
-abbrev ManagerT (m : Type → Type u) :=
+abbrev ManagerT (m : Type u → Type v) :=
   ExceptT Error (StateT Manager m)
 
 /-- `Manager` error/state-monad wrapped in `IO`. -/
 abbrev ManagerIO :=
   ManagerT IO
 
+abbrev ManagerM : Type u → Type u :=
+  ManagerT Id
+
+instance [Monad m] : MonadLift (ManagerM) (ManagerT m) where
+  monadLift code tm := do
+    let (res, tm) := code tm
+    return (res, tm)
+
+instance : MonadLift (Except cvc5.Error) (ManagerM) where
+  monadLift
+  | .ok res => return res
+  | .error e => throw (Error.ofCvc5 e)
+
 end Term
 
 
 
-/-! ### `Smt`: a term manager and a solver -/
+/-! ## `Smt`: a term manager and a solver -/
 
 /-- Smt state.
 
 Aggregates a `Term.Manager` and a `cvc5.Solver`.
 -/
-structure Smt where
+structure Smt.{u} : Type u where
 private mkRaw ::
-  private termManager : cvc5.TermManager
-  private solver : cvc5.Solver
+  private termManager : Term.Manager.{u}
+  private solver : ULift.{u} cvc5.Solver
 
 /-- `Smt` error/state-monad transformer. -/
 abbrev SmtT (m : Type → Type u) := ExceptT Error (StateT Smt m)
+
+/-- `Smt` error/state-monad wrapped in `IO`. -/
+abbrev SmtIO := SmtT IO
 
 namespace SmtT
 def throwInternal [Monad m] (msg : String) : SmtT m α :=
@@ -74,23 +109,20 @@ instance instMonadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (SmtT m) 
     return (res, {smt with termManager})
 end SmtT
 
-/-- `Smt` error/state-monad wrapped in `IO`. -/
-abbrev SmtIO := SmtT IO
-
 
 
 
 /-! ## Sort/term conversion classes  -/
 
 /-- Can be seen as a `Srt`. -/
-class ToSrt (α : Type u) where
+class ToSrt.{u} (α : Type u) : Type u where
   /-- Produces an `Srt` corresponding to `α`. -/
-  srt [Monad m] : Term.ManagerT m Srt
+  srt : Term.ManagerM Srt.{u}
 
 /-- Can be encoded as a `Term`. -/
-class ToTerm (α : Type u) extends ToSrt α where
+class ToTerm.{u} (α : Type u) extends ToSrt.{u} α : Type u where
   /-- Produces a `Term` corresponding to some `α`-value. -/
-  toTerm [Monad m] : α → Term.ManagerT m Term
+  toTerm : α → Term.ManagerM Term.{u}
 
 
 
@@ -104,19 +136,20 @@ variable [Monad m]
 
 instance instMonadLiftCvc5 : MonadLift (cvc5.SolverT m) (SmtT m) where
   monadLift code smt := do
-    let (res, solver) ← code smt.solver
+    let (res, solver) ← code smt.solver.down
+    let solver := ULift.up solver
     return (res.mapError Error.ofCvc5, {smt with solver})
 
 
 
-/-! ### Runners -/
+/-! ## Runners -/
 
 /-- Runs `SmtT` code given a term manager. -/
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) := do
   let res ←
-    cvc5.Solver.run tm fun solver => do
-      let (res, ⟨_, s⟩) ← code ⟨tm, solver⟩
-      return (res.mapError Error.toCvc5, s)
+    cvc5.Solver.run tm.down fun solver => do
+      let (res, ⟨_, s⟩) ← code ⟨tm, ULift.up solver⟩
+      return (res.mapError Error.toCvc5, s.down)
   return res.mapError Error.ofCvc5
 
 /-- Runs `SmtT` code, creates the term manager and the solver. -/
@@ -124,7 +157,7 @@ def run [MonadLiftT BaseIO m]
   (code : SmtT m α)
 : ExceptT Error m α := do
   let tm ← Term.Manager.mk
-  code.runWith tm
+  code.runWith (ULift.up tm)
 
 /-- Runs `SmtT` code, panics on errors by default. -/
 def run! [MonadLiftT BaseIO m] [Inhabited α]

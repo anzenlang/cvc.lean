@@ -14,9 +14,13 @@ namespace Cvc
 
 
 
+export Lean (Rat)
+
+
+
 /-! ## Re-exports from `cvc5` -/
 
-inductive Error
+inductive Error : Type u
 | internal (msg : String)
 | userError (msg : String)
 
@@ -24,12 +28,13 @@ namespace Error
 
 def toCvc5 : Error → cvc5.Error
 | .internal "a value is missing" => .missingValue
-| .internal msg => .user_error msg
-| .userError msg => .user_error msg
+| .internal msg => .userError msg
+| .userError msg => .userError msg
 
 def ofCvc5 : cvc5.Error → Error
 | .missingValue => .internal "a value is missing"
-| .user_error msg => .userError msg
+| .cvc5Error msg => .internal msg
+| .userError msg => .userError msg
 
 instance : Coe cvc5.Error Error := ⟨ofCvc5⟩
 
