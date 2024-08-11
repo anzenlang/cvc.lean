@@ -49,10 +49,20 @@ end Proof
 /-! ## Term Manager -/
 namespace Term
 
+def ofCvc5 : cvc5.Term → Term := ULift.up
+
+def toCvc5 : Term → cvc5.Term := ULift.down
+
 /-- Cvc5 term manager. -/
 def Manager : Type u := ULift cvc5.TermManager
 
-def Manager.mk := cvc5.TermManager.new
+namespace Manager
+def mk := cvc5.TermManager.new
+
+def ofCvc5 : cvc5.TermManager → Manager := ULift.up
+
+def toCvc5 : Manager → cvc5.TermManager := ULift.down
+end Manager
 
 /-- `Manager` error/state-monad transformer. -/
 abbrev ManagerT (m : Type u → Type v) :=

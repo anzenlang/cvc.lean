@@ -5,22 +5,27 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
+import Lean.Server.Utils
+
+import Cvc
+
 namespace Cvc.Test
 
-variable [Repr α] [BEq α]
+def IO.run : IO Unit → IO Unit :=
+  id
 
-/-- Crashes with an explanation if `expected ≠ value`. -/
-def check! (expected value : α) : IO Unit :=
-  if expected != value then do
-    println! "expected `{repr expected}`, got `{repr value}`"
-    panic! "check failed"
-  else return ()
+def fail {α : outParam Type} (msg : String) : IO α :=
+  IO.throwServerError msg
 
-/-- Crashes with an explanation if `expected ≠ value`. -/
-def checkNe! (lhs rhs : α) : IO Unit :=
-  if lhs == rhs then do
-    println! "`{repr lhs}` should be different from `{repr rhs}`, but is not"
-    panic! "check failed"
-  else return ()
+protected def pref (hint : String) : String :=
+  if hint.isEmpty then "" else "[" ++ hint ++ "] "
 
-end Test
+def assertEq [ToString α] [BEq α] (lft rgt : α) (hint := "") : IO Unit := do
+  if lft != rgt then
+    IO.eprintln s!"{Test.pref hint}comparison failed: `{lft}` is different from `{rgt}`"
+    fail "assertion failed"
+
+def assertNe [ToString α] [BEq α] (lft rgt : α) (hint := "") : IO Unit := do
+  if lft == rgt then
+    IO.eprintln s!"{Test.pref hint}comparison failed: `{lft}` is the same as `{rgt}`"
+    fail "assertion failed"

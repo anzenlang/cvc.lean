@@ -12,6 +12,18 @@ import Cvc.Basic.Defs
 /-! # Sort -/
 namespace Cvc.Srt
 
+def ofCvc5 : cvc5.Sort → Srt :=
+  ULift.up
+
+def toCvc5 : Srt → cvc5.Sort :=
+  ULift.down
+
+protected def toString : Srt → String :=
+  cvc5.Sort.toString ∘ toCvc5
+
+instance : ToString Srt :=
+  ⟨Srt.toString⟩
+
 protected opaque AsSort (_ : Srt) : Type u := PUnit
 
 instance : CoeSort Srt (Type u) where
@@ -25,18 +37,15 @@ instance (sort : Srt) : ToSrt sort.AsSort := ⟨return sort⟩
 
 variable [Monad m]
 
-def ofCvc5 (sort : cvc5.Sort) : Srt :=
-  ULift.up sort
-
 def srtLift (code : cvc5.TermManager → cvc5.Sort) : Term.Manager → Srt :=
-  ULift.up ∘ code ∘ ULift.down
+  ofCvc5 ∘ code ∘ ULift.down
 
 def srtLift?
   (code : cvc5.TermManager → Except cvc5.Error cvc5.Sort)
   (tm : Term.Manager)
 : Except Error Srt :=
   match code tm.down with
-  | .ok sort => .ok <| ULift.up sort
+  | .ok sort => .ok <| ofCvc5 sort
   | .error e => .error <| Error.ofCvc5 e
 
 @[inherit_doc cvc5.TermManager.getBooleanSort]
@@ -70,7 +79,7 @@ protected def array
   [I : ToSrt idx] [E : ToSrt elm]
 : Term.ManagerM Srt := do
   let (idx, elm) := (← I.srt, ← E.srt)
-  srtLift? (cvc5.TermManager.mkArraySort · idx.down elm.down) (← get)
+  srtLift? (cvc5.TermManager.mkArraySort · idx.toCvc5 elm.toCvc5) (← get)
 
 instance [ToSrt α] : ToSrt (Array α) := ⟨Srt.array Nat α⟩
 
@@ -94,6 +103,29 @@ protected def function
   (sorts : Array Srt.{u})
   (codomain : Type u) [I : ToSrt.{u} codomain]
 : Term.ManagerM Srt := do
-  let sorts := sorts.map ULift.down
+  let sorts := sorts.map toCvc5
   let codomain ← I.srt
-  srtLift? (cvc5.TermManager.mkFunctionSort · sorts codomain.down) (← get)
+  srtLift? (cvc5.TermManager.mkFunctionSort · sorts codomain.toCvc5) (← get)
+
+protected def cvc5Signature (self : Srt) : Term.ManagerM (Array cvc5.Sort × cvc5.Sort) := do
+  let self! := self.toCvc5
+  if self!.isFunction then
+    let domain ← self!.getFunctionDomainSorts
+    let codomain ← self!.getFunctionCodomainSort
+    return (domain, codomain)
+  else
+    return (#[], self!)
+
+
+protected def fn
+  (α : Type) (β : Type)
+  [A : ToSrt α] [B : ToSrt β]
+: Term.ManagerM Srt := do
+  let a ← A.srt
+  let b ← B.srt
+  let (domain, codomain) ← b.cvc5Signature
+  let domain := #[a.toCvc5] ++ domain
+  srtLift? (cvc5.TermManager.mkFunctionSort · domain codomain) (← get)
+
+instance [ToSrt α] [ToSrt β] : ToSrt (α → β) :=
+  ⟨Srt.fn α β⟩

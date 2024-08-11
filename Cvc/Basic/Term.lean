@@ -14,21 +14,27 @@ namespace Cvc.Term
 
 -- @[inherit_doc cvc5.Term.toString]
 protected def toString : Term → String :=
-  cvc5.Term.toString ∘ ULift.down
+  cvc5.Term.toString ∘ Term.toCvc5
+
+instance : ToString Term :=
+  ⟨Term.toString⟩
+
+def getSrt (t : Term) : Srt :=
+  Srt.ofCvc5 t.toCvc5.getSort
 
 /-! ### Constructors from `cvc5` -/
 
 variable [Monad m]
 
 def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerT m Term := fun tm => do
-  let res := code tm.down |> ULift.up
+  let res := code tm.toCvc5 |> ULift.up
   return (.ok res, tm)
 
 def termLift?
   (code : cvc5.TermManager → Except cvc5.Error cvc5.Term)
 : Term.ManagerT m Term := fun tm => do
-  match code tm.down with
-  | .ok res => return (.ok (ULift.up res), tm)
+  match code tm.toCvc5 with
+  | .ok res => return (.ok (Term.ofCvc5 res), tm)
   | .error e => return (.error (Error.ofCvc5 e), tm)
 
 -- @[inherit_doc cvc5.TermManager.mkBoolean]
@@ -51,7 +57,7 @@ def mk (kind : Kind) (children : Array Term := #[]) : ManagerT m Term :=
 
 -- @[inherit_doc cvc5.Proof.getResult]
 def ofProof : Proof → Term :=
-  ULift.up ∘ cvc5.Proof.getResult
+  Term.ofCvc5 ∘ cvc5.Proof.getResult
 
 
 
