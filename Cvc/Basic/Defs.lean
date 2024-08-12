@@ -17,10 +17,10 @@ namespace Cvc
 export cvc5 (Kind)
 
 /-- Type for cvc5 terms. -/
-def Term : Type u := ULift cvc5.Term
+def Term : Type := ULift cvc5.Term
 
 /-- Type for cvc5 sorts. -/
-def Srt : Type u := ULift cvc5.Sort
+def Srt : Type := ULift cvc5.Sort
 
 -- @[inherit_doc cvc5.Proof]
 abbrev Proof := cvc5.Proof
@@ -54,7 +54,7 @@ def ofCvc5 : cvc5.Term → Term := ULift.up
 def toCvc5 : Term → cvc5.Term := ULift.down
 
 /-- Cvc5 term manager. -/
-def Manager : Type u := ULift cvc5.TermManager
+def Manager : Type := ULift cvc5.TermManager
 
 namespace Manager
 def mk := cvc5.TermManager.new
@@ -65,14 +65,14 @@ def toCvc5 : Manager → cvc5.TermManager := ULift.down
 end Manager
 
 /-- `Manager` error/state-monad transformer. -/
-abbrev ManagerT (m : Type u → Type v) :=
+abbrev ManagerT (m : Type → Type) :=
   ExceptT Error (StateT Manager m)
 
 /-- `Manager` error/state-monad wrapped in `IO`. -/
 abbrev ManagerIO :=
   ManagerT IO
 
-abbrev ManagerM : Type u → Type u :=
+abbrev ManagerM : Type → Type :=
   ManagerT Id
 
 instance [Monad m] : MonadLift (ManagerM) (ManagerT m) where
@@ -95,13 +95,16 @@ end Term
 
 Aggregates a `Term.Manager` and a `cvc5.Solver`.
 -/
-structure Smt.{u} : Type u where
+structure Smt : Type where
 private mkRaw ::
-  private termManager : Term.Manager.{u}
-  private solver : ULift.{u} cvc5.Solver
+  private termManager : Term.Manager
+  private solver : cvc5.Solver
 
 /-- `Smt` error/state-monad transformer. -/
 abbrev SmtT (m : Type → Type u) := ExceptT Error (StateT Smt m)
+
+/-- Plain smt error/state-monad. -/
+abbrev SmtM := SmtT Id
 
 /-- `Smt` error/state-monad wrapped in `IO`. -/
 abbrev SmtIO := SmtT IO
@@ -112,6 +115,11 @@ def throwInternal [Monad m] (msg : String) : SmtT m α :=
 
 def throwUser [Monad m] (msg : String) : SmtT m α :=
   .userError msg |> throw
+
+instance instMonadLiftSmtM [Monad m] : MonadLift SmtM (SmtT m) where
+  monadLift code smt := do
+    let (res, solver) := code smt
+    return (res, solver)
 
 instance instMonadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (SmtT m) where
   monadLift code smt := do
@@ -125,14 +133,14 @@ end SmtT
 /-! ## Sort/term conversion classes  -/
 
 /-- Can be seen as a `Srt`. -/
-class ToSrt.{u} (α : Type u) : Type u where
+class ToSrt (α : Type) where
   /-- Produces an `Srt` corresponding to `α`. -/
-  srt : Term.ManagerM Srt.{u}
+  srt : Term.ManagerM Srt
 
 /-- Can be encoded as a `Term`. -/
-class ToTerm.{u} (α : Type u) extends ToSrt.{u} α : Type u where
+class ToTerm (α : Type) extends ToSrt α where
   /-- Produces a `Term` corresponding to some `α`-value. -/
-  toTerm : α → Term.ManagerM Term.{u}
+  toTerm : α → Term.ManagerM Term
 
 
 
@@ -146,8 +154,7 @@ variable [Monad m]
 
 instance instMonadLiftCvc5 : MonadLift (cvc5.SolverT m) (SmtT m) where
   monadLift code smt := do
-    let (res, solver) ← code smt.solver.down
-    let solver := ULift.up solver
+    let (res, solver) ← code smt.solver
     return (res.mapError Error.ofCvc5, {smt with solver})
 
 
@@ -158,8 +165,8 @@ instance instMonadLiftCvc5 : MonadLift (cvc5.SolverT m) (SmtT m) where
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) := do
   let res ←
     cvc5.Solver.run tm.down fun solver => do
-      let (res, ⟨_, s⟩) ← code ⟨tm, ULift.up solver⟩
-      return (res.mapError Error.toCvc5, s.down)
+      let (res, ⟨_, s⟩) ← code ⟨tm, solver⟩
+      return (res.mapError Error.toCvc5, s)
   return res.mapError Error.ofCvc5
 
 /-- Runs `SmtT` code, creates the term manager and the solver. -/

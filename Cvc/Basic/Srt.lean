@@ -75,7 +75,7 @@ instance : ToSrt String := ⟨Srt.string⟩
 
 @[inherit_doc cvc5.TermManager.mkArraySort]
 protected def array
-  (idx elm : Type u)
+  (idx elm : Type)
   [I : ToSrt idx] [E : ToSrt elm]
 : Term.ManagerM Srt := do
   let (idx, elm) := (← I.srt, ← E.srt)
@@ -100,8 +100,8 @@ protected def float
 
 @[inherit_doc cvc5.TermManager.mkFunctionSort]
 protected def function
-  (sorts : Array Srt.{u})
-  (codomain : Type u) [I : ToSrt.{u} codomain]
+  (sorts : Array Srt)
+  (codomain : Type) [I : ToSrt codomain]
 : Term.ManagerM Srt := do
   let sorts := sorts.map toCvc5
   let codomain ← I.srt

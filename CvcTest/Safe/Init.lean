@@ -5,9 +5,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
+import Cvc.Safe
 import CvcTest.Init
 
-namespace Cvc.Test
+namespace Cvc.Safe.Test
+
+export Cvc.Test (fail assertEq assertNe)
 
 def assertOk
   (code : SmtIO α)

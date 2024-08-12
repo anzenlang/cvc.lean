@@ -23,58 +23,58 @@ variable [Monad m]
 
 
 @[inherit_doc Solver.parse]
-def parseSmtLib (smtLib : String) : SmtT m Unit :=
-  Solver.parse (m := m) smtLib
+def parseSmtLib (smtLib : String) : SmtM Unit :=
+  Solver.parse (m := Id) smtLib
 
 
 
 /-! ### Getters -/
 
 @[inherit_doc Solver.getVersion]
-def getVersion : SmtT m String :=
-  Solver.getVersion (m := m)
+def getVersion : SmtM String :=
+  Solver.getVersion (m := Id)
 
 /-! ### Setters -/
 
 @[inherit_doc Solver.setOption]
-def setOption (key val : String) : SmtT m Unit :=
-  Solver.setOption (m := m) key val
+def setOption (key val : String) : SmtM Unit :=
+  Solver.setOption (m := Id) key val
 
 @[inherit_doc Solver.setLogic]
-def setLogic (logic : Logic) : SmtT m Unit :=
-  Solver.setLogic (m := m) logic.toSmtLib
+def setLogic (logic : Logic) : SmtM Unit :=
+  Solver.setLogic (m := Id) logic.toSmtLib
 
 /-! ### Declare/define -/
 
 
 @[inherit_doc Solver.declareFun]
-def declareFun' (symbol : String) (sorts : Array Srt) (codomain : Srt) : SmtT m Term :=
-  ULift.up <$> Solver.declareFun symbol (sorts.map ULift.down) codomain.down false (m := m)
+def declareFun' (symbol : String) (sorts : Array Srt) (codomain : Srt) : SmtM Term :=
+  ULift.up <$> Solver.declareFun symbol (sorts.map ULift.down) codomain.down false (m := Id)
 
 @[inherit_doc Solver.declareFun]
-def declareFun (symbol : String) (α : Type) [A : ToSrt α] : SmtT m Term := do
+def declareFun (symbol : String) (α : Type) [A : ToSrt α] : SmtM Term := do
   let a ← A.srt
   let (domain, codomain) ← a.cvc5Signature
-  ULift.up <$> Solver.declareFun symbol domain codomain false (m := m)
+  ULift.up <$> Solver.declareFun symbol domain codomain false (m := Id)
 
 @[inherit_doc Solver.declareSort]
-def declareSort (symbol : String) (arity : Nat) : SmtT m Srt :=
-  ULift.up <$> Solver.declareSort symbol arity false (m := m)
+def declareSort (symbol : String) (arity : Nat) : SmtM Srt :=
+  ULift.up <$> Solver.declareSort symbol arity false (m := Id)
 
 /-! ### Assert-like -/
 
 @[inherit_doc Solver.assertFormula]
-def assert (formula : Term) : SmtT m Unit :=
-  Solver.assertFormula (m := m) formula.down
+def assert (formula : Term) : SmtM Unit :=
+  Solver.assertFormula (m := Id) formula.down
 
 /-! ### Check-sat-like -/
 
 -- @[inherit_doc Solver.checkSat]
-def checkSat : SmtT m cvc5.Result :=
-  Solver.checkSat (m := m)
+def checkSat : SmtM cvc5.Result :=
+  Solver.checkSat (m := Id)
 
 /-- True if *sat*, false if *unsat*, none if *unknown*, error otherwise. -/
-def checkSat? : SmtT m (Option Bool) := do
+def checkSat? : SmtM (Option Bool) := do
   let res ← checkSat
   if res.isSat then
     return true
@@ -92,7 +92,7 @@ def checkSat? : SmtT m (Option Bool) := do
 /-! ### Unsat mode commands -/
 
 -- @[inherit_doc Solver.getProof]
-def getProof : SmtT m (Array cvc5.Proof) :=
-  Solver.getProof (m := m)
+def getProof : SmtM (Array cvc5.Proof) :=
+  Solver.getProof (m := Id)
 
 end Smt

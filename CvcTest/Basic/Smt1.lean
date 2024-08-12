@@ -17,6 +17,8 @@ open Smt
 test! do
   setLogic Logic.qf_lia
 
-  let f ← declareFun "f" (Int → Bool)
+  let n ← declareFun "n" Int
+  assertEq n.getSrt.toString "Int"
 
-  assertEq f.getSrt.toString "(-> Int Bool)"
+  let f ← declareFun "f" (Int → Int → Bool)
+  assertEq f.getSrt.toString "(-> Int Int Bool)"
