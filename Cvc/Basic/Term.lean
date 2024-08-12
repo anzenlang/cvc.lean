@@ -26,11 +26,11 @@ def getSrt (t : Term) : Srt :=
 
 variable [Monad m]
 
-def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm => do
+protected def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm => do
   let res := code tm.toCvc5 |> ULift.up
   return (.ok res, tm)
 
-def termLift?
+protected def termLift?
   (code : cvc5.TermManager → Except cvc5.Error cvc5.Term)
 : Term.ManagerM Term := fun tm => do
   match code tm.toCvc5 with
@@ -39,13 +39,13 @@ def termLift?
 
 -- @[inherit_doc cvc5.TermManager.mkBoolean]
 def mkBool (b : Bool) : ManagerM Term :=
-  termLift? (cvc5.TermManager.mkBoolean · b)
+  Term.termLift? (cvc5.TermManager.mkBoolean · b)
 
 instance : ToTerm Bool := ⟨mkBool⟩
 
 -- @[inherit_doc cvc5.TermManager.mkInteger]
 def mkInt (i : Int) : ManagerM Term :=
-  termLift? (cvc5.TermManager.mkInteger · i)
+  Term.termLift? (cvc5.TermManager.mkInteger · i)
 
 instance : ToTerm Int := ⟨mkInt⟩
 
@@ -53,7 +53,7 @@ instance : ToTerm Nat := ⟨mkInt ∘ Int.ofNat⟩
 
 @[inherit_doc cvc5.TermManager.mkTerm]
 def mk (kind : Kind) (children : Array Term := #[]) : ManagerM Term :=
-  termLift? (cvc5.TermManager.mkTerm · kind (children.map ULift.down))
+  Term.termLift? (cvc5.TermManager.mkTerm · kind (children.map ULift.down))
 
 -- @[inherit_doc cvc5.Proof.getResult]
 def ofProof : Proof → Term :=
@@ -63,59 +63,72 @@ def ofProof : Proof → Term :=
 
 /-! ### Convenience term constructors -/
 
+/-- If-then-else, `cnd : Bool` and `thn els : α`. -/
 def mkIte (cnd thn els : Term) : ManagerM Term :=
   mk .ITE #[cnd, thn, els]
 
+/-- Equality between two terms or more. -/
 def mkEqN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .EQUAL terms
 
+/-- Equality between two terms -/
 def mkEq (lhs rhs : Term) : ManagerM Term :=
   mkEqN #[lhs, rhs]
 
+/-- Pairwise distinct. -/
 def mkDistinct (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .DISTINCT terms
 
 
 
+/-- Boolean negation. -/
 def mkNot (term : Term) : ManagerM Term :=
   mk .NOT #[term]
-/-- Alias for `mkNot`. -/
+@[inherit_doc mkNot]
 abbrev not := @mkNot
 
+/-- N-ary conjunction. -/
 def mkAndN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .AND terms
 
+/-- Binary conjunction. -/
 def mkAnd (lhs rhs : Term) : ManagerM Term :=
   mkAndN #[lhs, rhs]
-/-- Alias for `mkAnd`. -/
+@[inherit_doc mkAnd]
 abbrev and := @mkAnd
 
+/-- N-ary implication. -/
 def mkImpliesN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .IMPLIES terms
 
+/-- Binary implication. -/
 def mkImplies (lhs rhs : Term) : ManagerM Term :=
   mkImpliesN #[lhs, rhs]
 
+/-- N-ary disjunction. -/
 def mkOrN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .OR terms
 
+/-- Binary disjunction. -/
 def mkOr (lhs rhs : Term) : ManagerM Term :=
   mkOrN #[lhs, rhs]
-/-- Alias for `mkOr`. -/
+@[inherit_doc mkOr]
 abbrev or := @mkOr
 
+/-- N-ary exclusive disjunction. -/
 def mkXorN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .XOR terms
 
+/-- Binary exclusive disjunction. -/
 def mkXor (lhs rhs : Term) : ManagerM Term :=
   mkXorN #[lhs, rhs]
-/-- Alias for `mkXor`. -/
+@[inherit_doc mkXor]
 abbrev xor := @mkXor
 
 

@@ -62,17 +62,22 @@ def assertInternalError
 
 
 
-scoped syntax docComment ? "test! " term : command
+scoped syntax docComment ? ("#test " <|> "#test? ") term : command
 
 macro_rules
-| `(command| $outputComment:docComment test! $code:term) => `(
+| `(command| $outputComment:docComment #test $code:term) => `(
   $outputComment:docComment
   #guard_msgs in #eval Cvc.Test.IO.run do
     Smt.run! do
       $code:term
 )
-| `(command| test! $code:term) => `(
+| `(command| #test $code:term) => `(
   /-- info: -/
-  test! $code
+  #test $code
+)
+| `(command| $[$outputComment]? #test? $code:term) => `(
+  #eval Cvc.Test.IO.run do
+    Smt.run! do
+      $code:term
 )
 end Test
