@@ -42,12 +42,16 @@ def mkBool (b : Bool) : ManagerM Term :=
   Term.termLift? (cvc5.TermManager.mkBoolean · b)
 
 instance : ToTerm Bool := ⟨mkBool⟩
+instance : ValueOfTerm Bool where
+  valueOfTerm t := t.toCvc5.getBooleanValue
 
 -- @[inherit_doc cvc5.TermManager.mkInteger]
 def mkInt (i : Int) : ManagerM Term :=
   Term.termLift? (cvc5.TermManager.mkInteger · i)
 
 instance : ToTerm Int := ⟨mkInt⟩
+instance : ValueOfTerm Int where
+  valueOfTerm t := t.toCvc5.getIntegerValue
 
 instance : ToTerm Nat := ⟨mkInt ∘ Int.ofNat⟩
 

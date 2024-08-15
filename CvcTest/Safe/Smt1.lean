@@ -71,7 +71,7 @@ error: cannot evaluate code because '_eval._lambda_4' uses 'sorry' and/or contai
   let _ : Term (Int → Bool) := fApp1
 
   let fApp2 ← fApp1 m
-  assertEq fApp2.toString "(@ (@ f n) m)"
+  assertEq fApp2.toString "(f n m)"
   assertEq fApp2.getSrt.toString "Bool"
   -- make sure `fApp2` has the right `Term` type
   let _ : Term Bool := fApp2

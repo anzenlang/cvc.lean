@@ -65,6 +65,11 @@ private instance [Monad m] : MonadLift (Cvc.Term.ManagerT m) (ManagerT m) where
     let (res, tm!) ← code tm.toUnsafe
     return (res, Manager.ofUnsafe tm!)
 
+private instance [Monad m] : MonadLift Cvc.Term.ManagerM (ManagerT m) where
+  monadLift code tm := do
+    let (res, tm!) := code tm.toUnsafe
+    return (res, Manager.ofUnsafe tm!)
+
 /-- `Manager` error/state-monad wrapped in `IO`. -/
 abbrev ManagerIO :=
   ManagerT IO
@@ -223,8 +228,33 @@ def getSrt (self : Term α) : Srt α :=
 
 
 
-protected def apply (self : Term (α → β)) (arg : Term α) : ManagerM (Term β) := do
-  ofUnsafe <$> Cvc.Term.mk .HO_APPLY #[self.toUnsafe, arg.toUnsafe]
+private partial def flattenHoApply
+  (revArgs : Array Cvc.Term) (term : cvc5.Term)
+: ManagerM Cvc.Term := do
+  match term.getKind with
+  | .HO_APPLY =>
+    let args := term.getChildren
+    let f := args.get! 0
+    let args := args.toSubarray (start := 1)
+    let revArgs := revArgs |> args.foldr fun arg acc => acc.push (Cvc.Term.ofCvc5 arg)
+    flattenHoApply revArgs f
+  | _ =>
+    if revArgs.isEmpty then
+      return Cvc.Term.ofCvc5 term
+    else
+      let revArgs := revArgs.push (.ofCvc5 term)
+      Cvc.Term.mk cvc5.Kind.APPLY_UF revArgs.reverse
+
+protected def apply
+  (self : Term (α → β)) (arg : Term α)
+: ManagerM (Term β) := do
+  let term! := self.toCvc5
+  let sort! := term!.getSort
+  let dom ← sort!.getFunctionDomainSorts
+  if 1 < dom.size then
+    ofUnsafe <$> Cvc.Term.mk .HO_APPLY #[self.toUnsafe, arg.toUnsafe]
+  else
+    ofUnsafe <$> flattenHoApply #[arg.toUnsafe] term!
 
 instance : CoeFun (Term (α → β)) (fun _ => Term α → ManagerM (Term β)) :=
   ⟨Term.apply⟩
@@ -413,5 +443,114 @@ def declareFun [Monad m] (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtT
 
 @[inherit_doc declareFun]
 abbrev declare := @declareFun
+
+
+
+@[inherit_doc Cvc.Smt.checkSat?]
+def checkSat? : SmtM (Option Bool) := do
+  Cvc.Smt.checkSat?
+
+
+
+protected structure Sat where
+private ofSmt ::
+  private toSmt : Smt
+
+protected abbrev SatT (m : Type → Type u) := ExceptT Error (StateT Smt.Sat m)
+
+def Sat.unexpected [Monad m] : Smt.SatT m α :=
+  .userError "unexpected sat result" |> throw
+
+protected abbrev SatM := Smt.SatT Id
+
+instance Sat.monadLiftSatM [Monad m] : MonadLift Smt.SatM (Smt.SatT m) where
+  monadLift code sat :=
+    return code sat
+
+
+
+protected structure Unsat where
+private ofSmt ::
+  private toSmt : Smt
+
+protected abbrev UnsatT (m : Type → Type u) := ExceptT Error (StateT Smt.Unsat m)
+
+def Unsat.unexpected [Monad m] : Smt.UnsatT m α :=
+  .userError "unexpected unsat result" |> throw
+
+protected abbrev UnsatM := Smt.UnsatT Id
+
+instance Unsat.monadLiftUnsatM [Monad m] : MonadLift Smt.UnsatM (Smt.UnsatT m) where
+  monadLift code sat :=
+    return code sat
+
+
+
+protected structure Unknown where
+private ofSmt ::
+  private toSmt : Smt
+
+protected abbrev UnknownT (m : Type → Type u) := ExceptT Error (StateT Smt.Unknown m)
+
+def Unknown.unexpected [Monad m] : Smt.UnknownT m α :=
+  .userError "could not decide (un)satisfiability" |> throw
+
+protected abbrev UnknownM := Smt.UnknownT Id
+
+instance Unknown.monadLiftUnknownM [Monad m] : MonadLift Smt.UnknownM (Smt.UnknownT m) where
+  monadLift code sat :=
+    return code sat
+
+
+
+/-- Check satisfiability and run specific sat, unsat, or unknown code.
+
+- `ifSat`: Runs when satisfiable, produces an unexpected-style error by default.
+- `ifUnsat`: Runs when unsatisfiable, produces an unexpected-style error by default.
+- `ifUnknown`: Runs when (un)satisfiability cannot be established, produces an unexpected-style
+  error by default.
+-/
+def checkSat
+  [Monad m]
+  (ifSat : Smt.SatT m α := Smt.Sat.unexpected)
+  (ifUnsat : Smt.UnsatT m α := Smt.Unsat.unexpected)
+  (ifUnknown : Smt.UnknownT m α := Smt.Unknown.unexpected)
+: SmtT m α := fun smt => do
+  match checkSat? smt with
+  | (.ok (some true), smt) =>
+    let (res, smt') ← ifSat ⟨smt⟩
+    return (res, smt'.toSmt)
+  | (.ok (some false), smt) =>
+    let (res, smt') ← ifUnsat ⟨smt⟩
+    return (res, smt'.toSmt)
+  | (.ok none, smt) =>
+    let (res, smt') ← ifUnknown ⟨smt⟩
+    return (res, smt'.toSmt)
+  | (.error e, smt) =>
+    return (.error e, smt)
+
+
+
+/-! ### Sat-specific commands -/
+
+@[inherit_doc Cvc.Smt.getValue]
+def getValue {α : Type} [I : Cvc.ValueOfTerm α]
+  (term : Term α)
+: Smt.SatM α := fun smt =>
+  let (res, smt!) := Cvc.Smt.getValue term.toUnsafe smt.toSmt.toUnsafe
+  match res with
+  | .ok value =>
+    let get : Cvc.SmtM α := I.valueOfTerm value
+    let (res, smt!) := get smt!
+    (res, Smt.Sat.ofSmt (Smt.ofUnsafe smt!))
+  | .error e =>
+    (.error e, Smt.Sat.ofSmt (Smt.ofUnsafe smt!))
+
+/-! ### Unsat-specific commands -/
+
+@[inherit_doc Cvc.Smt.getProof]
+def getProof : Smt.UnsatM (Array cvc5.Proof) := fun unsat =>
+  let (res, smt) := (Cvc.Smt.getProof : SmtM _) unsat.toSmt
+  (res, Smt.Unsat.ofSmt smt)
 
 end Smt

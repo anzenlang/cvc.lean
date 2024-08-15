@@ -19,8 +19,14 @@ export cvc5 (Kind)
 /-- Type for cvc5 terms. -/
 def Term : Type := ULift cvc5.Term
 
+instance : Inhabited Term where
+  default := ULift.up cvc5.Term.instInhabited.default
+
 /-- Type for cvc5 sorts. -/
 def Srt : Type := ULift cvc5.Sort
+
+instance : Inhabited Srt where
+  default := ULift.up cvc5.Sort.instInhabited.default
 
 -- @[inherit_doc cvc5.Proof]
 abbrev Proof := cvc5.Proof
@@ -141,6 +147,10 @@ class ToSrt (α : Type) where
 class ToTerm (α : Type) extends ToSrt α where
   /-- Produces a `Term` corresponding to some `α`-value. -/
   toTerm : α → Term.ManagerM Term
+
+/-- Can transform a `Term` into a native value. -/
+class ValueOfTerm (α : Type) where
+  valueOfTerm : Term → Term.ManagerM α
 
 
 
