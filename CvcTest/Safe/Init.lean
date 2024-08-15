@@ -68,7 +68,7 @@ macro_rules
 | `(command| $outputComment:docComment #test $code:term) => `(
   $outputComment:docComment
   #guard_msgs in #eval Cvc.Test.IO.run do
-    Smt.run! do
+    Smt.run! (handleError := fun e => IO.throwServerError e.toString) do
       $code:term
 )
 | `(command| #test $code:term) => `(
@@ -77,7 +77,7 @@ macro_rules
 )
 | `(command| $[$outputComment]? #test? $code:term) => `(
   #eval Cvc.Test.IO.run do
-    Smt.run! do
+    Smt.run! (handleError := fun e => IO.throwServerError e.toString) do
       $code:term
 )
 end Test
