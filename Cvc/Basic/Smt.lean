@@ -69,7 +69,7 @@ def assert (formula : Term) : SmtM Unit :=
 
 /-! ### Check-sat-like -/
 
--- @[inherit_doc Solver.checkSat]
+@[inherit_doc Solver.checkSat]
 def checkSat : SmtM cvc5.Result :=
   Solver.checkSat (m := Id)
 
@@ -87,11 +87,19 @@ def checkSat? : SmtM (Option Bool) := do
 
 /-! ### Sat mode commands -/
 
+@[inherit_doc Solver.getValue]
+def getValue (term : Term) : SmtM Term := do
+  let value ← Solver.getValue term.toCvc5 (m := Id)
+  return Term.ofCvc5 value
 
+@[inherit_doc Solver.getValues]
+def getValues (terms : Array Term) : SmtM (Array Term) := do
+  let values ← Solver.getValues (terms.map Term.toCvc5) (m := Id)
+  return values.map Term.ofCvc5
 
 /-! ### Unsat mode commands -/
 
--- @[inherit_doc Solver.getProof]
+@[inherit_doc Solver.getProof]
 def getProof : SmtM (Array cvc5.Proof) :=
   Solver.getProof (m := Id)
 
