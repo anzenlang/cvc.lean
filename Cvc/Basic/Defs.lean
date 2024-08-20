@@ -17,16 +17,20 @@ namespace Cvc
 export cvc5 (Kind)
 
 /-- Type for cvc5 terms. -/
-def Term : Type := ULift cvc5.Term
+structure Term where
+ofCvc5 ::
+  toCvc5 : cvc5.Term
 
 instance : Inhabited Term where
-  default := ULift.up cvc5.Term.instInhabited.default
+  default := Term.ofCvc5 cvc5.Term.instInhabited.default
 
 /-- Type for cvc5 sorts. -/
-def Srt : Type := ULift cvc5.Sort
+structure Srt where
+ofCvc5 ::
+  toCvc5 : cvc5.Sort
 
 instance : Inhabited Srt where
-  default := ULift.up cvc5.Sort.instInhabited.default
+  default := Srt.ofCvc5 cvc5.Sort.instInhabited.default
 
 -- @[inherit_doc cvc5.Proof]
 abbrev Proof := cvc5.Proof
@@ -54,10 +58,6 @@ end Proof
 
 /-! ## Term Manager -/
 namespace Term
-
-def ofCvc5 : cvc5.Term → Term := ULift.up
-
-def toCvc5 : Term → cvc5.Term := ULift.down
 
 /-- Cvc5 term manager. -/
 def Manager : Type := ULift cvc5.TermManager

@@ -9,7 +9,12 @@ import Cvc.Basic
 
 
 
-/-! # Safe -/
+/-! # Safe
+
+Safe(r) term creation / solver commands. Sorts and terms are strongly-typed, and
+sat/unsat/unknown-specific commands can only be invoked when the solver is in sat/unsat/unknown
+mode.
+-/
 namespace Cvc.Safe
 
 
@@ -29,7 +34,7 @@ private ofUnsafe ::
 /-! ## Term Manager -/
 namespace Term
 
-/-- Term manager state. -/
+/-- Safe term manager state. -/
 structure Manager : Type where
 private ofUnsafe ::
   toUnsafe : Cvc.Term.Manager
@@ -78,17 +83,28 @@ end Term
 
 
 
-/-! ## Conversion from lean types to dependent `Srt`s / `Term`s -/
+/-! ## Helper typeclasses -/
 
+/-- `α` can be seen as a `Srt β`. -/
 class HToSafeSrt (α : Type) (β : Type) where
   toSrt : Term.ManagerM (Srt β)
 
-class ToSafeSrt (α : Type) extends HToSafeSrt α α
+/-- `α` can be seen as a `Srt α`. -/
+class abbrev ToSafeSrt (α : Type) := HToSafeSrt α α
 
+/-- `α`-values can be seen as `Term β`. -/
 class HToSafeTerm (α : Type) (β : Type) extends HToSafeSrt α β where
   toTerm : α → Term.ManagerM (Term β)
 
-class ToSafeTerm (α : Type) extends HToSafeTerm α α
+/-- `α`-values can be seen as `Term α`. -/
+class abbrev ToSafeTerm (α : Type) := HToSafeTerm α α
+
+/-- `Term α` to `α`-value. -/
+class ValueOfSafeTerm (α : Type) extends HToSafeSrt α α, ValueOfTerm α where
+  ofTerm : Term α → Term.ManagerM α
+
+/-- Specifies that `Term α` have access to arithmetic operators like add, sub, mult, ... -/
+class ArithLike (α : Type)
 
 
 
@@ -104,13 +120,13 @@ instance instToString : ToString (Srt α) :=
 
 
 private def ofCvc5' (α : Type) : cvc5.Sort → Srt α :=
-  ofUnsafe ∘ ULift.up
+  ofUnsafe ∘ Srt.ofCvc5
 
 private def ofCvc5 : cvc5.Sort → Srt α :=
   ofCvc5' α
 
 def toCvc5 (srt : Srt α) : cvc5.Sort :=
-  srt.toUnsafe.down
+  srt.toUnsafe.toCvc5
 
 protected def cvc5Signature : Srt α → Term.ManagerM (Array cvc5.Sort × cvc5.Sort) :=
   (toUnsafe · |>.cvc5Signature)
@@ -157,6 +173,7 @@ instance : ToSafeSrt Int where
   toSrt := Srt.int
 instance : HToSafeSrt Nat Int where
   toSrt := Srt.int
+instance : ArithLike Int := ⟨⟩
 
 protected def real : Term.ManagerM (Srt Rat) := do
   let srt ← Cvc.Srt.real
@@ -164,6 +181,7 @@ protected def real : Term.ManagerM (Srt Rat) := do
 
 instance : ToSafeSrt Rat where
   toSrt := Srt.real
+instance : ArithLike Rat := ⟨⟩
 
 protected def string : Term.ManagerM (Srt String) := do
   let srt ← Cvc.Srt.string
@@ -277,6 +295,8 @@ def mkBool (b : Bool) : ManagerM (Term Bool) :=
 @[default_instance]
 instance : HToSafeTerm Bool Bool where
   toTerm := mkBool
+instance : ValueOfSafeTerm Bool where
+  ofTerm t := t.toCvc5.getBooleanValue
 
 def mkInt (i : Int) : ManagerM (Term Int) :=
   ofUnsafe <$> Cvc.Term.mkInt i
@@ -287,6 +307,8 @@ instance : HToSafeTerm Int Int where
 @[default_instance]
 instance : HToSafeTerm Nat Int where
   toTerm := mkInt ∘ Int.ofNat
+instance : ValueOfSafeTerm Int where
+  ofTerm t := t.toCvc5.getIntegerValue
 
 
 
@@ -295,7 +317,7 @@ instance : HToSafeTerm Nat Int where
 @[inherit_doc Cvc.Term.mkIte]
 def mkIte (cnd : Term Bool) (thn els : Term α) : ManagerM (Term α) :=
   ofUnsafe <$> Cvc.Term.mkIte cnd.toUnsafe thn.toUnsafe els.toUnsafe
-@[inherit_doc mkIte]
+@[inherit_doc Cvc.Term.mkIte]
 def ite := @mkIte
 
 @[inherit_doc Cvc.Term.mkEqN]
@@ -306,7 +328,7 @@ def mkEqN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : Mana
 @[inherit_doc Cvc.Term.mkEq]
 def mkEq (lhs rhs : Term α) : ManagerM (Term Bool) :=
   ofUnsafe <$> Cvc.Term.mkEq lhs.toUnsafe rhs.toUnsafe
-@[inherit_doc mkEq]
+@[inherit_doc Cvc.Term.mkEq]
 def eq := @mkEq
 
 @[inherit_doc Cvc.Term.mkDistinct]
@@ -320,27 +342,154 @@ def mkDistinct
 
 @[inherit_doc Cvc.Term.mkNot]
 def mkNot (self : Term Bool) : ManagerM (Term Bool) :=
-  return ofUnsafe (← self.toUnsafe.mkNot)
-@[inherit_doc mkNot]
+  ofUnsafe <$> self.toUnsafe.mkNot
+@[inherit_doc Cvc.Term.mkNot]
 abbrev not := mkNot
 
+@[inherit_doc Cvc.Term.mkAndN]
+def mkAndN (terms : Array (Term Bool)) : ManagerM (Term Bool) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkAndN terms
 @[inherit_doc Cvc.Term.mkAnd]
 def mkAnd (self that : Term Bool) : ManagerM (Term Bool) :=
-  return ofUnsafe (← self.toUnsafe.mkAnd that.toUnsafe)
-@[inherit_doc mkAnd]
+  ofUnsafe <$> self.toUnsafe.and that.toUnsafe
+@[inherit_doc Cvc.Term.mkAnd]
 abbrev and := mkAnd
 
+@[inherit_doc Cvc.Term.mkImpliesN]
+def mkImpliesN
+  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+: ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkImpliesN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkImplies]
+def mkImplies (self that : Term Bool) : ManagerM (Term Bool) :=
+  ofUnsafe <$> self.toUnsafe.xor that.toUnsafe
+@[inherit_doc Cvc.Term.mkImplies]
+abbrev implies := mkImplies
+
+@[inherit_doc Cvc.Term.mkOrN]
+def mkOrN (terms : Array (Term Bool)) : ManagerM (Term Bool) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkOrN terms
 @[inherit_doc Cvc.Term.mkOr]
 def mkOr (self that : Term Bool) : ManagerM (Term Bool) :=
-  return ofUnsafe (← self.toUnsafe.mkOr that.toUnsafe)
-@[inherit_doc mkOr]
+  ofUnsafe <$> self.toUnsafe.or that.toUnsafe
+@[inherit_doc Cvc.Term.mkOr]
 abbrev or := mkOr
 
+@[inherit_doc Cvc.Term.mkXorN]
+def mkXorN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkXorN terms! (by simp [terms!, valid])
 @[inherit_doc Cvc.Term.mkXor]
 def mkXor (self that : Term Bool) : ManagerM (Term Bool) :=
-  return ofUnsafe (← self.toUnsafe.mkXor that.toUnsafe)
-@[inherit_doc mkXor]
+  ofUnsafe <$> self.toUnsafe.xor that.toUnsafe
+@[inherit_doc Cvc.Term.mkXor]
 abbrev xor := mkXor
+
+
+
+/-! ### Arithmetic -/
+
+
+
+@[inherit_doc Cvc.Term.mkLeN]
+def mkLeN [ArithLike α]
+  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+: ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkLeN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkLe]
+def mkLe [ArithLike α] (lhs rhs : Term α) : ManagerM (Term Bool) :=
+  ofUnsafe <$> lhs.toUnsafe.le rhs.toUnsafe
+@[inherit_doc Cvc.Term.mkLe]
+abbrev le := @mkLe
+
+
+@[inherit_doc Cvc.Term.mkLeN]
+def mkLtN [ArithLike α]
+  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+: ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkLtN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkLt]
+def mkLt [ArithLike α] (lhs rhs : Term α) : ManagerM (Term Bool) :=
+  ofUnsafe <$> lhs.toUnsafe.lt rhs.toUnsafe
+@[inherit_doc Cvc.Term.mkLt]
+abbrev lt := @mkLt
+
+@[inherit_doc Cvc.Term.mkGeN]
+def mkGeN [ArithLike α]
+  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+: ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkGeN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkGe]
+def mkGe [ArithLike α] (lhs rhs : Term α) : ManagerM (Term Bool) :=
+  ofUnsafe <$> lhs.toUnsafe.ge rhs.toUnsafe
+@[inherit_doc Cvc.Term.mkGe]
+abbrev ge := @mkGe
+
+@[inherit_doc Cvc.Term.mkGtN]
+def mkGtN [ArithLike α]
+  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+: ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkGtN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkGt]
+def mkGt [ArithLike α] (lhs rhs : Term α) : ManagerM (Term Bool) :=
+  ofUnsafe <$> lhs.toUnsafe.gt rhs.toUnsafe
+@[inherit_doc Cvc.Term.mkGt]
+abbrev gt := @mkGt
+
+
+
+@[inherit_doc Cvc.Term.mkAddN]
+def mkAddN [ArithLike α] (terms : Array (Term α)) : ManagerM (Term α) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkAddN terms
+@[inherit_doc Cvc.Term.mkAdd]
+abbrev mkAdd [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
+  ofUnsafe <$> a.toUnsafe.add b.toUnsafe
+@[inherit_doc Cvc.Term.mkAdd]
+abbrev add := @mkAdd
+
+@[inherit_doc Cvc.Term.mkMultN]
+def mkMultN [ArithLike α] (terms : Array (Term α)) : ManagerM (Term α) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkMultN terms
+@[inherit_doc Cvc.Term.mkMult]
+abbrev mkMult [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
+  ofUnsafe <$> a.toUnsafe.mult b.toUnsafe
+@[inherit_doc Cvc.Term.mkMult]
+abbrev mult := @mkMult
+
+@[inherit_doc Cvc.Term.mkSubN]
+def mkSubN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
+  let terms! := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkSubN terms! (by simp [terms!, valid])
+@[inherit_doc Cvc.Term.mkSub]
+def mkSub (self that : Term Bool) : ManagerM (Term Bool) :=
+  ofUnsafe <$> self.toUnsafe.sub that.toUnsafe
+@[inherit_doc Cvc.Term.mkSub]
+abbrev sub := mkSub
+
+@[inherit_doc Cvc.Term.mkNeg]
+def mkNeg (self : Term α) : ManagerM (Term α) :=
+  ofUnsafe <$> self.toUnsafe.neg
+@[inherit_doc Cvc.Term.mkNeg]
+abbrev neg := @mkNeg
+
+
+
+/-- Converts a real term to an integer one via the floor function. -/
+def toInt (term : Term Rat) : ManagerM (Term Int) :=
+  ofUnsafe <$> term.toUnsafe.toInt
+
+/-- Converts an integer term to a real one. -/
+def toReal (term : Term Rat) : ManagerM (Term Int) :=
+  ofUnsafe <$> term.toUnsafe.toReal
 
 end Term
 
@@ -435,6 +584,9 @@ protected def run! := @SmtT.run!
 
 
 
+def setOption (option value : String) : SmtM PUnit := do
+  Cvc.Smt.setOption option value
+
 @[inherit_doc Cvc.Smt.declareFun]
 def declareFun [Monad m] (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtT m (Term α) := do
   let a ← A.toSrt
@@ -458,15 +610,21 @@ private ofSmt ::
 
 protected abbrev SatT (m : Type → Type u) := ExceptT Error (StateT Smt.Sat m)
 
-def Sat.unexpected [Monad m] : Smt.SatT m α :=
-  .userError "unexpected sat result" |> throw
-
 protected abbrev SatM := Smt.SatT Id
 
-instance Sat.monadLiftSatM [Monad m] : MonadLift Smt.SatM (Smt.SatT m) where
+namespace Sat
+def unexpected [Monad m] : Smt.SatT m α :=
+  .userError "unexpected sat result" |> throw
+
+instance monadLiftSatM [Monad m] : MonadLift Smt.SatM (Smt.SatT m) where
   monadLift code sat :=
     return code sat
 
+instance monadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (Smt.SatT m) where
+  monadLift code sat := do
+    let (res, smt) ← (code : SmtT m _) sat.toSmt
+    return (res, ofSmt smt)
+end Sat
 
 
 protected structure Unsat where
@@ -475,14 +633,21 @@ private ofSmt ::
 
 protected abbrev UnsatT (m : Type → Type u) := ExceptT Error (StateT Smt.Unsat m)
 
-def Unsat.unexpected [Monad m] : Smt.UnsatT m α :=
-  .userError "unexpected unsat result" |> throw
-
 protected abbrev UnsatM := Smt.UnsatT Id
 
-instance Unsat.monadLiftUnsatM [Monad m] : MonadLift Smt.UnsatM (Smt.UnsatT m) where
+namespace Unsat
+def unexpected [Monad m] : Smt.UnsatT m α :=
+  .userError "unexpected unsat result" |> throw
+
+instance monadLiftUnsatM [Monad m] : MonadLift Smt.UnsatM (Smt.UnsatT m) where
   monadLift code sat :=
     return code sat
+
+instance monadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (Smt.UnsatT m) where
+  monadLift code unsat := do
+    let (res, smt) ← (code : SmtT m _) unsat.toSmt
+    return (res, ofSmt smt)
+end Unsat
 
 
 
@@ -492,14 +657,21 @@ private ofSmt ::
 
 protected abbrev UnknownT (m : Type → Type u) := ExceptT Error (StateT Smt.Unknown m)
 
-def Unknown.unexpected [Monad m] : Smt.UnknownT m α :=
-  .userError "could not decide (un)satisfiability" |> throw
-
 protected abbrev UnknownM := Smt.UnknownT Id
 
-instance Unknown.monadLiftUnknownM [Monad m] : MonadLift Smt.UnknownM (Smt.UnknownT m) where
+namespace Unknown
+def unexpected [Monad m] : Smt.UnknownT m α :=
+  .userError "could not decide (un)satisfiability" |> throw
+
+instance monadLiftUnknownM [Monad m] : MonadLift Smt.UnknownM (Smt.UnknownT m) where
   monadLift code sat :=
     return code sat
+
+instance monadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (Smt.UnknownT m) where
+  monadLift code unknown := do
+    let (res, smt) ← (code : SmtT m _) unknown.toSmt
+    return (res, ofSmt smt)
+end Unknown
 
 
 
@@ -534,7 +706,7 @@ def checkSat
 /-! ### Sat-specific commands -/
 
 @[inherit_doc Cvc.Smt.getValue]
-def getValue {α : Type} [I : Cvc.ValueOfTerm α]
+def getValue {α : Type} [I : ValueOfSafeTerm α]
   (term : Term α)
 : Smt.SatM α := fun smt =>
   let (res, smt!) := Cvc.Smt.getValue term.toUnsafe smt.toSmt.toUnsafe

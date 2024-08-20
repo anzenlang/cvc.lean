@@ -14,7 +14,7 @@ namespace Cvc.Term
 
 -- @[inherit_doc cvc5.Term.toString]
 protected def toString : Term → String :=
-  cvc5.Term.toString ∘ Term.toCvc5
+  cvc5.Term.toString ∘ toCvc5
 
 instance : ToString Term :=
   ⟨Term.toString⟩
@@ -27,7 +27,7 @@ def getSrt (t : Term) : Srt :=
 variable [Monad m]
 
 protected def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm => do
-  let res := code tm.toCvc5 |> ULift.up
+  let res := code tm.toCvc5 |> ofCvc5
   return (.ok res, tm)
 
 protected def termLift?
@@ -57,7 +57,7 @@ instance : ToTerm Nat := ⟨mkInt ∘ Int.ofNat⟩
 
 @[inherit_doc cvc5.TermManager.mkTerm]
 def mk (kind : Kind) (children : Array Term := #[]) : ManagerM Term :=
-  Term.termLift? (cvc5.TermManager.mkTerm · kind (children.map ULift.down))
+  Term.termLift? (cvc5.TermManager.mkTerm · kind (children.map Term.toCvc5))
 
 -- @[inherit_doc cvc5.Proof.getResult]
 def ofProof : Proof → Term :=
@@ -87,6 +87,20 @@ def mkDistinct (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : Mana
 
 
 
+private def arraySizeSplit
+  (on0 : β) (on1 : α → β) (onMany : Array α → β)
+  (array : Array α)
+: β :=
+  if array.size = 0 then
+    on0
+  else if h : array.size = 1 then
+    array.get ⟨0, by simp [h]⟩
+    |> on1
+  else
+    onMany array
+
+
+
 /-- Boolean negation. -/
 def mkNot (term : Term) : ManagerM Term :=
   mk .NOT #[term]
@@ -94,10 +108,8 @@ def mkNot (term : Term) : ManagerM Term :=
 abbrev not := @mkNot
 
 /-- N-ary conjunction. -/
-def mkAndN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
-  let _ := valid
-  mk .AND terms
-
+def mkAndN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkBool true) (return ·) (mk .AND ·)
 /-- Binary conjunction. -/
 def mkAnd (lhs rhs : Term) : ManagerM Term :=
   mkAndN #[lhs, rhs]
@@ -108,16 +120,15 @@ abbrev and := @mkAnd
 def mkImpliesN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .IMPLIES terms
-
 /-- Binary implication. -/
 def mkImplies (lhs rhs : Term) : ManagerM Term :=
   mkImpliesN #[lhs, rhs]
+@[inherit_doc mkImplies]
+abbrev implies := mkImplies
 
 /-- N-ary disjunction. -/
-def mkOrN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
-  let _ := valid
-  mk .OR terms
-
+def mkOrN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkBool false) (return ·) (mk .OR ·)
 /-- Binary disjunction. -/
 def mkOr (lhs rhs : Term) : ManagerM Term :=
   mkOrN #[lhs, rhs]
@@ -128,7 +139,6 @@ abbrev or := @mkOr
 def mkXorN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .XOR terms
-
 /-- Binary exclusive disjunction. -/
 def mkXor (lhs rhs : Term) : ManagerM Term :=
   mkXorN #[lhs, rhs]
@@ -137,36 +147,90 @@ abbrev xor := @mkXor
 
 
 
-def mkAddN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
+/-- N-ary less-than-or-equal-to. -/
+def mkLeN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
-  mk .ADD terms
+  mk .LEQ terms
+/-- Binary less-than-or-equal-to. -/
+def mkLe (lhs rhs : Term) : ManagerM Term :=
+  mkLeN #[lhs, rhs]
+@[inherit_doc mkLe]
+abbrev le := mkLe
 
+/-- N-ary less-than. -/
+def mkLtN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
+  let _ := valid
+  mk .LT terms
+/-- Binary less-than. -/
+def mkLt (lhs rhs : Term) : ManagerM Term :=
+  mkLtN #[lhs, rhs]
+@[inherit_doc mkLt]
+abbrev lt := mkLt
+
+/-- N-ary greater-than-or-equal-to. -/
+def mkGeN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
+  let _ := valid
+  mk .GEQ terms
+/-- Binary greater-than-or-equal-to. -/
+def mkGe (lhs rhs : Term) : ManagerM Term :=
+  mkGeN #[lhs, rhs]
+@[inherit_doc mkGe]
+abbrev ge := mkGe
+
+/-- N-ary greater-than. -/
+def mkGtN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
+  let _ := valid
+  mk .GT terms
+/-- Binary greater-than. -/
+def mkGt (lhs rhs : Term) : ManagerM Term :=
+  mkGtN #[lhs, rhs]
+@[inherit_doc mkGt]
+abbrev gt := mkGt
+
+
+
+/-- N-ary addition. -/
+def mkAddN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 0) (return ·) (mk .ADD ·)
+/-- Binary addition. -/
 def mkAdd (lhs rhs : Term) : ManagerM Term :=
   mkAddN #[lhs, rhs]
-/-- Alias for `mkAdd`. -/
+@[inherit_doc mkAdd]
 abbrev add := @mkAdd
 
-def mkMultN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
-  let _ := valid
-  mk .MULT terms
-
+/-- N-ary multiplication. -/
+def mkMultN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .MULT ·)
+/-- Binary multiplication. -/
 def mkMult (lhs rhs : Term) : ManagerM Term :=
   mkMultN #[lhs, rhs]
-/-- Alias for `mkMult`. -/
+@[inherit_doc mkMult]
 abbrev mult := @mkMult
 
+/-- N-ary subtraction. -/
 def mkSubN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .SUB terms
-
+/-- Binary subtraction. -/
 def mkSub (lhs rhs : Term) : ManagerM Term :=
   mkSubN #[lhs, rhs]
-/-- Alias for `mkSub`. -/
+@[inherit_doc mkSub]
 abbrev sub := @mkSub
 
+/-- Arithmetic negation. -/
 def mkNeg (term : Term) : ManagerM Term :=
   mk .NEG #[term]
-/-- Alias for `mkNeg`. -/
+@[inherit_doc mkNeg]
 abbrev neg := @mkNeg
+
+
+
+/-- Converts a integer/real term to an integer via the floor function. -/
+def toInt (term : Term) : ManagerM Term :=
+  mk .TO_INTEGER #[term]
+
+/-- Converts a integer/real term to a real. -/
+def toReal (term : Term) : ManagerM Term :=
+  mk .TO_REAL #[term]
 
 end Term

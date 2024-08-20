@@ -12,12 +12,6 @@ import Cvc.Basic.Defs
 /-! # Sort -/
 namespace Cvc.Srt
 
-def ofCvc5 : cvc5.Sort → Srt :=
-  ULift.up
-
-def toCvc5 : Srt → cvc5.Sort :=
-  ULift.down
-
 protected def toString : Srt → String :=
   cvc5.Sort.toString ∘ toCvc5
 

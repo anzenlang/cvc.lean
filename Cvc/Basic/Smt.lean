@@ -49,23 +49,23 @@ def setLogic (logic : Logic) : SmtM Unit :=
 
 @[inherit_doc Solver.declareFun]
 def declareFun' (symbol : String) (sorts : Array Srt) (codomain : Srt) : SmtM Term :=
-  ULift.up <$> Solver.declareFun symbol (sorts.map ULift.down) codomain.down false (m := Id)
+  Term.ofCvc5 <$> Solver.declareFun symbol (sorts.map Srt.toCvc5) codomain.toCvc5 false (m := Id)
 
 @[inherit_doc Solver.declareFun]
 def declareFun (symbol : String) (α : Type) [A : ToSrt α] : SmtM Term := do
   let a ← A.srt
   let (domain, codomain) ← a.cvc5Signature
-  ULift.up <$> Solver.declareFun symbol domain codomain false (m := Id)
+  Term.ofCvc5 <$> Solver.declareFun symbol domain codomain false (m := Id)
 
 @[inherit_doc Solver.declareSort]
 def declareSort (symbol : String) (arity : Nat) : SmtM Srt :=
-  ULift.up <$> Solver.declareSort symbol arity false (m := Id)
+  Srt.ofCvc5 <$> Solver.declareSort symbol arity false (m := Id)
 
 /-! ### Assert-like -/
 
 @[inherit_doc Solver.assertFormula]
 def assert (formula : Term) : SmtM Unit :=
-  Solver.assertFormula (m := Id) formula.down
+  Solver.assertFormula (m := Id) formula.toCvc5
 
 /-! ### Check-sat-like -/
 
