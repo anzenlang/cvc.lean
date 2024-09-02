@@ -44,8 +44,20 @@ def setOption (key val : String) : SmtM Unit :=
 def setLogic (logic : Logic) : SmtM Unit :=
   Solver.setLogic (m := Id) logic.toSmtLib
 
-/-! ### Declare/define -/
+/-! ### Simplify, interpolants, QE -/
 
+@[inherit_doc Solver.getInterpolant?]
+def getInterpolant? (term : Term) : SmtM (Option Term) := do
+  if let some term! ← Solver.getInterpolant? (m := Id) term.toCvc5 then
+    return Term.ofCvc5 term!
+  else
+    return none
+
+@[inherit_doc Solver.getQuantifierElimination]
+def getQuantifierElimination (q : Term) : SmtM Term :=
+  Term.ofCvc5 <$> Solver.getQuantifierElimination (m := Id) q.toCvc5
+
+/-! ### Declare/define -/
 
 @[inherit_doc Solver.declareFun]
 def declareFun' (symbol : String) (sorts : Array Srt) (codomain : Srt) : SmtM Term :=

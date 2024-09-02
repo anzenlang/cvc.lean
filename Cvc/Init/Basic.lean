@@ -28,13 +28,15 @@ namespace Error
 
 def toCvc5 : Error → cvc5.Error
 | .internal "a value is missing" => .missingValue
-| .internal msg => .userError msg
-| .userError msg => .userError msg
+| .internal msg => .error msg
+| .userError msg => .error msg
 
 def ofCvc5 : cvc5.Error → Error
 | .missingValue => .internal "a value is missing"
-| .cvc5Error msg => .internal msg
-| .userError msg => .userError msg
+| .error msg => .userError s!"user error: {msg}"
+| .option msg => .userError s!"option error: {msg}"
+| .unsupported msg => .userError s!"unsupported: {msg}"
+| .recoverable msg => .userError s!"recoverable: {msg}"
 
 instance : Coe cvc5.Error Error := ⟨ofCvc5⟩
 

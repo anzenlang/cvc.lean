@@ -14,7 +14,7 @@ package cvc {
 }
 
 require cvc5 from
-  git "https://github.com/anzenlang/lean-cvc5" @ "exception_handling"
+  git "https://github.com/anzenlang/lean-cvc5" @ "dry_defs_macro"
 
 @[default_target]
 lean_lib Cvc {}

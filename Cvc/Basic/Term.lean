@@ -9,8 +9,19 @@ import Cvc.Basic.Srt
 
 
 
+namespace Cvc
+
+
+
+/-- A bound variable. -/
+structure BVar where
+private ofTerm ::
+  toTerm : Term
+
+
+
 /-! # Terms -/
-namespace Cvc.Term
+namespace Term
 
 -- @[inherit_doc cvc5.Term.toString]
 protected def toString : Term → String :=
@@ -19,33 +30,43 @@ protected def toString : Term → String :=
 instance : ToString Term :=
   ⟨Term.toString⟩
 
+/-- Yields the sort of a term. -/
 def getSrt (t : Term) : Srt :=
   Srt.ofCvc5 t.toCvc5.getSort
+
+@[inherit_doc cvc5.Term.substitute]
+def substitute (term : Term) (substs : Array (Term × Term)) : Term.ManagerM Term :=
+  let substs := substs.map fun (t, r) => (t.toCvc5, r.toCvc5)
+  Term.ofCvc5 <$> term.toCvc5.substitute substs
 
 /-! ### Constructors from `cvc5` -/
 
 variable [Monad m]
 
-protected def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm => do
+protected def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm =>
   let res := code tm.toCvc5 |> ofCvc5
   return (.ok res, tm)
 
 protected def termLift?
   (code : cvc5.TermManager → Except cvc5.Error cvc5.Term)
-: Term.ManagerM Term := fun tm => do
+: Term.ManagerM Term := fun tm =>
   match code tm.toCvc5 with
   | .ok res => return (.ok (Term.ofCvc5 res), tm)
   | .error e => return (.error (Error.ofCvc5 e), tm)
 
--- @[inherit_doc cvc5.TermManager.mkBoolean]
+@[inherit_doc cvc5.TermManager.mkVar]
+def mkBVar (name : String) (srt : Srt) : ManagerM BVar :=
+  BVar.ofTerm <$> Term.termLift (cvc5.TermManager.mkVar · srt.toCvc5 name)
+
+@[inherit_doc cvc5.TermManager.mkBoolean]
 def mkBool (b : Bool) : ManagerM Term :=
-  Term.termLift? (cvc5.TermManager.mkBoolean · b)
+  Term.termLift (cvc5.TermManager.mkBoolean · b)
 
 instance : ToTerm Bool := ⟨mkBool⟩
 instance : ValueOfTerm Bool where
   valueOfTerm t := t.toCvc5.getBooleanValue
 
--- @[inherit_doc cvc5.TermManager.mkInteger]
+@[inherit_doc cvc5.TermManager.mkInteger]
 def mkInt (i : Int) : ManagerM Term :=
   Term.termLift? (cvc5.TermManager.mkInteger · i)
 
@@ -66,6 +87,22 @@ def ofProof : Proof → Term :=
 
 
 /-! ### Convenience term constructors -/
+
+
+
+/-- Creates a cvc5 term corresponding to a list of bound variables. -/
+def mkBVarList (bvars : Array BVar) : ManagerM Term :=
+  bvars.map BVar.toTerm |> mk .VARIABLE_LIST
+
+/-- Existentially quantified formula. -/
+def mkExists (bvars : Array BVar) (t : Term) : ManagerM Term :=
+  mkBVarList bvars >>= (mk .EXISTS #[·, t])
+
+/-- Universally quantifier formula. -/
+def mkForall (bvars : Array BVar) (t : Term) : ManagerM Term :=
+  mkBVarList bvars >>= (mk .FORALL #[·, t])
+
+
 
 /-- If-then-else, `cnd : Bool` and `thn els : α`. -/
 def mkIte (cnd thn els : Term) : ManagerM Term :=
@@ -233,4 +270,8 @@ def toInt (term : Term) : ManagerM Term :=
 def toReal (term : Term) : ManagerM Term :=
   mk .TO_REAL #[term]
 
-end Term
+
+
+@[inherit_doc cvc5.Solver.simplify]
+def simplify (term : Term) : SmtM Term :=
+  Term.ofCvc5 <$> cvc5.Solver.simplify (m := Id) term.toCvc5

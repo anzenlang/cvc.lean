@@ -29,6 +29,51 @@ structure Term (α : Type) where
 private ofUnsafe ::
   toUnsafe : Cvc.Term
 
+namespace Term
+def untype (t : Term α) : (β : Type) × Term β :=
+  ⟨α, t⟩
+end Term
+
+/-- A bound variable. -/
+structure BVar (α : Type) where
+private ofUnsafe ::
+  toUnsafe : Cvc.BVar
+
+namespace BVar
+-- def untype (bv : BVar α) : (β : Type) × BVar β :=
+--   ⟨α, bv⟩
+def toTerm! (bv : BVar α) : Cvc.Term :=
+  bv.toUnsafe.toTerm
+def toTerm (bv : BVar α) : Term α :=
+  Term.ofUnsafe bv.toTerm!
+end BVar
+
+
+-- /-- A list of bound variables. -/
+-- def BVars := Array ((α : Type) × BVar α)
+
+-- namespace BVars
+-- def push (self : BVars) (bv : BVar α) : BVars :=
+--   Array.push self bv.untype
+
+-- def toUnsafe (self : BVars) : Array Cvc.BVar :=
+--   self.map fun ⟨_, bv⟩ => bv.toUnsafe
+-- end BVars
+
+
+/-- A list of bound variables. -/
+structure BVars where
+private ofUnsafe ::
+  toUnsafe : Array Cvc.BVar
+
+namespace BVars
+def empty : BVars where
+  toUnsafe := #[]
+
+def push (self : BVars) (bv : BVar α) : BVars :=
+  {self with toUnsafe := self.toUnsafe.push bv.toUnsafe}
+end BVars
+
 
 
 /-! ## Term Manager -/
@@ -241,8 +286,21 @@ private def ofCvc5 [ToSafeSrt α] : cvc5.Term → Term α :=
 
 
 
+@[inherit_doc Cvc.Term.getSrt]
 def getSrt (self : Term α) : Srt α :=
   Srt.ofUnsafe self.toUnsafe.getSrt
+
+@[inherit_doc Cvc.Term.simplify]
+def simplify (term : Term α) : SmtM (Term α) :=
+  Term.ofUnsafe <$> Cvc.Term.simplify term.toUnsafe
+
+@[inherit_doc Cvc.Term.substitute]
+def substitute
+  [ToSafeSrt α]
+  (term : Term α) (substs : Array ((β : Type) × Term β × Term β))
+: Term.ManagerM (Term α) := do
+  let substs := substs.map fun ⟨_, t, r⟩ => (t.toCvc5, r.toCvc5)
+  Term.ofCvc5 <$> term.toCvc5.substitute substs
 
 
 
@@ -289,6 +347,10 @@ def of {α : Type} {β : outParam Type} [I : HToSafeTerm α β] (a : α) : Manag
 
 
 
+def mkBVar (name : String) (α : Type) [A : ToSafeSrt α] : ManagerM (BVar α) := do
+  let srt ← A.toSrt.toUnsafe
+  BVar.ofUnsafe <$> Cvc.Term.mkBVar name srt.toUnsafe
+
 def mkBool (b : Bool) : ManagerM (Term Bool) :=
   ofUnsafe <$> Cvc.Term.mkBool b
 
@@ -313,6 +375,22 @@ instance : ValueOfSafeTerm Int where
 
 
 /-! ### Convenience term constructors -/
+
+
+
+@[inherit_doc Cvc.Term.mkBVarList]
+private def mkBVarList (bvars : BVars) : ManagerM Cvc.Term :=
+  Cvc.Term.mkBVarList bvars.toUnsafe
+
+@[inherit_doc Cvc.Term.mkExists]
+def mkExists (bvars : BVars) (t : Term Bool) : ManagerM (Term Bool) :=
+  Term.ofUnsafe <$> Cvc.Term.mkExists bvars.toUnsafe t.toUnsafe
+
+@[inherit_doc Cvc.Term.mkForall]
+def mkForall (bvars : BVars) (t : Term Bool) : ManagerM (Term Bool) :=
+  Term.ofUnsafe <$> Cvc.Term.mkForall bvars.toUnsafe t.toUnsafe
+
+
 
 @[inherit_doc Cvc.Term.mkIte]
 def mkIte (cnd : Term Bool) (thn els : Term α) : ManagerM (Term α) :=
@@ -596,6 +674,13 @@ def declareFun [Monad m] (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtT
 @[inherit_doc declareFun]
 abbrev declare := @declareFun
 
+@[inherit_doc Cvc.Smt.getInterpolant?]
+def getInterpolant? (term : Term Bool) : SmtM (Option (Term Bool)) := do
+  Option.map Term.ofUnsafe <$> Cvc.Smt.getInterpolant? term.toUnsafe
+
+@[inherit_doc Cvc.Smt.getQuantifierElimination]
+def getQuantifierElimination (q : Term Bool) : SmtM (Term Bool) := do
+  Term.ofUnsafe <$> Cvc.Smt.getQuantifierElimination q.toUnsafe
 
 
 @[inherit_doc Cvc.Smt.checkSat?]
