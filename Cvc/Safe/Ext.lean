@@ -61,6 +61,7 @@ macro_rules
 | `(smt! $n:ident) => `(pure $n)
 | `(smt! $n:name) => `(pure $n)
 | `(smt! $n:num) => `(Cvc.Safe.Term.mkInt $n)
+| `(smt! - $n:num) => `(Cvc.Safe.Term.mkInt (- $n))
 
 | `(smt! $lft → $rgt) =>
   `( (do (← smt! $lft).implies (← smt! $rgt)) )
@@ -99,7 +100,7 @@ macro_rules
 --   `( (do (← smt! $lft).ge (← smt! $rgt)) )
 | `(smt! $lft + $rgt) =>
   `( (do (← smt! $lft).add (← smt! $rgt)) )
-| `(smt! $lft - $rgt) =>
-  `( (do (← smt! $lft).sub (← smt! $rgt)) )
 | `(smt! - $t) =>
   `( (do (← smt! $t).neg) )
+| `(smt! $lft - $rgt) =>
+  `( (do (← smt! $lft).sub (← smt! $rgt)) )

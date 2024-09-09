@@ -33,7 +33,7 @@ def toCvc5 : Error → cvc5.Error
 
 def ofCvc5 : cvc5.Error → Error
 | .missingValue => .internal "a value is missing"
-| .error msg => .userError s!"user error: {msg}"
+| .error msg => .userError s!"{msg}"
 | .option msg => .userError s!"option error: {msg}"
 | .unsupported msg => .userError s!"unsupported: {msg}"
 | .recoverable msg => .userError s!"recoverable: {msg}"

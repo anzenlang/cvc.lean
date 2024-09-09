@@ -86,7 +86,7 @@ private ofUnsafe ::
 
 /-- Term manager state constructor. -/
 def Manager.mk : BaseIO Manager :=
-  (Manager.ofUnsafe ∘ ULift.up) <$> Cvc.Term.Manager.mk
+  Manager.ofUnsafe <$> Cvc.Term.Manager.mk
 
 /-- Term manager error/state monad transformer. -/
 abbrev ManagerT (m : Type → Type) :=
@@ -119,6 +119,10 @@ private instance [Monad m] : MonadLift Cvc.Term.ManagerM (ManagerT m) where
   monadLift code tm := do
     let (res, tm!) := code tm.toUnsafe
     return (res, Manager.ofUnsafe tm!)
+
+instance [Monad m] : Inhabited (ManagerT m α) where
+  default tm := do
+    return (.error (.internal "default value should never be used"), tm)
 
 /-- `Manager` error/state-monad wrapped in `IO`. -/
 abbrev ManagerIO :=
@@ -436,7 +440,7 @@ abbrev and := mkAnd
 
 @[inherit_doc Cvc.Term.mkImpliesN]
 def mkImpliesN
-  (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp)
+  (terms : Array (Term Bool)) (valid : 2 ≤ terms.size := by simp)
 : ManagerM (Term Bool) :=
   let terms! := terms.map toUnsafe
   ofUnsafe <$> Cvc.Term.mkImpliesN terms! (by simp [terms!, valid])
@@ -457,7 +461,7 @@ def mkOr (self that : Term Bool) : ManagerM (Term Bool) :=
 abbrev or := mkOr
 
 @[inherit_doc Cvc.Term.mkXorN]
-def mkXorN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
+def mkXorN (terms : Array (Term Bool)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
   let terms! := terms.map toUnsafe
   ofUnsafe <$> Cvc.Term.mkXorN terms! (by simp [terms!, valid])
 @[inherit_doc Cvc.Term.mkXor]
@@ -544,14 +548,14 @@ abbrev mkMult [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
 abbrev mult := @mkMult
 
 @[inherit_doc Cvc.Term.mkSubN]
-def mkSubN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
+def mkSubN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term α) :=
   let terms! := terms.map toUnsafe
   ofUnsafe <$> Cvc.Term.mkSubN terms! (by simp [terms!, valid])
 @[inherit_doc Cvc.Term.mkSub]
-def mkSub (self that : Term Bool) : ManagerM (Term Bool) :=
+def mkSub (self that : Term α) : ManagerM (Term α) :=
   ofUnsafe <$> self.toUnsafe.sub that.toUnsafe
 @[inherit_doc Cvc.Term.mkSub]
-abbrev sub := mkSub
+abbrev sub := @mkSub
 
 @[inherit_doc Cvc.Term.mkNeg]
 def mkNeg (self : Term α) : ManagerM (Term α) :=

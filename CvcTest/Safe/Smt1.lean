@@ -24,7 +24,8 @@ has type
 but is expected to have type
   Term Bool : Type
 ---
-error: cannot evaluate code because '_eval._lambda_4' uses 'sorry' and/or contains errors
+error: cannot evaluate expression that depends on the `sorry` axiom.
+Use `#eval!` to evaluate nevertheless (which may cause lean to crash).
 -/
 #test do
   setLogic Logic.qf_lia.uf

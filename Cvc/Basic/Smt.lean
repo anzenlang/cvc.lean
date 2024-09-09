@@ -109,6 +109,11 @@ def getValues (terms : Array Term) : SmtM (Array Term) := do
   let values ← Solver.getValues (terms.map Term.toCvc5) (m := Id)
   return values.map Term.ofCvc5
 
+@[inherit_doc Solver.getModelDomainElements]
+def getModelDomainElements (srt : Srt) : SmtM (Array Term) := do
+  let values ← Solver.getModelDomainElements srt.toCvc5 (m := Id)
+  return values.map Term.ofCvc5
+
 /-! ### Unsat mode commands -/
 
 @[inherit_doc Solver.getProof]

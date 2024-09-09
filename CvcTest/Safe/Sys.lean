@@ -17,11 +17,6 @@ open Smt
 /-! ## Code for a simple induction-check library  -/
 namespace Sys
 
--- structure SVar (F : Type → Type) (α : Type) where
--- mkRaw ::
---   val : F α
---   instValueOfSafeTerm : ValueOfSafeTerm α
-
 structure SVar (F : Type → Type) (α : Type)
 extends ValueOfSafeTerm α where
 mkRaw ::
@@ -29,13 +24,19 @@ mkRaw ::
 
 namespace SVar
 
+def Untyped (F : Type → Type) : Type 1 :=
+  (α : Type) × SVar F α
+
+def untype (self : SVar F α) : Untyped F :=
+  ⟨_, self⟩
+
 protected abbrev Decl := SVar (fun _ => String)
 protected abbrev Term := SVar Term
 protected abbrev BVar := SVar BVar
 protected abbrev Value := SVar id
 
-instance {self : SVar F α} : ValueOfSafeTerm α :=
-  self.toValueOfSafeTerm
+instance : Coe (SVar F α) (F α) where
+  coe svar := svar.val
 
 def mk [I : ValueOfSafeTerm α] (val : F α) : SVar F α :=
   ⟨I, val⟩
@@ -53,10 +54,10 @@ def mkDecl' (α : Type) [ValueOfSafeTerm α] (name : String) : SVar.Decl α :=
   mkDecl name
 
 protected def I (self : SVar F α) : ValueOfSafeTerm α :=
-  self.instValueOfSafeTerm
+  self.toValueOfSafeTerm
 
 def mapM [Monad m] {F F' : Type → Type} (self : SVar F α) (f : F α → m (F' α)) : m (SVar F' α) := do
-  let val ← f self.val
+  let val ← f self
   return mk'' self.I val
 
 def map : SVar F α → (F α → F' α) → SVar F' α :=
@@ -86,13 +87,15 @@ class SVars (S : (Type → Type) → Type) where
   allDoM {m : Type → Type} [Monad m] :
     S F1 → (f : {α : Type} → [ValueOfSafeTerm α] → F1 α → m (F2 α)) → m (S F2)
   forIn {m : Type → Type} {β : Type} [Monad m] :
-    S F → β → ((α : Type) → [ValueOfSafeTerm α] → F α → β → m (ForInStep β)) → m β
+    S F → β → (SVar.Untyped F → β → m (ForInStep β)) → m β
 
 namespace SVars
 
-instance instForIn [SVars S] : ForIn m (S F) ((α : Type) × ValueOfSafeTerm α × F α) where
-  forIn svars init f :=
-    SVars.forIn svars init fun α inst val => f ⟨α, inst, val⟩
+instance instForIn [SVars S] : ForIn m (S F) (SVar.Untyped F) :=
+  ⟨SVars.forIn⟩
+
+abbrev Untyped (F : Type → Type) : Type 1 :=
+  Array (SVar.Untyped F)
 
 abbrev Model S [SVars S] := S Id
 abbrev Model' S [SVars S] := Model S

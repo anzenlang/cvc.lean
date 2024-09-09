@@ -12,44 +12,46 @@ import CvcTest.Safe.Sys
 
 namespace Cvc.Safe.Test
 
+open Sys (SVar SVars)
+
 namespace sw
 
 structure Vars (F : Type → Type) where
-  reset : Sys.SVar F Bool
-  startStop : Sys.SVar F Bool
-  counting : Sys.SVar F Bool
-  count : Sys.SVar F Int
+  reset : SVar F Bool
+  startStop : SVar F Bool
+  counting : SVar F Bool
+  count : SVar F Int
 
 namespace Vars
 variable (self : Vars F)
+
+def untype : SVars.Untyped F := #[
+  self.reset.untype,
+  self.startStop.untype,
+  self.counting.untype,
+  self.count.untype
+]
 
 def reset! := self.reset.val
 def startStop! := self.startStop.val
 def counting! := self.counting.val
 def count! := self.count.val
-end Vars
 
-instance mySVars.instSVars : Sys.SVars Vars where
+instance instSVars : SVars Vars where
   allDoM self f := do
     let reset ← self.reset.mapM f
     let startStop ← self.startStop.mapM f
     let counting ← self.counting.mapM f
     let count ← self.count.mapM f
     return ⟨reset, startStop, counting, count⟩
-  forIn self acc f :=
-    let array : Array ((α : Type) × ValueOfSafeTerm α × _) := #[
-      ⟨Bool, inferInstance, self.reset!⟩,
-      ⟨Bool, inferInstance, self.startStop!⟩,
-      ⟨Bool, inferInstance, self.counting!⟩,
-      ⟨Int, inferInstance, self.count!⟩
-    ]
-    ForIn.forIn array acc fun ⟨α, _, val⟩ acc => f α val acc
+  forIn self := self.untype.forIn
+end Vars
 
 def vars : Vars (fun _ => String) where
-  reset := Sys.SVar.mk "reset"
-  startStop := Sys.SVar.mk "startStop"
-  counting := Sys.SVar.mk "counting"
-  count := Sys.SVar.mk "count"
+  reset := SVar.mk "reset"
+  startStop := SVar.mk "startStop"
+  counting := SVar.mk "counting"
+  count := SVar.mk "count"
 
 def init : Sys.Pred Vars := smt! state =>
   (state.count! = 0) ∧ (state.counting! = state.startStop!)

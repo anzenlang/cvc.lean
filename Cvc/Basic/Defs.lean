@@ -63,7 +63,9 @@ namespace Term
 def Manager : Type := ULift cvc5.TermManager
 
 namespace Manager
-def mk := cvc5.TermManager.new
+def mk : BaseIO Manager := do
+  let tm ← cvc5.TermManager.new
+  return ULift.up tm
 
 def ofCvc5 : cvc5.TermManager → Manager := ULift.up
 
@@ -85,6 +87,13 @@ instance [Monad m] : MonadLift (ManagerM) (ManagerT m) where
   monadLift code tm := do
     let (res, tm) := code tm
     return (res, tm)
+
+instance [Monad m] : MonadExcept Error (ManagerT m) where
+  throw e tm := return (.error e, tm)
+  tryCatch code errorDo tm := do
+    match ← code tm with
+    | (.ok a, tm) => return (.ok a, tm)
+    | (.error e, tm) => errorDo e tm
 
 instance : MonadLift (Except cvc5.Error) (ManagerM) where
   monadLift
@@ -131,6 +140,13 @@ instance instMonadLiftManagerT [Monad m] : MonadLift (Term.ManagerT m) (SmtT m) 
   monadLift code smt := do
     let (res, termManager) ← code smt.termManager
     return (res, {smt with termManager})
+
+instance instMonadExcept [Monad m] : MonadExcept Error (Term.ManagerT m) where
+  throw e smt := return (.error e, smt)
+  tryCatch code errorDo smt := do
+    match ← code smt with
+    | (.ok res, smt) => return (.ok res, smt)
+    | (.error e, smt) => errorDo e smt
 end SmtT
 
 
@@ -184,7 +200,7 @@ def run [MonadLiftT BaseIO m]
   (code : SmtT m α)
 : ExceptT Error m α := do
   let tm ← Term.Manager.mk
-  code.runWith (ULift.up tm)
+  code.runWith tm
 
 /-- Runs `SmtT` code, panics on errors by default. -/
 def run! [MonadLiftT BaseIO m] [Inhabited α]
