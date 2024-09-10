@@ -116,6 +116,8 @@ def mkEqN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM 
 /-- Equality between two terms -/
 def mkEq (lhs rhs : Term) : ManagerM Term :=
   mkEqN #[lhs, rhs]
+@[inherit_doc mkEq]
+protected abbrev eq := mkEq
 
 /-- Pairwise distinct. -/
 def mkDistinct (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
