@@ -17,6 +17,8 @@ mode.
 -/
 namespace Cvc.Safe
 
+export Cvc (Logic)
+
 
 
 /-- A cvc sort corresponding to a lean type. -/
