@@ -6,39 +6,39 @@ namespace Cvc.Safe.Test.Minimize
 
 
 
-abbrev ITerm := Term Int
+abbrev IntTerm := Term Int
 
 /-- Instantiated by user-defined variable-list-like structures. -/
-class Vars (S : Type → Type) where
-  /-- Apply some monadic treatment to whatever `S` stores. -/
-  mapM [Monad m] {α β : Type} (self : S α) (f : α → m β) : m (S β)
+class Vars (V : Type → Type) where
+  /-- Apply some monadic treatment to whatever `V` stores. -/
+  mapM [Monad m] {α β : Type} (self : V α) (f : α → m β) : m (V β)
 
 namespace Vars
-variable [I : Vars S]
+variable [I : Vars V]
 
 /-- Turns strings into declared (variable) `Term`s. -/
-def declare (vars : S String) : SmtM (S ITerm) := do
+def declare (vars : V String) : SmtM (V IntTerm) := do
   I.mapM vars (Smt.declareFun · Int)
 
 /-- Turns `Term`s into value, assuming a *satisfiable* context. -/
-def getModel (terms : S ITerm) : Smt.SatM (S Int) := do
+def getModel (terms : V IntTerm) : Smt.SatM (V Int) := do
   I.mapM terms Smt.getValue
 end Vars
 
 /-- Given custom variables as `Term`s, produces a `Term` of type `α`. -/
-abbrev Fun (S : Type → Type) (α : Type) := S ITerm → Term.ManagerM (Term α)
+abbrev Fun (V : Type → Type) (α : Type) := V IntTerm → Term.ManagerM (Term α)
 
-/-- Same as `Fun S Bool`. -/
-abbrev Pred S := Fun S Bool
+/-- Same as `Fun V Bool`. -/
+abbrev Pred V := Fun V Bool
 
 
 
 
 open Smt in
-def findModelWith? [Monad m] [Vars S]
-  (vars : S String)
-  (constraints : Array (Pred S))
-  (ifSat : S ITerm → S Int → Smt.SatT m α)
+def findModelWith? [Monad m] [Vars V]
+  (vars : V String)
+  (constraints : Array (Pred V))
+  (ifSat : V IntTerm → V Int → Smt.SatT m α)
 : SmtT m (Option α) := do
   setLogic Logic.qf_lia
   setOption "produce-models" "true"
@@ -55,9 +55,9 @@ def findModelWith? [Monad m] [Vars S]
       ifSat varTerms model)
     (ifUnsat := return none)
 
-def findModel? [Monad m] [Vars S]
-  (vars : S String) (constraints : Array (Pred S))
-: SmtT m (Option (S Int)) :=
+def findModel? [Monad m] [Vars V]
+  (vars : V String) (constraints : Array (Pred V))
+: SmtT m (Option (V Int)) :=
   findModelWith? vars constraints fun _ model => return model
 
 
@@ -70,13 +70,13 @@ abbrev Minimized? (S : Type → Type) := Option (Int × S Int)
 **NB**: without proper `constraints`, this function may not terminate.
 -/
 partial def minimize
-  [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [Vars S]
-  (vars : S String)
-  (f : Fun S Int)
-  (constraints : Array (Pred S) := #[])
-  (res : Minimized? S := none)
+  [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [Vars V]
+  (vars : V String)
+  (f : Fun V Int)
+  (constraints : Array (Pred V) := #[])
+  (res : Minimized? V := none)
   (count : Nat := 0)
-: m (Minimized? S × Nat) := do
+: m (Minimized? V × Nat) := do
   let better? ←
     findModelWith? (m := m) vars constraints
       (fun terms model => do

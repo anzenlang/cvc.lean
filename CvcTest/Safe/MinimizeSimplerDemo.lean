@@ -8,25 +8,23 @@ namespace Cvc.Safe.Test.Minimize
 
 namespace Test1
 
-structure State (α : Type) where
+structure MyVars (α : Type) where
   n1 : α
   n2 : α
   n3 : α
 
-namespace State
-protected abbrev Decl := State String
-protected abbrev Terms := State ITerm
-protected abbrev Model := State Int
+namespace MyVars
 
-instance : Vars State where
+instance : Vars MyVars where
   mapM s f := do
     let n1 ← f s.n1
     let n2 ← f s.n2
     let n3 ← f s.n3
     return {n1, n2, n3}
-end State
 
-def vars : State.Decl := ⟨"n1", "n2", "n3"⟩
+end MyVars
+
+def vars : MyVars String := ⟨"n1", "n2", "n3"⟩
 
 /-- info:
 got a model:
@@ -35,7 +33,7 @@ got a model:
 - `n3 = 1`
 -/
 #test do
-  let preds : Array (Pred State) := #[
+  let preds : Array (Pred MyVars) := #[
     smt! terms => 0 < terms.n1,
     smt! terms => 0 < terms.n2,
     smt! terms => ((2*terms.n1) + (3*terms.n2)) = 7*terms.n3
@@ -58,12 +56,12 @@ minimum value is `-75` on
 - n3 = 5
 -/
 #guard_msgs in #eval do
-  let constraints : Array (Pred State) := #[
+  let constraints : Array (Pred MyVars) := #[
     smt! terms => ((-10) ≤ terms.n1) ∧ (terms.n1 ≤ 10),
     smt! terms => ((-10) ≤ terms.n2) ∧ (terms.n2 ≤ 10),
     smt! terms => ((-5) ≤ terms.n3) ∧ (terms.n3 ≤ 5)
   ]
-  let f : Fun State Int :=
+  let f : Fun MyVars Int :=
     smt! terms =>
       terms.n1 - (2 * terms.n2) + 3 * (terms.n3 - terms.n1)
   let minimized? ← minimize vars f constraints
