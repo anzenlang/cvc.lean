@@ -87,25 +87,26 @@ end Res
 
 def Dumb.checkSat
   (commands : Array String)
-  (_env : Array (Lean.Expr × String × Srt))
+  (env : Array (Lean.Expr × String × Srt))
 : Term.Manager → Except Error Res :=
   let script : SmtM Res := do
     Smt.setLogic Logic.all
     Smt.setOption "produce-models" "true"
-    let str := commands.foldl (init := "") fun str c => s!"{str}{c}\n"
+    let str :=
+      commands.foldl (init := "(set-option :fresh-declarations true)") fun str c => s!"{str}\n{c}"
+    let mut nuEnv := #[]
+    for (e, n, s) in env do
+      let var ← Smt.declareFun n s
+      nuEnv := nuEnv.push (e, var, n, s)
     Smt.parseSmtLib str
-    -- let mut nuEnv := #[]
-    -- for (e, n, s) in env do
-    --   let var ← Smt.declareFun n s
-    --   nuEnv := nuEnv.push (e, var, n, s)
     let res ← Smt.checkSat
     if res.isSat then
-      -- let mut model := #[]
-      -- for (expr, var, n, _srt) in nuEnv do
-      --   let val ← Smt.getValue var
-      --   model := model.push (expr, val, n)
-      -- return .sat model
-      return .sat #[]
+      let mut model := #[]
+      for (expr, var, n, _srt) in nuEnv do
+        let val ← Smt.getValue var
+        model := model.push (expr, val, n)
+      return .sat model
+      -- return .sat #[]
     else if res.isUnsat then
       return .unsat
     else if res.isUnknown then
@@ -163,8 +164,10 @@ def checkSat
   for (name, _) in _state.usedNames.toArray do
     let name :=
       if name.startsWith "_" then name else "_" ++ name
+    -- println! "working on `{name}`"
     match _state.l2hMap.find? name with
     | some (.term n) =>
+      -- println! "→ {n}"
       let (e, s) := sni.varVal[n]!
       if let (.ok (some s), _) := Srt.ofLamSort s tm then
         env := env.push (e, name, s)
@@ -281,7 +284,7 @@ unsafe def evalSat? : Tactic
     match res with
     | .unsat => logInfo "goal is **not** falsifiable ✅"
     | .sat model =>
-      let mut msg := "goal **is falsifiable**"
+      let mut msg := "goal seems falsifiable, **it might not be provable**"
       for (expr, valTerm, name) in model do
         let mut var := toString expr
         match expr with
@@ -299,7 +302,7 @@ unsafe def evalSat? : Tactic
             var := toString name
         | _ => pure ()
         msg := s!"{msg}\n- [{name}] {var} = {valTerm}"
-      throwError msg
+      logWarning msg
     | .unknown => throwError "failed to decide (un)satifiability"
   let messages ← Core.getMessageLog
   restoreState state

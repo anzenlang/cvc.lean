@@ -9,7 +9,7 @@ import CvcTest.Init
 
 namespace Cvc.Tactic.Test
 
-scoped syntax docComment ? "#test " command : command
+scoped syntax docComment ? ("#test " <|> "#test?") command : command
 
 macro_rules
 | `(command| $outputComment:docComment #test $cmd:command) => `(
@@ -19,5 +19,8 @@ macro_rules
 | `(command| #test $cmd:command) => `(
   /-- info: -/
   #test $cmd
+)
+| `(command| $[ $outputComment:docComment ]? #test? $cmd:command) => `(
+  $cmd:command
 )
 end Test
