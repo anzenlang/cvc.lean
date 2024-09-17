@@ -83,7 +83,7 @@ In what follows:
 - `V Int`: user's fields are `Int`-values, used for models.
 -/
 
-def declare [Vars V] (vars : V String) : SmtM (V (Term Int)) :=
+def declare [Vars V] (vars : V String) : SmtM (V IntTerm) :=
   Vars.mapM vars (Smt.declareFun · Int)
 
 def getModel [Vars V] (vars : V IntTerm) : Smt.SatM (V Int) :=

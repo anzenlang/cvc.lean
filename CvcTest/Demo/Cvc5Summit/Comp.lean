@@ -84,6 +84,7 @@ end
 
 
 section
+open Cvc (Logic)
 open Cvc.Safe
 
 open Smt in
@@ -119,34 +120,33 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 
 open Smt in
 def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
-  setLogic Cvc.Logic.qf_lia.uf
+  setLogic Logic.lia.qf.uf
   setOption "produce-models" "true"
 
   let n ← declareFun "n" Int
-  let f ← declareFun "f" (Int → Int → Bool)
-  let t ← smt! ((3 * n) = 6) ∧ ¬ (n ≤ 1) ∨ (f n 7)
+  let f ← declareFun "f" (Int → Bool)
+  let t ← smt! ((3 * n) = 6) ∧ ¬ (n ≤ 1) ∨ (f n)
 
   assert t
 
   checkSat
     (ifSat := do
       let nVal ← getValue n
-      let appVal ← getValue (← smt! f n 7)
+      let appVal ← getValue (← smt! f n)
       return (nVal, appVal))
 
 
 /-- info:
-n     = 2
-f n 7 = false
+n   = 2
+f n = false
 -/
 #guard_msgs in
 #eval do
   let res ← cvcSafeDemo'.run!
-    (handleError := fun e => do
+    fun e => do
       println! "error: {e}"
       return none
-    )
   if let some (nVal, appVal) := res then
-    println! "n     = {nVal}"
-    println! "f n 7 = {appVal}"
+    println! "n   = {nVal}"
+    println! "f n = {appVal}"
 end
