@@ -34,9 +34,9 @@ got a model:
 -/
 #test do
   let preds : Array (Pred MyVars) := #[
-    smt! terms => 0 < terms.n1,
-    smt! terms => 0 < terms.n2,
-    smt! terms => ((2*terms.n1) + (3*terms.n2)) = 7*terms.n3
+    smt! fun terms => 0 < terms.n1,
+    smt! fun terms => 0 < terms.n2,
+    smt! fun terms => ((2*terms.n1) + (3*terms.n2)) = 7*terms.n3
   ]
   if let some model ← findModel? vars preds then
     println! "got a model:"
@@ -57,12 +57,12 @@ minimum value is `-75` on
 -/
 #guard_msgs in #eval do
   let constraints : Array (Pred MyVars) := #[
-    smt! terms => ((-10) ≤ terms.n1) ∧ (terms.n1 ≤ 10),
-    smt! terms => ((-10) ≤ terms.n2) ∧ (terms.n2 ≤ 10),
-    smt! terms => ((-5) ≤ terms.n3) ∧ (terms.n3 ≤ 5)
+    smt! fun terms => ((-10) ≤ terms.n1) ∧ (terms.n1 ≤ 10),
+    smt! fun terms => ((-10) ≤ terms.n2) ∧ (terms.n2 ≤ 10),
+    smt! fun terms => ((-5) ≤ terms.n3) ∧ (terms.n3 ≤ 5)
   ]
   let f : Fun MyVars Int :=
-    smt! terms =>
+    smt! fun terms =>
       terms.n1 - (2 * terms.n2) + 3 * (terms.n3 - terms.n1)
   let minimized? ← minimize vars f constraints
   if let (some (val, model), count) := minimized? then

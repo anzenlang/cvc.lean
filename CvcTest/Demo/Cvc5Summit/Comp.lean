@@ -118,27 +118,35 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 
 
 open Smt in
-def cvcSafeDemo' : SmtT IO (Option Int) := do
-  setLogic .qf_lia
+def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
+  setLogic Cvc.Logic.qf_lia.uf
   setOption "produce-models" "true"
 
   let n ← declareFun "n" Int
-  let t ← smt! ((3 * n) = 6) ∧ ¬ (n ≤ 1)
+  let f ← declareFun "f" (Int → Int → Bool)
+  let t ← smt! ((3 * n) = 6) ∧ ¬ (n ≤ 1) ∨ (f n 7)
 
   assert t
 
   checkSat
     (ifSat := do
       let nVal ← getValue n
-      return nVal)
-    (ifUnsat := return none)
+      let appVal ← getValue (← smt! f n 7)
+      return (nVal, appVal))
 
 
-/-- info: 2 -/
+/-- info:
+n     = 2
+f n 7 = false
+-/
 #guard_msgs in
 #eval do
-  if let some nVal ← cvcSafeDemo'.run! then
-    return nVal
-  else
-    IO.throwServerError "expected sat result"
+  let res ← cvcSafeDemo'.run!
+    (handleError := fun e => do
+      println! "error: {e}"
+      return none
+    )
+  if let some (nVal, appVal) := res then
+    println! "n     = {nVal}"
+    println! "f n 7 = {appVal}"
 end

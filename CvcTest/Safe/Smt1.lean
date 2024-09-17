@@ -65,6 +65,8 @@ Use `#eval!` to evaluate nevertheless (which may cause lean to crash).
   let m ← declareFun "m" Int
   assertEq m.getSrt.toString "Int"
 
+  -- (partial) application works out of the box, but only for one argument
+  -- for more arguments see `smt!` below
   let fApp1 ← f n
   assertEq fApp1.toString "(@ f n)"
   assertEq fApp1.getSrt.toString "(-> Int Bool)"
@@ -88,5 +90,22 @@ Use `#eval!` to evaluate nevertheless (which may cause lean to crash).
 
   assert not_fApp2
 
-  let isSat? ← checkSat?
-  assertEq isSat? false
+  let isSat ←
+    checkSat
+      (ifSat := pure true)
+      (ifUnsat := pure false)
+  assertEq isSat false
+
+  -- using `smt!`
+
+  let fApp1' ← smt! f n
+  assertEq fApp1'.toString "(@ f n)"
+  let _ : Term (Int → Bool) := fApp1'
+
+  let fApp ← smt! f n m
+  assertEq fApp.toString "(f n m)"
+  let _ : Term Bool := fApp
+
+  let not_fApp ← smt! ¬ (f n m)
+  assertEq not_fApp.toString "(not (f n m))"
+  let _ : Term Bool := not_fApp

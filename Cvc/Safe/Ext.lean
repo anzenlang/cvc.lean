@@ -16,7 +16,7 @@ namespace Cvc.Safe
 declare_syntax_cat smterm
 
 
-syntax "[" term "]" : smterm
+syntax "[|" term "|]" : smterm
 syntax "![" term "]" : smterm
 
 syntax "(" smterm ")" : smterm
@@ -31,7 +31,7 @@ syntax smterm " ∨ " smterm : smterm
 syntax "¬ " smterm : smterm
 
 syntax "if " smterm " then " smterm " else " smterm : smterm
-syntax "let " ident " ← " smterm ppLine smterm : smterm
+syntax "let " ident " ← " smterm "; " ppLine smterm : smterm
 
 syntax smterm " = " smterm : smterm
 syntax smterm " ≠ " smterm : smterm
@@ -46,15 +46,21 @@ syntax smterm " + " smterm : smterm
 syntax smterm " - " smterm : smterm
 syntax "- " smterm : smterm
 
-syntax "smt! " smterm : term
-syntax "smt! " ident+ " => " smterm : term
+syntax:100 smterm:100 (colGt smterm:101) : smterm
+
+syntax "smt! " ppLine (colGt smterm) : term
+open Lean.Parser.Term in
+syntax "smt! " "fun" (ppSpace funBinder)+ optType " => " ppLine (colGt smterm) : term
 
 macro_rules
-| `(smt! $[ $i ]* => $t:smterm ) => `(
-  fun $[ $i ]* => smt! $t
+| `(smt! fun $binders $optTy => $t:smterm ) => `(
+  fun $binders $optTy => smt! $t
+)
+| `(smt! fun $binders => $t:smterm ) => `(
+  fun $binders => smt! $t
 )
 
-| `(smt! [ $t:term ]) => `((pure $t))
+| `(smt! [| $t:term |]) => `((pure $t))
 | `(smt! ![ $t:term ]) => `($t)
 | `(smt! ($t:smterm)) => `(smt! $t)
 
@@ -75,7 +81,7 @@ macro_rules
 | `(smt! if $cnd then $thn else $els) =>
   `( (do (← smt! $cnd).ite (← smt! $thn) (← smt! $els)) )
 
-| `(smt! let $id ← $idDef $tail) =>
+| `(smt! let $id ← $idDef ; $tail) =>
   `( (do
         let $id ← smt! $idDef
         smt! $tail
@@ -93,6 +99,11 @@ macro_rules
   `( (do (← smt! $lft).lt (← smt! $rgt)) )
 | `(smt! $lft > $rgt) =>
   `( (do (← smt! $lft).gt (← smt! $rgt)) )
+
+| `(smt! $f:smterm $arg:smterm) =>
+  `( (do
+    (← smt! $f).apply (← smt! $arg)
+  ) )
 
 | `(smt! $lft * $rgt) =>
   `( (do (← smt! $lft).mult (← smt! $rgt)) )

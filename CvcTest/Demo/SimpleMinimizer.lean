@@ -153,10 +153,10 @@ def findModel?Demo : IO Unit := do
   let vars : MyVars String := ⟨"n1", "n2", "n3"⟩
 
   let constraints : Array (Pred MyVars) := #[
-    smt! terms => 0 < terms.n1,
-    smt! terms => terms.n2 < 0,
-    smt! terms => 0 < terms.n3,
-    smt! terms => ((2*terms.n1) + (3*terms.n2)) = 7*terms.n3
+    smt! fun terms => 0 < terms.n1,
+    smt! fun terms => terms.n2 < 0,
+    smt! fun terms => 0 < terms.n3,
+    smt! fun terms => ((2*terms.n1) + (3*terms.n2)) = 7*terms.n3
   ]
 
   let model? ← findModel? vars constraints |>.run!
@@ -244,12 +244,12 @@ namespace User
 def minimize?Demo : IO Unit := do
   let vars : MyVars String := ⟨"n1", "n2", "n3"⟩
   let constraints : Array (Pred MyVars) := #[
-    smt! terms => ((-10) ≤ terms.n1) ∧ (terms.n1 ≤ 10),
-    smt! terms => ((-10) ≤ terms.n2) ∧ (terms.n2 ≤ 10),
-    smt! terms => ((-5) ≤ terms.n3) ∧ (terms.n3 ≤ 5)
+    smt! fun terms => ((-10) ≤ terms.n1) ∧ (terms.n1 ≤ 10),
+    smt! fun terms => ((-10) ≤ terms.n2) ∧ (terms.n2 ≤ 10),
+    smt! fun terms => ((-5) ≤ terms.n3) ∧ (terms.n3 ≤ 5)
   ]
   let f : Fun MyVars Int :=
-    smt! terms => -- n1 - 2*n2 + 3* (n3 - n1)
+    smt! fun terms => -- n1 - 2*n2 + 3* (n3 - n1)
       terms.n1 - (2 * terms.n2) + 3 * (terms.n3 - terms.n1)
   let minimized? ← minimize? vars f constraints
   if let (some (val, model), count) := minimized? then

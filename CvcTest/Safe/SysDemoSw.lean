@@ -53,24 +53,24 @@ def vars : Vars (fun _ => String) where
   counting := SVar.mk "counting"
   count := SVar.mk "count"
 
-def init : Sys.Pred Vars := smt! state =>
+def init : Sys.Pred Vars := smt! fun state =>
   (state.count! = 0) ∧ (state.counting! = state.startStop!)
 
-def trans : Sys.Pred2 Vars := smt! prev curr =>
+def trans : Sys.Pred2 Vars := smt! fun prev curr =>
   let counting ←
-    curr.counting! = if curr.startStop! then ¬ prev.counting! else prev.counting!
+    curr.counting! = if curr.startStop! then ¬ prev.counting! else prev.counting!;
   let countDef ←
     if curr.reset! then 0
-    else prev.count! + (if prev.counting! then 1 else 0)
+    else prev.count! + (if prev.counting! then 1 else 0);
   let count ←
-    curr.count! = countDef
+    curr.count! = countDef;
   counting ∧ count
 
 def count_pos : String × Sys.Pred Vars :=
-  ("0 ≤ count", smt! state => state.count! ≥ 0)
+  ("0 ≤ count", smt! fun state => state.count! ≥ 0)
 
 def count_ne_minus_seven : String × Sys.Pred Vars :=
-  ("count ≠ -7", smt! state => state.count! ≠ (- 7))
+  ("count ≠ -7", smt! fun state => state.count! ≠ (- 7))
 
 def sys (cex : Bool) : Sys Vars where
   logic := .qf_lia
