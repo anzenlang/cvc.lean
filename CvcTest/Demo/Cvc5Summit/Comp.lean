@@ -143,9 +143,10 @@ f n = false
 #guard_msgs in
 #eval do
   let res ← cvcSafeDemo'.run!
-    fun e => do
+    (handleError := fun e => do
       println! "error: {e}"
       return none
+    )
   if let some (nVal, appVal) := res then
     println! "n   = {nVal}"
     println! "f n = {appVal}"
