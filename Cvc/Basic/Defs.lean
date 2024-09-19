@@ -24,6 +24,10 @@ ofCvc5 ::
 instance : Inhabited Term where
   default := Term.ofCvc5 cvc5.Term.instInhabited.default
 
+instance : Ord Term where
+  compare t t' :=
+    compare t.toCvc5.getId t'.toCvc5.getId
+
 /-- Type for cvc5 sorts. -/
 structure Srt where
 ofCvc5 ::

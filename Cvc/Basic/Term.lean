@@ -104,6 +104,13 @@ def mkForall (bvars : Array BVar) (t : Term) : ManagerM Term :=
 
 
 
+def mkApply (f : Term) (args : Array Term) : ManagerM Term :=
+  let args := #[f] ++ args
+  mk .APPLY_UF args
+abbrev apply := mkApply
+
+
+
 /-- If-then-else, `cnd : Bool` and `thn els : α`. -/
 def mkIte (cnd thn els : Term) : ManagerM Term :=
   mk .ITE #[cnd, thn, els]

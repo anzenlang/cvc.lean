@@ -57,6 +57,9 @@ def assertInternalError
     | .userError err => do
         IO.eprintln s!"{Test.pref hint}expected cvc5 error `{expected}`, got user error `{err}`"
         fail "assertion failed"
+    | .unsupported err => do
+        IO.eprintln s!"{Test.pref hint}expected cvc5 error `{expected}`, got unsupported `{err}`"
+        fail "assertion failed"
     )
     result hint
 
