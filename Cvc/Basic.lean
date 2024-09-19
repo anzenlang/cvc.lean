@@ -8,4 +8,5 @@ Authors: Adrien Champion
 import Cvc.Basic.Defs
 import Cvc.Basic.Srt
 import Cvc.Basic.Term
+import Cvc.Basic.Ast
 import Cvc.Basic.Smt
