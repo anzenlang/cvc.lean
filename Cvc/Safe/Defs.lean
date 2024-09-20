@@ -18,6 +18,7 @@ mode.
 namespace Cvc.Safe
 
 export Cvc (Logic)
+export Cvc.Term (ManagerM ManagerT ManagerIO)
 
 
 
@@ -75,62 +76,6 @@ def empty : BVars where
 def push (self : BVars) (bv : BVar α) : BVars :=
   {self with toUnsafe := self.toUnsafe.push bv.toUnsafe}
 end BVars
-
-
-
-/-! ## Term Manager -/
-namespace Term
-
-/-- Safe term manager state. -/
-structure Manager : Type where
-private ofUnsafe ::
-  toUnsafe : Cvc.Term.Manager
-
-/-- Term manager state constructor. -/
-def Manager.mk : BaseIO Manager :=
-  Manager.ofUnsafe <$> Cvc.Term.Manager.mk
-
-/-- Term manager error/state monad transformer. -/
-abbrev ManagerT (m : Type → Type) :=
-  ExceptT Error (StateT Manager m)
-
-namespace ManagerT
-private def toUnsafe [Monad m] (safeCode : ManagerT m α) : Cvc.Term.ManagerT m α :=
-  fun unsafeTm => do
-    let (res, safeTm) ← safeCode ⟨unsafeTm⟩
-    return (res, safeTm.toUnsafe)
-
-private def runUnsafe [Monad m] (unsafeCode : Cvc.Term.ManagerT m α) : ManagerT m α :=
-  fun safeTm => do
-    let (res, unsafeTm) ← unsafeCode safeTm.toUnsafe
-    return (res, ⟨unsafeTm⟩)
-end ManagerT
-
-/-- Term manager error/state monad. -/
-abbrev ManagerM := ManagerT Id
-
-instance [Monad m] : MonadLift ManagerM (ManagerT m) where
-  monadLift code tm := return code tm
-
-private instance [Monad m] : MonadLift (Cvc.Term.ManagerT m) (ManagerT m) where
-  monadLift code tm := do
-    let (res, tm!) ← code tm.toUnsafe
-    return (res, Manager.ofUnsafe tm!)
-
-private instance [Monad m] : MonadLift Cvc.Term.ManagerM (ManagerT m) where
-  monadLift code tm := do
-    let (res, tm!) := code tm.toUnsafe
-    return (res, Manager.ofUnsafe tm!)
-
-instance [Monad m] : Inhabited (ManagerT m α) where
-  default tm := do
-    return (.error (.internal "default value should never be used"), tm)
-
-/-- `Manager` error/state-monad wrapped in `IO`. -/
-abbrev ManagerIO :=
-  ManagerT IO
-
-end Term
 
 
 
@@ -354,7 +299,7 @@ def of {α : Type} {β : outParam Type} [I : HToSafeTerm α β] (a : α) : Manag
 
 
 def mkBVar (name : String) (α : Type) [A : ToSafeSrt α] : ManagerM (BVar α) := do
-  let srt ← A.toSrt.toUnsafe
+  let srt ← A.toSrt
   BVar.ofUnsafe <$> Cvc.Term.mkBVar name srt.toUnsafe
 
 def mkBool (b : Bool) : ManagerM (Term Bool) :=
@@ -618,7 +563,7 @@ def throwUser (msg : String) : SmtT m α :=
 
 instance instMonadLiftManagerT : MonadLift (Term.ManagerT m) (SmtT m) where
   monadLift code :=
-    SmtT.ofUnsafe code.toUnsafe
+    SmtT.ofUnsafe code
 
 instance instMonadLiftSmtT : MonadLift (Cvc.SmtT m) (SmtT m) where
   monadLift code smt := do
@@ -636,7 +581,7 @@ private instance : MonadLift (cvc5.SolverT m) (SmtT m) where
 
 @[inherit_doc Cvc.Smt.runWith]
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) :=
-  code.toUnsafe.runWith tm.toUnsafe
+  code.toUnsafe.runWith tm
 
 @[inherit_doc Cvc.Smt.run]
 def run [MonadLiftT BaseIO m]
