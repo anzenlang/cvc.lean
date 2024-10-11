@@ -18,4 +18,4 @@ open Smt
 (set-logic QF_LIA)
   "
 
-  setOption "produce-proofs" "true"
+  setOption .produceProofs

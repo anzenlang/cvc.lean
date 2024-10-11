@@ -7,3 +7,4 @@ Authors: Adrien Champion
 
 import Cvc.Init.Basic
 import Cvc.Init.Logic
+import Cvc.Init.Option

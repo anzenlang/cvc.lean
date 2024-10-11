@@ -37,7 +37,8 @@ def getVersion : SmtM String :=
 /-! ### Setters -/
 
 @[inherit_doc Solver.setOption]
-def setOption (key val : String) : SmtM Unit :=
+def setOption (opt : Opt) : SmtM Unit :=
+  let (key, val) := opt.keyVal
   Solver.setOption (m := Id) key val
 
 @[inherit_doc Solver.setLogic]

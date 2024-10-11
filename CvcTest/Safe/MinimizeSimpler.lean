@@ -41,7 +41,7 @@ def findModelWith? [Monad m] [Vars V]
   (ifSat : V IntTerm → V Int → Smt.SatT m α)
 : SmtT m (Option α) := do
   setLogic Logic.qf_lia
-  setOption "produce-models" "true"
+  setOption .produceModels
 
   let varTerms ← Vars.declare vars
 

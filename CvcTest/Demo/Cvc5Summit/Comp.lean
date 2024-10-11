@@ -61,7 +61,7 @@ def cvcBasicDemo : SmtIO (Option Term) := do
   let six ← Term.mkInt 6
 
   setLogic Logic.qf_lia
-  setOption "produce-models" "true"
+  setOption .produceModels
 
   let n ← declareFun "n" Int
 
@@ -100,7 +100,7 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
   let six ← Term.mkInt 6
 
   setLogic .qf_lia
-  setOption "produce-models" "true"
+  setOption .produceModels
 
   let n ← declareFun "n" Int
   let three_n ← three.mult n
@@ -128,7 +128,7 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 open Smt in
 def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
   setLogic Logic.lia.qf.uf
-  setOption "produce-models" "true"
+  setOption .produceModels
 
   let n ← declareFun "n" Int
   let f ← declareFun "f" (Int → Bool)

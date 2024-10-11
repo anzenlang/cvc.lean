@@ -91,7 +91,7 @@ def Dumb.checkSat
 : Term.Manager → Except Error Res :=
   let script : SmtM Res := do
     Smt.setLogic Logic.all
-    Smt.setOption "produce-models" "true"
+    Smt.setOption .produceModels
     let str :=
       commands.foldl (init := "(set-option :fresh-declarations true)") fun str c => s!"{str}\n{c}"
     let mut nuEnv := #[]

@@ -231,7 +231,7 @@ abbrev Decl :=
 
 def checkInit : SmtT m self.Model? := do
   setLogic self.logic
-  setOption "produce-models" "true"
+  setOption .produceModels
   let terms ← SVars.init self.svars
   let init ← self.init terms
   assert init
@@ -244,7 +244,7 @@ def checkInit : SmtT m self.Model? := do
 
 def checkTrans : SmtT m self.Model2? := do
   setLogic self.logic
-  setOption "produce-models" "true"
+  setOption .produceModels
 
   let currSVars := self.svars
   let currTerms ← SVars.init currSVars
@@ -283,7 +283,7 @@ def preimageOf
   (predsNegated := true)
 : SmtT m (Term Bool) := do
   setLogic self.logic
-  setOption "produce-interpolants" "true"
+  setOption .produceInterpolants
 
   -- we're switching `prev ↔ curr` so that the resulting term mentions current variables
   let prevTerms ← SVars.init self.svars

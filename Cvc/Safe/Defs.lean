@@ -613,8 +613,8 @@ protected def run! := @SmtT.run!
 
 
 
-def setOption (option value : String) : SmtM PUnit := do
-  Cvc.Smt.setOption option value
+def setOption (opt : Opt) : SmtM PUnit := do
+  Cvc.Smt.setOption opt
 
 @[inherit_doc Cvc.Smt.declareFun]
 def declareFun [Monad m] (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtT m (Term α) := do

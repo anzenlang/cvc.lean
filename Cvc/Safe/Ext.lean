@@ -16,8 +16,8 @@ namespace Cvc.Safe
 declare_syntax_cat smterm
 
 
-syntax "[|" term "|]" : smterm
-syntax "![" term "]" : smterm
+-- syntax "[|" term "|]" : smterm
+-- syntax "![" term "]" : smterm
 
 syntax "(" smterm ")" : smterm
 
@@ -60,8 +60,8 @@ macro_rules
   fun $binders => smt! $t
 )
 
-| `(smt! [| $t:term |]) => `((pure $t))
-| `(smt! ![ $t:term ]) => `($t)
+-- | `(smt! [| $t:term |]) => `((pure $t))
+-- | `(smt! ![ $t:term ]) => `($t)
 | `(smt! ($t:smterm)) => `(smt! $t)
 
 | `(smt! $n:ident) => `(pure $n)
