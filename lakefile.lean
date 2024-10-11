@@ -16,7 +16,7 @@ package cvc {
 require cvc5 from
   git "https://github.com/anzenlang/lean-cvc5" @ "dry_defs_macro"
 require auto from
-  git "https://github.com/anzenlang/lean-auto" @ "bump_4.11.0"
+  git "https://github.com/leanprover-community/lean-auto" @ "v4.11.0"
 
 @[default_target]
 lean_lib Cvc {}
