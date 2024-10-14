@@ -255,9 +255,10 @@ syntax (name := falsifiable?)
     Auto.hints (Auto.uord)*
 : tactic
 
-@[tactic falsifiable?]
-unsafe def evalSat? : Tactic
-| `(falsifiable?| falsifiable? $[($options,*)]? $hints $[$uords]*) => do
+def discardWithLog
+  (options : Option (Syntax.TSepArray `falsifiableOpt ","))
+  (action : Opts → TacticM Unit)
+: TacticM Unit := do
   let state ← saveState
   let mut opts := Opts.default
   if let some options := options then
@@ -267,23 +268,43 @@ unsafe def evalSat? : Tactic
     if opts.timed then
       pure $ some (← IO.monoMsNow)
     else pure none
-  let mainGoal ← getMainGoal
-  let (goalBinders, newGoal) ← mainGoal.intros
-  let [nngoal] ← newGoal.apply (.const ``Classical.byContradiction [])
-    | throwError "[falsifiable?] unexpected result after applying `Classical.byContradiction`"
-  let (ngoal, absurd) ← MVarId.intro1 nngoal
-  let declName? ← Elab.Term.getDeclName?
-  replaceMainGoal [absurd]
-  withMainContext do
-    let (lemmas, inhFacts) ← Auto.collectAllLemmas hints uords (goalBinders.push ngoal)
-    replaceMainGoal [newGoal]
-    let res ← runSat? declName? lemmas inhFacts opts
-    if let some startTime := startTime? then
-      let time := (← IO.monoMsNow) - startTime
-      logInfo s!"done in {time}ms"
-    match res with
-    | .unsat => logInfo "goal is **not** falsifiable ✅"
-    | .sat model =>
+
+  action opts
+
+  if let some startTime := startTime? then
+    let time := (← IO.monoMsNow) - startTime
+    logInfo s!"done in {time}ms"
+
+  let log ← Core.getMessageLog
+  restoreState state
+  Core.setMessageLog log
+
+def evalSatDo
+  (options : Option (Syntax.TSepArray `falsifiableOpt ","))
+  (hints : TSyntax `Auto.hints)
+  (uords : Array (TSyntax `Auto.uord))
+  (action : Opts → Res → TacticM Unit)
+: TacticM Unit :=
+  discardWithLog options fun opts => do
+    let mainGoal ← getMainGoal
+    let (goalBinders, newGoal) ← mainGoal.intros
+    let [nngoal] ← newGoal.apply (.const ``Classical.byContradiction [])
+      | throwError "[falsifiable?] unexpected result after applying `Classical.byContradiction`"
+    let (ngoal, absurd) ← MVarId.intro1 nngoal
+    let declName? ← Elab.Term.getDeclName?
+    replaceMainGoal [absurd]
+    withMainContext do
+      let (lemmas, inhFacts) ← Auto.collectAllLemmas hints uords (goalBinders.push ngoal)
+      replaceMainGoal [newGoal]
+      let res ← runSat? declName? lemmas inhFacts opts
+      action opts res
+
+@[tactic falsifiable?]
+unsafe def evalSat? : Tactic
+| `(falsifiable?| falsifiable? $[($options,*)]? $hints $[$uords]*) => do
+  evalSatDo options hints uords fun
+    | _, .unsat => logInfo "goal is **not** falsifiable ✅"
+    | opts, .sat model => do
       let mut msg := "goal seems falsifiable, **it might not be provable**"
       for (expr, valTerm, name) in model do
         let mut var := toString expr
@@ -301,12 +322,52 @@ unsafe def evalSat? : Tactic
           else
             var := toString name
         | _ => pure ()
-        msg := s!"{msg}\n- [{name}] {var} = {valTerm}"
+        if opts.verbose then
+          msg := s!"{msg}\n- [{name}] {var} = {valTerm}"
+        else
+          msg := s!"{msg}\n- {var} = {valTerm}"
       logWarning msg
-    | .unknown => throwError "failed to decide (un)satifiability"
-  let messages ← Core.getMessageLog
-  restoreState state
-  Core.setMessageLog messages
+    | _, .unknown => throwError "failed to decide (un)satifiability"
+| _ => throwUnsupportedSyntax
+
+syntax (name := falsifiableTerm?)
+  "falsifiableTerm?"
+    ( "(" falsifiableOpt,* ")" )?
+    Auto.hints (Auto.uord)*
+: tactic
+
+@[tactic falsifiableTerm?]
+unsafe def evalSatTerm? : Tactic
+| `(falsifiableTerm?| falsifiableTerm? $[($options,*)]? $hints $[$uords]*) => do
+  evalSatDo options hints uords fun
+    | _, .unsat => logInfo "this term is not falsifiable ✅"
+    | opts, .sat model => do
+      let mut msg := ""
+      for (expr, valTerm, name) in model do
+        let mut var := toString expr
+        match expr with
+        | .fvar fv => do
+          let name ← fv.getUserName
+          if let some name := Name.root name then
+            var := name
+          else
+            var := toString name
+        | .mvar mv => do
+          let name := mv.name
+          if let some name := Name.root name then
+            var := name
+          else
+            var := toString name
+        | _ => pure ()
+        if opts.verbose then
+          msg := s!"{msg}\n- [{name}] {var} = {valTerm}"
+        else
+          msg := s!"{msg}\n- {var} = {valTerm}"
+      if ¬ msg.isEmpty then
+        msg := " with" ++ msg
+      logWarning s!"this term seems falsifiable{msg}"
+    | _, .unknown =>
+      logWarning "failed to assess falsifiability, the solver gave up"
 | _ => throwUnsupportedSyntax
 
 
@@ -325,3 +386,115 @@ unsafe def evalSat? : Tactic
 -- example : ∃ (k : Nat), 0 = 0 + 3 * k := by
 --   falsifiable?
 --   sorry
+
+open Lean.Parser.Tactic (tacticSeq1Indented) in
+scoped syntax (name := try_with_log)
+  "try_with_log" tacticSeq1Indented
+: tactic
+
+@[tactic try_with_log]
+def elab_try_with_log : Tactic
+| `(tactic| try_with_log $[$tacs]*) => do
+  let state ← saveState
+  loop 0 tacs
+  let log ← Core.getMessageLog
+  restoreState state
+  Core.setMessageLog log
+| _ => throwUnsupportedSyntax
+where loop (i : Nat) (tacs : Array Syntax) := do
+  if _isLt : i < tacs.size then
+    try
+      evalTactic tacs[i]
+      loop i.succ tacs
+    catch
+    | e =>
+      if i = tacs.size - 1
+      then return ()
+      else throw e
+  else return ()
+
+syntax (name := findCex)
+  withPosition(
+    "#findCex "
+      ( "(" falsifiableOpt,* ")" )?
+      Auto.hints (Auto.uord)*
+      (colGt term)
+    ";"?
+  )
+  ppLine
+  term
+: term
+
+example (P : Prop) : True := by
+  try_with_log
+    apply (by simp only [implies_true] : P → True) ; falsifiableTerm? [stnahoeusnthao]
+  trivial
+
+@[term_elab findCex]
+def evalFindCex : Term.TermElab
+| `(#findCex $[($options,*)]? $hints $[$uords]* $t:term $[;]? $andThen), exp? => do
+  -- make sure `t` can be elaborated, otherwise the error will be invisible
+  let _ ← Lean.Elab.Term.elabTerm t none
+  let findCex ← `(
+      by
+        try_with_log
+          apply (by simp only [implies_true] : $t → True)
+          falsifiableTerm? $[($options,*)]? $hints $[$uords]*
+          trivial
+        trivial
+    )
+  let tru ← `(True)
+  let tru ← Lean.Elab.Term.elabTerm tru none
+  let _ ← Lean.Elab.Term.elabByTactic findCex tru
+  Term.elabTerm andThen exp?
+| _, _ => throwUnsupportedSyntax
+
+
+/--
+warning: this term seems falsifiable with
+- n2 = 0
+- n3 = 0
+-/
+#guard_msgs in
+def test1 (n1 n2 n3 : Nat) : Nat :=
+  let d := n2 - n3
+  #findCex d ≠ 0
+  n1 / d
+
+/--
+warning: failed to assess falsifiability, the solver gave up
+-/
+#guard_msgs in
+def testArray1 (a : α) (l : Array α) : Array α :=
+  let l' := l.push a
+  #findCex l'.size = l.size + 1
+  l'
+
+/--
+info: this term is not falsifiable ✅
+-/
+#guard_msgs in
+def testArray2 (a : α) (l : Array α) : Array α :=
+  let l' := l.push a
+  #findCex [l.size_push a]
+    l'.size = l.size + 1
+  l'
+
+/--
+warning: failed to assess falsifiability, the solver gave up
+-/
+#guard_msgs in
+def testList1 (a : α) (l : List α) : List α :=
+  let l' := l.cons a
+  #findCex l'.length = l.length + 1
+  l'
+
+/--
+info: this term is not falsifiable ✅
+-/
+#guard_msgs in
+def testList2 (a : α) (l : List α) : List α :=
+  let l' := l.cons a
+  #findCex [l.length_cons a]
+    l'.length = l.length + 1
+  l'
