@@ -32,7 +32,7 @@ example : 1 = 1 := by
 
 /--
 warning: goal seems falsifiable, **it might not be provable**
-- [_n] n = 0
+- n = 0
 ---
 warning: declaration uses 'sorry'
 -/
