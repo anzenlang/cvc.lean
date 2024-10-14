@@ -75,6 +75,15 @@ def empty : BVars where
 
 def push (self : BVars) (bv : BVar α) : BVars :=
   {self with toUnsafe := self.toUnsafe.push bv.toUnsafe}
+
+protected def toString (self : BVars) : String :=
+
+  self.toUnsafe.foldl
+    (fun s bv => if s = "[" then s ++ toString bv else s ++ ", " ++ toString bv)
+    "["
+  |> (· ++ "]")
+
+instance : ToString BVars := ⟨BVars.toString⟩
 end BVars
 
 

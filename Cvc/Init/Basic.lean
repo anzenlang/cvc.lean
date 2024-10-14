@@ -29,6 +29,16 @@ deriving Inhabited
 
 namespace Error
 
+def mapMsg (f : String → String) : Error → Error
+| .internal msg => f msg |> .internal
+| .unsupported msg => f msg |> .unsupported
+| .userError msg => f msg |> .userError
+
+def append (self : Error) (txt : String) (newline := true) : Error :=
+  let txt := if newline then "\n"++txt else txt
+  self.mapMsg (· ++ txt)
+
+
 def toCvc5 : Error → cvc5.Error
 | .internal "a value is missing" => .missingValue
 | .internal msg => .error msg

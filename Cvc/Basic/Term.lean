@@ -284,3 +284,14 @@ def toReal (term : Term) : ManagerM Term :=
 @[inherit_doc cvc5.Solver.simplify]
 def simplify (term : Term) : SmtM Term :=
   Term.ofCvc5 <$> cvc5.Solver.simplify (m := Id) term.toCvc5
+
+end Term
+
+
+
+namespace BVar
+protected def toString (self : BVar) : String :=
+  self.toTerm.toString
+
+instance : ToString BVar := ⟨BVar.toString⟩
+end BVar
