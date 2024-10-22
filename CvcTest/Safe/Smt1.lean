@@ -106,6 +106,6 @@ Use `#eval!` to evaluate nevertheless (which may cause lean to crash).
   assertEq fApp.toString "(f n m)"
   let _ : Term Bool := fApp
 
-  let not_fApp ← smt! ¬ (f n m)
+  let not_fApp ← smt! ¬ f n m
   assertEq not_fApp.toString "(not (f n m))"
   let _ : Term Bool := not_fApp

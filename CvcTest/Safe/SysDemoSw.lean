@@ -70,7 +70,7 @@ def count_pos : String × Sys.Pred Vars :=
   ("0 ≤ count", smt! fun state => state.count! ≥ 0)
 
 def count_ne_minus_seven : String × Sys.Pred Vars :=
-  ("count ≠ -7", smt! fun state => state.count! ≠ (- 7))
+  ("count ≠ -7", smt! fun state => state.count! ≠ - 7)
 
 def sys (cex : Bool) : Sys Vars where
   logic := .qf_lia

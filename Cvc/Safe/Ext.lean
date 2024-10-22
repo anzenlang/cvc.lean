@@ -112,7 +112,7 @@ macro_rules
   ) )
 
 | `(smt! $lft * $rgt) =>
-  `( (do (← smt! $lft).mult (← smt! $rgt)) )
+  `( (do (← smt! $lft).mul (← smt! $rgt)) )
 | `(smt! $lft / $rgt) =>
   `( (do (← smt! $lft).intDivTotal (← smt! $rgt)) )
 | `(smt! $lft /! $rgt) =>

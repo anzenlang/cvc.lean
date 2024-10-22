@@ -65,7 +65,7 @@ def cvcBasicDemo : SmtIO (Option Term) := do
 
   let n ← declareFun "n" Int
 
-  let three_n ← three.mult n
+  let three_n ← three.mul n
   let t ← three_n.eq six
 
   assert t
@@ -103,7 +103,7 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
   setOption .produceModels
 
   let n ← declareFun "n" Int
-  let three_n ← three.mult n
+  let three_n ← three.mul n
   let t ← three_n.eq six
 
   assert t
@@ -132,7 +132,7 @@ def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
 
   let n ← declareFun "n" Int
   let f ← declareFun "f" (Int → Bool)
-  let t ← smt! ((3 * n) = 6) ∧ ¬ (n ≤ 1) ∨ (f n)
+  let t ← smt! 3 * n = 6 ∧ (¬ n ≤ 1 ∨ f n)
 
   assert t
 
