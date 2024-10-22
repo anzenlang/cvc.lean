@@ -493,15 +493,65 @@ abbrev mkAdd [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
 @[inherit_doc Cvc.Term.mkAdd]
 abbrev add := @mkAdd
 
-@[inherit_doc Cvc.Term.mkMultN]
-def mkMultN [ArithLike α] (terms : Array (Term α)) : ManagerM (Term α) :=
+@[inherit_doc Cvc.Term.mkMulN]
+def mkMulN [ArithLike α] (terms : Array (Term α)) : ManagerM (Term α) :=
   let terms := terms.map toUnsafe
-  ofUnsafe <$> Cvc.Term.mkMultN terms
-@[inherit_doc Cvc.Term.mkMult]
-abbrev mkMult [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
-  ofUnsafe <$> a.toUnsafe.mult b.toUnsafe
-@[inherit_doc Cvc.Term.mkMult]
-abbrev mult := @mkMult
+  ofUnsafe <$> Cvc.Term.mkMulN terms
+@[inherit_doc Cvc.Term.mkMul]
+abbrev mkMul [ArithLike α] (a b : Term α) : ManagerM (Term α) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkMul]
+abbrev mul := @mkMul
+
+@[inherit_doc Cvc.Term.mkRatDivN]
+def mkRatDivN (terms : Array (Term Rat)) : ManagerM (Term Rat) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkRatDivN terms
+@[inherit_doc Cvc.Term.mkRatDiv]
+abbrev mkRatDiv (a b : Term Rat) : ManagerM (Term Rat) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkRatDiv]
+abbrev ratDiv := @mkRatDiv
+
+@[inherit_doc Cvc.Term.mkRatDivTotalN]
+def mkRatDivTotalN (terms : Array (Term Rat)) : ManagerM (Term Rat) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkRatDivTotalN terms
+@[inherit_doc Cvc.Term.mkRatDivTotal]
+abbrev mkRatDivTotal (a b : Term Rat) : ManagerM (Term Rat) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkRatDivTotal]
+abbrev ratDivTotal := @mkRatDivTotal
+
+@[inherit_doc Cvc.Term.mkIntDivN]
+def mkIntDivN (terms : Array (Term Int)) : ManagerM (Term Int) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkIntDivN terms
+@[inherit_doc Cvc.Term.mkIntDiv]
+abbrev mkIntDiv (a b : Term Int) : ManagerM (Term Int) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkIntDiv]
+abbrev intDiv := @mkIntDiv
+
+@[inherit_doc Cvc.Term.mkIntDivTotalN]
+def mkIntDivTotalN (terms : Array (Term Int)) : ManagerM (Term Int) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkIntDivTotalN terms
+@[inherit_doc Cvc.Term.mkIntDivTotal]
+abbrev mkIntDivTotal (a b : Term Int) : ManagerM (Term Int) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkIntDivTotal]
+abbrev intDivTotal := @mkIntDivTotal
+
+@[inherit_doc Cvc.Term.mkModN]
+def mkModN (terms : Array (Term Int)) : ManagerM (Term Int) :=
+  let terms := terms.map toUnsafe
+  ofUnsafe <$> Cvc.Term.mkModN terms
+@[inherit_doc Cvc.Term.mkMod]
+abbrev mkMod (a b : Term Int) : ManagerM (Term Int) :=
+  ofUnsafe <$> a.toUnsafe.mul b.toUnsafe
+@[inherit_doc Cvc.Term.mkMod]
+abbrev Mod := @mkMod
 
 @[inherit_doc Cvc.Term.mkSubN]
 def mkSubN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term α) :=

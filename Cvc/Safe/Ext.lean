@@ -25,33 +25,39 @@ syntax ident : smterm
 syntax name : smterm
 syntax num : smterm
 
-syntax smterm " → " smterm : smterm
-syntax smterm " ∧ " smterm : smterm
-syntax smterm " ∨ " smterm : smterm
-syntax "¬ " smterm : smterm
+syntax:25 smterm:26 " → " smterm:25 : smterm
+syntax:35 smterm:36 " ∧ " smterm:35 : smterm
+syntax:30 smterm:31 " ∨ " smterm:30 : smterm
+syntax:max "¬ " smterm:40 : smterm
 
-syntax "if " smterm " then " smterm " else " smterm : smterm
+syntax
+  withPosition("if " (colGt smterm) " then " (colGt smterm) " else " (colGt smterm))
+: smterm
 syntax "let " ident " ← " smterm "; " ppLine smterm : smterm
 
-syntax smterm " = " smterm : smterm
-syntax smterm " ≠ " smterm : smterm
-syntax smterm " ≤ " smterm : smterm
-syntax smterm " ≥ " smterm : smterm
-syntax smterm " < " smterm : smterm
-syntax smterm " > " smterm : smterm
+syntax:50 smterm:51 " = " smterm:50 : smterm
+syntax:50 smterm:51 " ≠ " smterm:50 : smterm
+syntax:50 smterm:51 " ≤ " smterm:50 : smterm
+syntax:50 smterm:51 " ≥ " smterm:50 : smterm
+syntax:50 smterm:51 " < " smterm:50 : smterm
+syntax:50 smterm:51 " > " smterm:50 : smterm
 
-syntax smterm " * " smterm : smterm
-syntax smterm " / " smterm : smterm
-syntax smterm " + " smterm : smterm
-syntax smterm " - " smterm : smterm
-syntax "- " smterm : smterm
+syntax:70 smterm:70 " * " smterm:71 : smterm
+syntax:70 smterm:70 " /! " smterm:71 : smterm
+syntax:70 smterm:70 " /. " smterm:71 : smterm
+syntax:70 smterm:70 " /.! " smterm:71 : smterm
+syntax:70 smterm:70 " / " smterm:71 : smterm
+syntax:70 smterm:70 " % " smterm:71 : smterm
+syntax:65 smterm:65 " + " smterm:66 : smterm
+syntax:65 smterm:65 " - " smterm:66 : smterm
+syntax:75 "- " smterm : smterm
 
 syntax:100 smterm:100 (colGt smterm:101) : smterm
 
 syntax "smt! " ppLine (colGt smterm) : term
 open Lean.Parser.Term in
 syntax "smt! " "fun" (ppSpace funBinder)+ optType " => " ppLine (colGt smterm) : term
-
+#eval 1 + 3
 macro_rules
 | `(smt! fun $binders $optTy => $t:smterm ) => `(
   fun $binders $optTy => smt! $t
@@ -107,8 +113,14 @@ macro_rules
 
 | `(smt! $lft * $rgt) =>
   `( (do (← smt! $lft).mult (← smt! $rgt)) )
--- | `(smt! $lft / $rgt) =>
---   `( (do (← smt! $lft).ge (← smt! $rgt)) )
+| `(smt! $lft / $rgt) =>
+  `( (do (← smt! $lft).intDivTotal (← smt! $rgt)) )
+| `(smt! $lft /! $rgt) =>
+  `( (do (← smt! $lft).intDiv (← smt! $rgt)) )
+| `(smt! $lft /. $rgt) =>
+  `( (do (← smt! $lft).ratDiv (← smt! $rgt)) )
+| `(smt! $lft /.! $rgt) =>
+  `( (do (← smt! $lft).ratDivTotal (← smt! $rgt)) )
 | `(smt! $lft + $rgt) =>
   `( (do (← smt! $lft).add (← smt! $rgt)) )
 | `(smt! - $t) =>

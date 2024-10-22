@@ -245,13 +245,58 @@ def mkAdd (lhs rhs : Term) : ManagerM Term :=
 abbrev add := @mkAdd
 
 /-- N-ary multiplication. -/
-def mkMultN : (terms : Array Term) → ManagerM Term :=
+def mkMulN : (terms : Array Term) → ManagerM Term :=
   arraySizeSplit (mkInt 1) (return ·) (mk .MULT ·)
 /-- Binary multiplication. -/
-def mkMult (lhs rhs : Term) : ManagerM Term :=
-  mkMultN #[lhs, rhs]
-@[inherit_doc mkMult]
-abbrev mult := @mkMult
+def mkMul (lhs rhs : Term) : ManagerM Term :=
+  mkMulN #[lhs, rhs]
+@[inherit_doc mkMul]
+abbrev mul := @mkMul
+
+/-- N-ary rational division. -/
+def mkRatDivN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .DIVISION ·)
+/-- Binary multiplication. -/
+def mkRatDiv (lhs rhs : Term) : ManagerM Term :=
+  mkRatDivN #[lhs, rhs]
+@[inherit_doc mkRatDiv]
+abbrev ratDiv := @mkRatDiv
+
+/-- N-ary total division. -/
+def mkRatDivTotalN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .DIVISION_TOTAL ·)
+/-- Binary multiplication. -/
+def mkRatDivTotal (lhs rhs : Term) : ManagerM Term :=
+  mkRatDivTotalN #[lhs, rhs]
+@[inherit_doc mkRatDivTotal]
+abbrev ratDivTotal := @mkRatDivTotal
+
+/-- N-ary integer division. -/
+def mkIntDivN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .INTS_DIVISION ·)
+/-- Binary multiplication. -/
+def mkIntDiv (lhs rhs : Term) : ManagerM Term :=
+  mkIntDivN #[lhs, rhs]
+@[inherit_doc mkIntDiv]
+abbrev intDiv := @mkIntDiv
+
+/-- N-ary total integer division. -/
+def mkIntDivTotalN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .INTS_DIVISION_TOTAL ·)
+/-- Binary multiplication. -/
+def mkIntDivTotal (lhs rhs : Term) : ManagerM Term :=
+  mkIntDivTotalN #[lhs, rhs]
+@[inherit_doc mkIntDivTotal]
+abbrev intDivTotal := @mkIntDivTotal
+
+/-- N-ary modulo. -/
+def mkModN : (terms : Array Term) → ManagerM Term :=
+  arraySizeSplit (mkInt 1) (return ·) (mk .INTS_MODULUS ·)
+/-- Binary multiplication. -/
+def mkMod (lhs rhs : Term) : ManagerM Term :=
+  mkModN #[lhs, rhs]
+@[inherit_doc mkMod]
+protected abbrev mod := @mkMod
 
 /-- N-ary subtraction. -/
 def mkSubN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
