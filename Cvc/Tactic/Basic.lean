@@ -337,7 +337,7 @@ syntax (name := falsifiableTerm?)
 : tactic
 
 @[tactic falsifiableTerm?]
-unsafe def evalSatTerm? : Tactic
+unsafe def evalFalsifiableTerm? : Tactic
 | `(falsifiableTerm?| falsifiableTerm? $[($options,*)]? $hints $[$uords]*) => do
   evalSatDo options hints uords fun
     | _, .unsat => logInfo "this term is not falsifiable ✅"
@@ -435,6 +435,8 @@ def evalFindCex : Term.TermElab
 | `(#findCex $[($options,*)]? $hints $[$uords]* $t:term $[;]? $andThen), exp? => do
   -- make sure `t` can be elaborated, otherwise the error will be invisible
   let _ ← Lean.Elab.Term.elabTerm t none
+  let tru ← `(True)
+  let tru ← Lean.Elab.Term.elabTerm tru none
   let findCex ← `(
       by
         try_with_log
@@ -443,8 +445,6 @@ def evalFindCex : Term.TermElab
           trivial
         trivial
     )
-  let tru ← `(True)
-  let tru ← Lean.Elab.Term.elabTerm tru none
   let _ ← Lean.Elab.Term.elabByTactic findCex tru
   Term.elabTerm andThen exp?
 | _, _ => throwUnsupportedSyntax

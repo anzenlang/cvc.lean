@@ -56,13 +56,19 @@ syntax:100 smterm:100 (colGt smterm:101) : smterm
 
 syntax "smt! " ppLine (colGt smterm) : term
 open Lean.Parser.Term in
-syntax "smt! " "fun" (ppSpace funBinder)+ optType " => " ppLine (colGt smterm) : term
-#eval 1 + 3
+syntax (("smt! " "fun") <|> "smtfun") (ppSpace funBinder)+ optType " => " ppLine (colGt smterm) : term
+
 macro_rules
 | `(smt! fun $binders $optTy => $t:smterm ) => `(
   fun $binders $optTy => smt! $t
 )
 | `(smt! fun $binders => $t:smterm ) => `(
+  fun $binders => smt! $t
+)
+| `(smtfun $binders $optTy => $t:smterm ) => `(
+  fun $binders $optTy => smt! $t
+)
+| `(smtfun $binders => $t:smterm ) => `(
   fun $binders => smt! $t
 )
 

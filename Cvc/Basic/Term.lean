@@ -41,8 +41,6 @@ def substitute (term : Term) (substs : Array (Term × Term)) : Term.ManagerM Ter
 
 /-! ### Constructors from `cvc5` -/
 
-variable [Monad m]
-
 protected def termLift (code : cvc5.TermManager → cvc5.Term) : Term.ManagerM Term := fun tm =>
   let res := code tm.toCvc5 |> ofCvc5
   return (.ok res, tm)

@@ -20,6 +20,12 @@ namespace Cvc.Safe
 export Cvc (Logic)
 export Cvc.Term (ManagerM ManagerT ManagerIO)
 
+namespace Smt
+
+export Cvc.Smt (Actlit)
+
+end Smt
+
 
 
 /-- A cvc sort corresponding to a lean type. -/
@@ -105,7 +111,7 @@ class HToSafeTerm (α : Type) (β : Type) extends HToSafeSrt α β where
 class abbrev ToSafeTerm (α : Type) := HToSafeTerm α α
 
 /-- `Term α` to `α`-value. -/
-class ValueOfSafeTerm (α : Type) extends HToSafeSrt α α, ValueOfTerm α where
+class ValueOfSafeTerm (α : Type) extends HToSafeSrt α α, ValueOfTerm α, ToString α where
   ofTerm : Term α → Term.ManagerM α
 
 /-- Specifies that `Term α` have access to arithmetic operators like add, sub, mult, ... -/
@@ -246,6 +252,20 @@ private def ofCvc5 [ToSafeSrt α] : cvc5.Term → Term α :=
 
 
 
+@[inherit_doc Cvc.Term.isActlit]
+def isActlit (t : Term Bool) : SmtM Bool :=
+  Cvc.Term.isActlit t.toUnsafe
+
+/-- The `Bool` term corresponding to an activation literal. -/
+def ofActlit (actlit : Smt.Actlit) : Term Bool :=
+  ofUnsafe actlit.term
+
+@[inherit_doc Cvc.Term.assertActivation]
+def assertActivation (a : Smt.Actlit) (t : Term Bool) : SmtM Unit :=
+  t.toUnsafe.assertActivation a
+
+
+
 @[inherit_doc Cvc.Term.getSrt]
 def getSrt (self : Term α) : Srt α :=
   Srt.ofUnsafe self.toUnsafe.getSrt
@@ -292,7 +312,7 @@ protected def apply
   else
     ofUnsafe <$> flattenHoApply #[arg.toUnsafe] term!
 
-instance : CoeFun (Term (α → β)) (fun _ => Term α → ManagerM (Term β)) :=
+instance : CoeFun (Term (α → β)) (𝕂 $ Term α → ManagerM (Term β)) :=
   ⟨Term.apply⟩
 
 
@@ -402,7 +422,7 @@ def mkImpliesN
   ofUnsafe <$> Cvc.Term.mkImpliesN terms! (by simp [terms!, valid])
 @[inherit_doc Cvc.Term.mkImplies]
 def mkImplies (self that : Term Bool) : ManagerM (Term Bool) :=
-  ofUnsafe <$> self.toUnsafe.xor that.toUnsafe
+  ofUnsafe <$> self.toUnsafe.implies that.toUnsafe
 @[inherit_doc Cvc.Term.mkImplies]
 abbrev implies := mkImplies
 
@@ -676,10 +696,10 @@ def setOption (opt : Opt) : SmtM PUnit := do
   Cvc.Smt.setOption opt
 
 @[inherit_doc Cvc.Smt.declareFun]
-def declareFun [Monad m] (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtT m (Term α) := do
+def declareFun (symbol : String) (α : Type) [A : ToSafeSrt α] : SmtM (Term α) := do
   let a ← A.toSrt
   let (domain, codomain) ← a.cvc5Signature
-  Term.ofCvc5 <$> cvc5.Solver.declareFun symbol domain codomain false (m := m)
+  Term.ofCvc5 <$> cvc5.Solver.declareFun symbol domain codomain false (m := Id)
 
 @[inherit_doc declareFun]
 abbrev declare := @declareFun
@@ -694,8 +714,22 @@ def getQuantifierElimination (q : Term Bool) : SmtM (Term Bool) := do
 
 
 @[inherit_doc Cvc.Smt.checkSat?]
-def checkSat? : SmtM (Option Bool) := do
-  Cvc.Smt.checkSat?
+def checkSat? (terms : Array (Term Bool) := #[]) : SmtM (Option Bool) :=
+  if terms.isEmpty
+  then Cvc.Smt.checkSat?
+  else terms.map Term.toUnsafe |> Cvc.Smt.checkSatAssuming?
+
+@[inherit_doc Cvc.Smt.mkActlit]
+def mkActlit : SmtM Actlit :=
+  Cvc.Smt.mkActlit
+
+@[inherit_doc Cvc.Smt.assertActivation]
+def assertActivation (a : Actlit) (t : Term Bool) : SmtM Unit :=
+  Cvc.Smt.assertActivation a t.toUnsafe
+
+@[inherit_doc Cvc.Smt.deActlit]
+def deActlit (a : Actlit) : SmtM Unit :=
+  Cvc.Smt.deActlit a
 
 
 
@@ -779,11 +813,12 @@ end Unknown
 -/
 def checkSat
   [Monad m]
+  (terms : Array (Term Bool) := #[])
   (ifSat : Smt.SatT m α := Smt.Sat.unexpected)
   (ifUnsat : Smt.UnsatT m α := Smt.Unsat.unexpected)
   (ifUnknown : Smt.UnknownT m α := Smt.Unknown.unexpected)
 : SmtT m α := fun smt => do
-  match checkSat? smt with
+  match checkSat? terms smt with
   | (.ok (some true), smt) =>
     let (res, smt') ← ifSat ⟨smt⟩
     return (res, smt'.toSmt)

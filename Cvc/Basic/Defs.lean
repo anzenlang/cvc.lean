@@ -116,8 +116,9 @@ Aggregates a `Term.Manager` and a `cvc5.Solver`.
 -/
 structure Smt : Type where
 private mkRaw ::
-  private termManager : Term.Manager
-  private solver : cvc5.Solver
+  termManager : Term.Manager
+  solver : cvc5.Solver
+  nextActlitIdx : Nat
 
 /-- `Smt` error/state-monad transformer. -/
 abbrev SmtT (m : Type → Type u) := ExceptT Error (StateT Smt m)
@@ -151,6 +152,11 @@ instance instMonadExcept [Monad m] : MonadExcept Error (Term.ManagerT m) where
     match ← code smt with
     | (.ok res, smt) => return (.ok res, smt)
     | (.error e, smt) => errorDo e smt
+
+protected def nextActlitIdx : SmtM Nat := fun state => do
+  let n := state.nextActlitIdx
+  let state := { state with nextActlitIdx := state.nextActlitIdx.succ }
+  return (.ok n, state)
 end SmtT
 
 
@@ -195,7 +201,7 @@ instance instMonadLiftCvc5 : MonadLift (cvc5.SolverT m) (SmtT m) where
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) := do
   let res ←
     cvc5.Solver.run tm.down fun solver => do
-      let (res, ⟨_, s⟩) ← code ⟨tm, solver⟩
+      let (res, ⟨_, s, _⟩) ← code ⟨tm, solver, 0⟩
       return (res.mapError Error.toCvc5, s)
   return res.mapError Error.ofCvc5
 

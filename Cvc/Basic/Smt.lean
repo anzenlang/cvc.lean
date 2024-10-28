@@ -86,9 +86,26 @@ def assert (formula : Term) : SmtM Unit :=
 def checkSat : SmtM cvc5.Result :=
   Solver.checkSat (m := Id)
 
+@[inherit_doc Solver.checkSat]
+def checkSatAssuming (terms : Array Term) : SmtM cvc5.Result :=
+  terms.map Term.toCvc5
+  |> Solver.checkSatAssuming (m := Id)
+
 /-- True if *sat*, false if *unsat*, none if *unknown*, error otherwise. -/
 def checkSat? : SmtM (Option Bool) := do
   let res ← checkSat
+  if res.isSat then
+    return true
+  else if res.isUnsat then
+    return false
+  else if res.isUnknown then
+    return none
+  else
+    SmtT.throwInternal "checkSat result is none of *sat*, *unsat*, and *unknown*"
+
+@[inherit_doc checkSat?]
+def checkSatAssuming? (terms : Array Term) : SmtM (Option Bool) := do
+  let res ← checkSatAssuming terms
   if res.isSat then
     return true
   else if res.isUnsat then
