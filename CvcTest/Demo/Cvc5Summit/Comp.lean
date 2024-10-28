@@ -108,10 +108,10 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 
   assert t
 
-  checkSat
+  checkSat (m := IO)
     (ifSat := do
       let nVal ← getValue n
-      return nVal)
+      return some nVal)
     (ifUnsat := return none)
 
 

@@ -47,16 +47,16 @@ instance instSVars : SVars Vars where
   forIn self := self.untype.forIn
 end Vars
 
-def vars : Vars (fun _ => String) where
+def vars : Vars (𝕂 String) where
   reset := SVar.mk "reset"
   startStop := SVar.mk "startStop"
   counting := SVar.mk "counting"
   count := SVar.mk "count"
 
-def init : Sys.Pred Vars := smt! fun state =>
+def init : Sys.PredT IO Vars := smt! fun state =>
   (state.count! = 0) ∧ (state.counting! = state.startStop!)
 
-def trans : Sys.Pred2 Vars := smt! fun prev curr =>
+def trans : Sys.PredT2 IO Vars := smt! fun prev curr =>
   let counting ←
     curr.counting! = if curr.startStop! then ¬ prev.counting! else prev.counting!;
   let countDef ←
@@ -72,7 +72,7 @@ def count_pos : String × Sys.Pred Vars :=
 def count_ne_minus_seven : String × Sys.Pred Vars :=
   ("count ≠ -7", smt! fun state => state.count! ≠ - 7)
 
-def sys (cex : Bool) : Sys Vars where
+def sys (cex : Bool) : SysT IO Vars where
   logic := .qf_lia
   svars := vars
   init := init
@@ -87,7 +87,7 @@ def showModel (model : Sys.Model Vars) (pref := "") : IO Unit := do
   println! "  {pref} counting = {model.counting!}"
   println! "  {pref}    count = {model.count!}"
 
-def checkInit (sys : Sys Vars) : SmtIO Unit := do
+def checkInit [Monad m] [MonadLiftT IO m] (sys : SysT m Vars) : SmtT m Unit := do
   println! "checking stopwatch init"
   if let some cex ← sys.checkInit then
     println! "cex:"
@@ -95,7 +95,7 @@ def checkInit (sys : Sys Vars) : SmtIO Unit := do
   else
     println! "candidates hold in init"
 
-def checkTrans (sys : Sys Vars) : SmtIO Unit := do
+def checkTrans [Monad m] [MonadLiftT IO m] (sys : SysT m Vars) : SmtT m Unit := do
   println! "checking stopwatch trans"
   if let some (prev, curr) ← sys.checkTrans then
     println! "cex:"
@@ -113,7 +113,9 @@ end sw
 checking stopwatch init
 candidates hold in init
 -/
-#test sw.sys false |> sw.checkInit
+#test do
+  let sys := sw.sys false
+  sw.checkInit sys
 
 /-- info:
 checking stopwatch trans
