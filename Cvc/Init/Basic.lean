@@ -14,10 +14,22 @@ namespace Cvc
 
 
 
+abbrev Set (α : Type) [Ord α] :=
+  Lean.RBMap α Unit compare
+
+namespace Set
+variable {α : Type} [Ord α]
+
+def empty : Set α := Lean.RBMap.empty
+end Set
+
+
 export Lean (Rat)
 
 
 
+/-- The `𝕂`onstant combinator. -/
+abbrev 𝕂 (val : α) (_ : β) : α := val
 
 /-! ## Re-exports from `cvc5` -/
 
