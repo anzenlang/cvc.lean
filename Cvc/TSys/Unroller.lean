@@ -2,42 +2,39 @@ import Cvc.TSys.Unrolling
 
 
 
-namespace Cvc.Safe.TSys
+namespace Cvc.Safe
 
 
 
-structure SVars.UFrame (State : SVars S) (k : Nat) : Type where
-  state : State.Terms k
+namespace Symbols
 
+structure UFrame (State : Symbols S) (k : Nat) : Type where
+  state : State.TermsAt k
 
-
-structure Unroller (State : SVars S) where
+structure Unroller (State : Symbols S) where
 private mkRaw ::
   logic : Logic
-  symbols : State.Symbols
+  symbols : State.Idents
   init : State.Predicate
   step : State.Relation
   depthSucc : Nat
   unrolling : State.Unrolling State.UFrame depthSucc
   zero_lt_depthSucc : 0 < depthSucc := by omega
 
-abbrev SVars.Unroller (State : SVars S) :=
-  TSys.Unroller State
-
 namespace Unroller
 
-def mk [Monad m] [State : SVars S]
-  (logic : Logic) (symbols : State.Symbols)
+def mk [Monad m] [State : Symbols S]
+  (logic : Logic) (symbols : State.Idents)
   (init : State.Predicate) (step : State.Relation)
 : SmtT m (Unroller State) := do
   Smt.setOption .produceModels
   Smt.setLogic logic
-  let svars0 ← symbols.declare 0
+  let svars0 ← symbols.declareAt 0
   return {
     logic, symbols
     init, step
     depthSucc := 1,
-    unrolling := SVars.Unrolling.empty.cons ⟨svars0⟩
+    unrolling := Symbols.Unrolling.empty.cons ⟨svars0⟩
   }
 
 def depth : Unroller State → Nat
@@ -54,7 +51,7 @@ theorem inv_depthSucc : 0 < sys.depthSucc := sys.zero_lt_depthSucc
 def getUFrameAt (i : Fin sys.depthSucc) : State.UFrame i :=
   sys.unrolling.get i
 
-def getSVarsAt (i : Fin sys.depthSucc) :=
+def getSymbolsAt (i : Fin sys.depthSucc) :=
   sys.getUFrameAt i |>.state
 
 abbrev currentOffset : Fin sys.depthSucc :=
@@ -63,7 +60,7 @@ abbrev currentOffset : Fin sys.depthSucc :=
 def getCurrentUFrame : State.UFrame 0 :=
   sys.getUFrameAt sys.currentOffset
 
-def getCurrentSVars :=
+def getCurrentSymbols :=
   sys.getCurrentUFrame |>.state
 
 abbrev oldestOffset : Fin sys.depthSucc :=
@@ -72,14 +69,14 @@ abbrev oldestOffset : Fin sys.depthSucc :=
 def getOldestUFrame : State.UFrame sys.oldestOffset :=
   sys.getUFrameAt sys.oldestOffset
 
-def getOldestSVars :=
+def getOldestSymbols :=
   sys.getOldestUFrame |>.state
 
 def unroll (sys : Unroller State) : Nat → SmtM (Unroller State)
 | 0 => return sys
 | n + 1 => do
-  let svars' := sys.getOldestSVars
-  let svars ← sys.symbols.declare sys.depthSucc
+  let svars' := sys.getOldestSymbols
+  let svars ← sys.symbols.declareAt sys.depthSucc
   let step ← sys.step svars svars'
   Smt.assert step
   let unrolling := sys.unrolling.cons ⟨svars⟩
@@ -90,9 +87,11 @@ def unroll (sys : Unroller State) : Nat → SmtM (Unroller State)
   }
   sys.unroll n
 
-def unrollOnce (sys : Unroller State) : SmtM (State.Terms sys.depthSucc.succ × Unroller State) := do
+def unrollOnce
+  (sys : Unroller State)
+: SmtM (State.TermsAt sys.depthSucc.succ × Unroller State) := do
   let sys ← sys.unroll 1
-  return (sys.getOldestSVars, sys)
+  return (sys.getOldestSymbols, sys)
 
 def checkSat [Monad m] (inInit : Bool)
   (assuming : Array (Term Bool) := #[])
@@ -103,7 +102,7 @@ def checkSat [Monad m] (inInit : Bool)
   -- add `init` at the last state index to `assuming` if asked to
   let mut assuming := assuming
   if inInit then
-    let init ← sys.init sys.getOldestSVars
+    let init ← sys.init sys.getOldestSymbols
     assuming := assuming.push init
   -- let's do this
   Smt.checkSat assuming ifSat ifUnsat ifUnknown

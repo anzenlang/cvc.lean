@@ -7,16 +7,16 @@ namespace Cvc.Safe
 
 
 
-namespace TSys.SVars
+namespace Symbols
 
-inductive CandidateStatus (State : SVars S)
+inductive CandidateStatus (State : Symbols S)
 | initValidUntil (k? : Option Nat) (stepCex? : Option Nat)
 | invariant (k : Nat) (strength : Set String)
 | cex (k : Nat) (trace : State.Unrolling State.Model k)
 
 namespace CandidateStatus
 
-variable {State : SVars S}
+variable {State : Symbols S}
 
 protected def toString : CandidateStatus State → String
 | initValidUntil k? stepCex? =>
@@ -56,7 +56,7 @@ def updateInitValidUntil [Monad m]
 
 end CandidateStatus
 
-structure Candidate (State : SVars S) where
+structure Candidate (State : Symbols S) where
 private mkRaw ::
   name : String
   pred : State.Predicate
@@ -68,9 +68,9 @@ private mkRaw ::
 namespace Candidate
 
 def mk
-  {State : SVars S}
+  {State : Symbols S}
   (name : String) (pred : State.Predicate)
-  (stateZero : State.Terms 0)
+  (stateZero : State.TermsAt 0)
 : SmtM State.Candidate := do
   let currentNegativePred ← (← pred stateZero).not
   let currentNegativeActlit ← Cvc.Smt.mkActlit
@@ -112,7 +112,7 @@ end Candidate
 
 
 
--- structure Candidates (State : SVars S) where
+-- structure Candidates (State : Symbols S) where
 -- private mkRaw ::
 --   unknown : Array State.Candidate
 --   falsifiedInit : Array ((k : Nat) × State.CexTrace k × Array State.Candidate)
@@ -122,7 +122,7 @@ end Candidate
 
 -- namespace Candidates
 
--- variable {State : SVars S}
+-- variable {State : Symbols S}
 
 -- def mk
 --   (namedCandidates : Array (String × State.Predicate))
@@ -130,7 +130,7 @@ end Candidate
 -- : SmtM State.Candidates := do
 --   let mut unknown := Array.mkEmpty namedCandidates.size
 --   for (name, pred) in namedCandidates do
---     let candidate ← SVars.Candidate.mk name pred svarsZero
+--     let candidate ← Symbols.Candidate.mk name pred svarsZero
 --     unknown := unknown.push candidate
 --   return ⟨unknown, #[], #[], #[], #[]⟩
 
@@ -151,42 +151,46 @@ end Candidate
 
 -- end Candidates
 
-end TSys.SVars
+end Symbols
 
 
-open TSys (SVars)
 
-structure TSys (State : SVars S) extends TSys.Unroller State
+/-- Transition system for some notion of state.
+
+Consider using `Symbols.TSys` instead, which allows `State.TSys` notation when `State : Symbols S`.
+-/
+structure TSys (State : Symbols S) extends State.Unroller
 where private mkRaw ::
   candidates : Array State.Candidate
 
-abbrev TSys.SVars.TSys (State : SVars S) :=
+/-- Transition system over some notion of state. -/
+abbrev Symbols.TSys (State : Symbols S) :=
   Safe.TSys State
 
 namespace TSys
 
-variable {State : SVars S}
+variable {State : Symbols S}
 
 /-- Builds a transition system, assumes the solver expects a `Smt.setLogic` command. -/
 def mk
-  (logic : Logic) (symbols : State.Symbols)
+  (logic : Logic) (symbols : State.Idents)
   (init : State.Predicate) (step : State.Relation)
   (namedCandidates : Array (String × State.Predicate))
 : SmtM State.TSys := do
-  let unroller ← Unroller.mk logic symbols init step
-  let svarsZero := unroller.getCurrentSVars
+  let unroller ← Symbols.Unroller.mk logic symbols init step
+  let svarsZero := unroller.getCurrentSymbols
   let mut candidates := Array.mkEmpty namedCandidates.size
   for (name, pred) in namedCandidates do
-    let candidate ← SVars.Candidate.mk name pred svarsZero
+    let candidate ← Symbols.Candidate.mk name pred svarsZero
     candidates := candidates.push candidate
   return ⟨unroller, candidates⟩
 
-variable {State : SVars S} (sys : TSys State)
+variable {State : Symbols S} (sys : TSys State)
 
 def initDepth := sys.depthSucc.pred
 
 def getUnknownCandidates : Array State.Candidate :=
-  sys.candidates.filter SVars.Candidate.isUnknown
+  sys.candidates.filter Symbols.Candidate.isUnknown
 
 def getJustProved : Array State.Candidate :=
   sys.candidates.filter fun candidate =>
@@ -194,7 +198,7 @@ def getJustProved : Array State.Candidate :=
     | .invariant k _ => sys.depthSucc = k
     | .initValidUntil _ _ | .cex _ _ => false
 
-def getFalsifiedAt (depth : Nat) : Array (State.Candidate × State.CexTrace depth.succ) :=
+def getFalsifiedAt (depth : Nat) : Array (State.Candidate × State.Trace depth.succ) :=
   sys.candidates.filterMap fun candidate =>
     match candidate.status with
     | .cex k' trace =>
@@ -213,7 +217,7 @@ abbrev isDone : Bool :=
 
 /-- Positively activates **unknown** candidates at `sys.depthSucc`. -/
 def activateOldestNegativeCandidates
-  (svars : State.Terms sys.depthSucc)
+  (svars : State.TermsAt sys.depthSucc)
 : (h : ¬ sys.isDone := by assumption) → SmtM Unit := fun _ =>
   for candidate in sys.candidates do
     if candidate.isUnknown then

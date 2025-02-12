@@ -1,21 +1,21 @@
-import Cvc.TSys.Defs
+import Cvc.Safe
 
 
 
-namespace Cvc.Safe.TSys
+namespace Cvc.Safe
 
 
 
-namespace SVars
+namespace Symbols
 
-inductive Unrolling (State : SVars S) (F : Nat → Type u) : Nat → Type u
+inductive Unrolling (State : Symbols S) (F : Nat → Type u) : Nat → Type u
 | empty : Unrolling State F 0
 | cons (data : F n) (tail : Unrolling State F n) : Unrolling State F n.succ
 
 namespace Unrolling
 
 def reverse.loop
-  {State : SVars S}
+  {State : Symbols S}
   (acc : State.Unrolling (𝕂 α) (k - i))
   (u : State.Unrolling (𝕂 α) i)
   (h : i ≤ k := by first | simp | omega)
@@ -34,7 +34,8 @@ def reverse.loop
     ] at acc
     exact loop (i := i') acc tail
 
-def reverse {α : Type u} {State : SVars S} : State.Unrolling (𝕂 α) k → State.Unrolling (𝕂 α) k :=
+def reverse {α : Type u} {State : Symbols S}
+: State.Unrolling (𝕂 α) k → State.Unrolling (𝕂 α) k :=
   reverse.loop ((Nat.sub_self k).symm ▸ .empty)
 
 def get : {k : Nat} → (i : Fin k) → Unrolling State F k → F i
@@ -119,97 +120,72 @@ def fold : (β → (i : Fin k) → F i → β) → β → Unrolling State F k �
 
 end Unrolling
 
-end SVars
+end Symbols
 
 
 
-protected structure Unrolled (step : Nat) (α : Type u) where
+protected structure TSys.Unrolled (step : Nat) (α : Type u) where
   data : α
 
-namespace SVars
+namespace Symbols
 
-variable [Monad m]
+-- variable [Monad m]
 
--- structure Model (S) [SVars S] (step : Nat) extends TSys.Unrolled step (S Id)
+-- structure Model (S) [Symbols S] (step : Nat) extends TSys.Unrolled step (S Id)
 -- where protected mkRaw ::
 
--- def Model.mk [SVars S] : S Id → Model S step :=
+-- def Model.mk [Symbols S] : S Id → Model S step :=
 --   Model.mkRaw ∘ Unrolled.mk
 
--- structure BVars (S) [SVars S] (step : Nat) extends TSys.Unrolled step (S BVar)
+-- structure BVars (S) [Symbols S] (step : Nat) extends TSys.Unrolled step (S BVar)
 -- where protected mkRaw ::
 
--- def BVars.mk [SVars S] : S BVar → BVars S step :=
+-- def BVars.mk [Symbols S] : S BVar → BVars S step :=
 --   BVars.mkRaw ∘ Unrolled.mk
 
--- structure Terms (S) [SVars S] (step : Nat) extends TSys.Unrolled step (S Term)
+-- structure Terms (S) [Symbols S] (step : Nat) extends TSys.Unrolled step (S Term)
 -- where protected mkRaw ::
--- def Terms.mk [SVars S] : S Term → Terms S step :=
+-- def Terms.mk [Symbols S] : S Term → Terms S step :=
 --   Terms.mkRaw ∘ Unrolled.mk
 
 
 
--- def declare [State : SVars S] (symbols : State.Symbols) (k : Nat) : SmtM (State.Terms k) :=
+-- def declare [State : Symbols S] (symbols : State.Symbols) (k : Nat) : SmtM (State.Terms k) :=
 --   Terms.mk <$> State.mapM symbols fun symbol => symbol.declare k
 
--- def bvars [State : SVars S] (symbols : State.Symbols) (k : Nat) : SmtM (State.BVars k) :=
+-- def bvars [State : Symbols S] (symbols : State.Symbols) (k : Nat) : SmtM (State.BVars k) :=
 --   BVars.mk <$> State.mapM symbols fun symbol => symbol.bvar k
 
--- def bvarsList [State : SVars S] (bvars : State.BVars k) : SmtM Safe.BVars := do
+-- def bvarsList [State : Symbols S] (bvars : State.BVars k) : SmtM Safe.BVars := do
 --   let mut list := Safe.BVars.empty
 --   for ⟨_, _, bvar⟩ in bvars.data do
 --     list := list.push bvar
 --   return list
 
--- def getModel [State : SVars S] (terms : State.Terms k) : Smt.SatM (State.Model k) :=
+-- def getModel [State : Symbols S] (terms : State.Terms k) : Smt.SatM (State.Model k) :=
 --   Model.mk <$> State.mapM terms.data fun term => term.getVal
 
+abbrev Model {S} [State : Symbols S] : (step : Nat) → Type := fun _ => State.Concrete
 
-
-abbrev Model (S) [SVars S] : (step : Nat) → Type := 𝕂 (S Id)
-abbrev BVars (S) [SVars S] : (step : Nat) → Type := 𝕂 (S BVar)
-abbrev Terms (S) [SVars S] : (step : Nat) → Type := 𝕂 (S Term)
-
-abbrev PredicateT (S) [SVars S] : Type :=
-  S Term → Term.ManagerT m (Term Bool)
-
-abbrev Predicate (S) [SVars S] : Type :=
-  S Term → Term.ManagerM (Term Bool)
-
-abbrev RelationT (S) [SVars S] : Type :=
-  (prev : S Term) → (curr : S Term) → Term.ManagerT m (Term Bool)
-
-abbrev Relation (S) [SVars S] : Type :=
-  (prev : S Term) → (curr : S Term) → Term.ManagerM (Term Bool)
-
-
-
-def Symbols.declare [State : SVars S] (symbols : State.Symbols) (k : Nat) : SmtM (State.Terms k) :=
-  State.mapM symbols fun symbol => symbol.declare k
-
-def Symbols.bvars [State : SVars S] (symbols : State.Symbols) (k : Nat) : SmtM (State.BVars k) :=
-  State.mapM symbols fun symbol => symbol.bvar k
-
-def Terms.getModel [State : SVars S] (terms : State.Terms k) : Smt.SatM (State.Model k) :=
-  State.mapM terms fun term => term.getVal
-
-abbrev CexTrace (State : SVars S) (k : Nat) :=
+abbrev Trace (State : Symbols S) (k : Nat) :=
   State.Unrolling State.Model k
 
-namespace CexTrace
-protected def toString (symbols : State.Symbols)
-: {k : Nat} → (cex : CexTrace State k) → (pref : String := "") → (acc : String := "") → String
+namespace Trace
+
+protected
+def toString (symbols : State.Idents)
+: {k : Nat} → (cex : Trace State k) → (pref : String := "") → (acc : String := "") → String
 | 0, .empty, pref, acc => s!"{pref}‼️ empty counterexample ‼️{accAsSep acc}"
 | 1, .cons state .empty, pref, acc => present acc pref state 0
 | k + 1, .cons state tail, pref, acc =>
   present acc pref state k
-  |> CexTrace.toString symbols tail pref
+  |> Trace.toString symbols tail pref
 where
   getSymbol (k : Nat) := Id.run do
     let mut count := 0
-    for symbol in symbols do
+    for s in symbols do
       if count = k
-      then return symbol.snd.get
+      then return s.snd.get
       else count := count + 1
     return "<unknown state variable>"
   accAsSep : String → String
@@ -224,6 +200,6 @@ where
       count := count + 1
     return if k = 0 then s!"{s}\n{pref}|===|" else s
 
-end CexTrace
+end Trace
 
-end SVars
+end Symbols

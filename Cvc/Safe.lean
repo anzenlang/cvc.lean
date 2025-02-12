@@ -8,3 +8,5 @@ Authors: Adrien Champion
 import Cvc.Safe.Defs
 import Cvc.Safe.Smt
 import Cvc.Safe.Ext
+import Cvc.Safe.Symbols
+import Cvc.Safe.SymbolsExt

@@ -6,24 +6,18 @@ import CvcTest.Safe.Init
 
 namespace Cvc.Safe.TSys.Test.Sw1
 
+open scoped Cvc.Safe.Symbols
 open scoped Cvc.Safe.Test
 
 
 
-structure State.Vars (F : Type → Type) : Type where
-  startStop : SVar F Bool
-  reset : SVar F Bool
-  counting : SVar F Bool
-  count : SVar F Int
+symbol structure State where
+  startStop : Bool
+  reset : Bool
+  counting : Bool
+  count : Int
 
-namespace State.Vars
-variable (self : Vars F)
-
-def startStop! := self.startStop.get
-def reset! := self.reset.get
-def counting! := self.counting.get
-def count! := self.count.get
-end State.Vars
+namespace State
 
 scoped macro "returnIfDone! " t:term:max otherwise:term : term => `(
   do
@@ -32,29 +26,11 @@ scoped macro "returnIfDone! " t:term:max otherwise:term : term => `(
     | .done res => pure res
 )
 
-instance State : SVars State.Vars where
-  mapM self f := do
-    return {
-      startStop := ← f self.startStop
-      reset := ← f self.reset
-      counting := ← f self.counting
-      count := ← f self.count
-    }
-  forIn self acc f := do
-    returnIfDone! (f self.startStop.untype acc) fun acc =>
-    returnIfDone! (f self.reset.untype acc) fun acc =>
-    returnIfDone! (f self.counting.untype acc) fun acc =>
-    returnIfDone! (f self.count.untype acc) fun acc =>
-      pure acc
-
-def State.symbols : State.Symbols :=
-  ⟨"startStop", "reset", "counting", "count"⟩
-
-def State.init : State.Predicate :=
+def init : Predicate :=
   smtfun state =>
     state.count! = 0 ∧ ¬ state.counting!
 
-def State.step : State.Relation :=
+def step : Relation :=
   smtfun state state' =>
     state'.counting! = (
       if state'.startStop! then ¬ state.counting! else state.counting!
@@ -63,53 +39,54 @@ def State.step : State.Relation :=
       else if state'.counting! then state.count! + 1 else state.count!
     )
 
-def State.candidateZeroLtCount : String × State.Predicate := (
+def candidateZeroLtCount : String × Predicate := (
   "zeroLtCount",
   smtfun state => 0 < state.count!
 )
 
-def State.candidateCountPos : String × State.Predicate := (
+def candidateCountPos : String × Predicate := (
   "countPos",
   smtfun state => 0 ≤ state.count!
 )
 
-def State.candidateResetInv : String × State.Predicate := (
+def candidateResetInv : String × Predicate := (
   "resetInv",
   smtfun state => state.reset! → state.count! = 0
 )
 
-def State.candidateCountNeqN7 : String × State.Predicate := (
+def candidateCountNeqN7 : String × Predicate := (
   "CountNeqN7",
   smtfun state => state.count! ≠ - 7
 )
 
-def State.candidateCountNeq7 : String × State.Predicate := (
+def candidateCountNeq7 : String × Predicate := (
   "CountNeq7",
   smtfun state => state.count! ≠ 7
 )
 
-abbrev Sys := State.TSys
+abbrev Sys :=
+  instSymbols.TSys.{0, 0}
 
 namespace Sys
 
 def mkBad : SmtM Sys :=
-  TSys.mk .qf_lia State.symbols State.init State.step
+  TSys.mk .qf_lia State.idents State.init State.step
     #[State.candidateZeroLtCount]
 
-def mkBadFar : SmtM Sys :=
-  TSys.mk .qf_lia State.symbols State.init State.step
+def mkBad7 : SmtM Sys :=
+  TSys.mk .qf_lia State.idents State.init State.step
     #[State.candidateCountNeq7]
 
 def mkBasic : SmtM Sys :=
-  TSys.mk .qf_lia State.symbols State.init State.step
+  TSys.mk .qf_lia State.idents State.init State.step
     #[State.candidateCountPos]
 
 def mkStrong : SmtM Sys :=
-  TSys.mk .qf_lia State.symbols State.init State.step
+  TSys.mk .qf_lia State.idents State.init State.step
     #[State.candidateCountPos, State.candidateResetInv, State.candidateCountNeqN7]
 
 def mkWeak : SmtM Sys :=
-  TSys.mk .qf_lia State.symbols State.init State.step
+  TSys.mk .qf_lia State.idents State.init State.step
     #[State.candidateResetInv]
 
 /--
@@ -355,5 +332,5 @@ nothing left to do at depth 7/1
 exiting
 -/
 #test do
-  run Sys.mkBadFar
+  run Sys.mkBad7
     -- (showNegCandidates := true)
