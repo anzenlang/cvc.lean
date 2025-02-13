@@ -661,12 +661,16 @@ private instance : MonadLift (cvc5.SolverT m) (SmtT m) where
 @[inherit_doc Cvc.Smt.runWith]
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) :=
   code.toUnsafe.runWith tm
+@[inherit_doc runWith]
+def runIOWith := @runWith (m := IO)
 
 @[inherit_doc Cvc.Smt.run]
 def run [MonadLiftT BaseIO m]
   (code : SmtT m α)
 : ExceptT Error m α :=
   code.toUnsafe.run
+@[inherit_doc run]
+def runIO := @run (m := IO)
 
 @[inherit_doc Cvc.Smt.run!]
 def run! [MonadLiftT BaseIO m] [Inhabited α]
@@ -674,6 +678,8 @@ def run! [MonadLiftT BaseIO m] [Inhabited α]
   (handleError : Error → m α := fun e => panic! s!"{e}")
 : m α :=
   code.toUnsafe.run! handleError
+@[inherit_doc run!]
+def runIO! := @run! (m := IO)
 
 end SmtT
 
@@ -811,8 +817,7 @@ end Unknown
 - `ifUnknown`: Runs when (un)satisfiability cannot be established, produces an unexpected-style
   error by default.
 -/
-def checkSat
-  [Monad m]
+def checkSat [Monad m]
   (terms : Array (Term Bool) := #[])
   (ifSat : Smt.SatT m α := Smt.Sat.unexpected)
   (ifUnsat : Smt.UnsatT m α := Smt.Unsat.unexpected)
