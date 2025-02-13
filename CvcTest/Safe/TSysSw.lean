@@ -6,6 +6,7 @@ import CvcTest.Safe.Init
 
 namespace Cvc.Safe.TSys.Test.Sw1
 
+open scoped Cvc.Safe.Term
 open scoped Cvc.Safe.Symbols
 open scoped Cvc.Safe.Test
 
@@ -27,11 +28,11 @@ scoped macro "returnIfDone! " t:term:max otherwise:term : term => `(
 )
 
 def init : Predicate :=
-  smtfun state =>
+  smtFun! state =>
     state.count! = 0 ∧ ¬ state.counting!
 
 def step : Relation :=
-  smtfun state state' =>
+  smtFun! state state' =>
     state'.counting! = (
       if state'.startStop! then ¬ state.counting! else state.counting!
     ) ∧ state'.count! = (
@@ -41,27 +42,27 @@ def step : Relation :=
 
 def candidateZeroLtCount : String × Predicate := (
   "zeroLtCount",
-  smtfun state => 0 < state.count!
+  smtFun! state => 0 < state.count!
 )
 
 def candidateCountPos : String × Predicate := (
   "countPos",
-  smtfun state => 0 ≤ state.count!
+  smtFun! state => 0 ≤ state.count!
 )
 
 def candidateResetInv : String × Predicate := (
   "resetInv",
-  smtfun state => state.reset! → state.count! = 0
+  smtFun! state => state.reset! → state.count! = 0
 )
 
 def candidateCountNeqN7 : String × Predicate := (
   "CountNeqN7",
-  smtfun state => state.count! ≠ - 7
+  smtFun! state => state.count! ≠ - 7
 )
 
 def candidateCountNeq7 : String × Predicate := (
   "CountNeq7",
-  smtfun state => state.count! ≠ 7
+  smtFun! state => state.count! ≠ 7
 )
 
 abbrev Sys :=

@@ -126,6 +126,7 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 
 
 open Smt in
+open scoped Term in
 def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
   setLogic Logic.lia.qf.uf
   setOption .produceModels

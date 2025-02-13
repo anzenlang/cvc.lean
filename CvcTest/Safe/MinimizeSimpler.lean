@@ -65,6 +65,7 @@ def findModel? [Monad m] [Vars V]
 /-- Minimization result: smallest value found and its corresponding model. -/
 abbrev Minimized? (S : Type → Type) := Option (Int × S Int)
 
+open scoped Term in
 /-- Finds a minimum for `f(vars)` in the space delimited by `constraints`.
 
 **NB**: without proper `constraints`, this function may not terminate.

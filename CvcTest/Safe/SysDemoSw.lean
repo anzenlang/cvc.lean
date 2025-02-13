@@ -13,6 +13,9 @@ import CvcTest.Safe.Sys
 namespace Cvc.Safe.Test
 
 open Sys (SVar SVars)
+open scoped Term
+
+
 
 namespace sw
 

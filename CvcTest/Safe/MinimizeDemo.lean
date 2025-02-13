@@ -4,6 +4,7 @@ import CvcTest.Safe.Minimize
 
 namespace Cvc.Safe.Test.Minimize
 
+open scoped Term
 
 
 namespace Test1
@@ -32,9 +33,9 @@ got a model:
 -/
 #test do
   let preds : Array (Pred State) := #[
-    smt! fun terms => 0 < terms.n1,
-    smt! fun terms => 0 < terms.n2,
-    smt! fun terms => 2 * terms.n1 + 3 * terms.n2 = 7*terms.n3
+    smtFun! terms => 0 < terms.n1,
+    smtFun! terms => 0 < terms.n2,
+    smtFun! terms => 2 * terms.n1 + 3 * terms.n2 = 7*terms.n3
   ]
   if let some model ← findModel? vars preds then
     println! "got a model:"
@@ -55,11 +56,11 @@ minimum value is `-55` on
 -/
 #guard_msgs in #eval do
   let constraints : Array (Pred State) := #[
-    smt! fun terms => (-10) ≤ terms.n1 ∧ terms.n1 ≤ 10,
-    smt! fun terms => (-10) ≤ terms.n2 ∧ terms.n2 ≤ 10,
-    smt! fun terms => (-5) ≤ terms.n3 ∧ terms.n3 ≤ 5
+    smtFun! terms => (-10) ≤ terms.n1 ∧ terms.n1 ≤ 10,
+    smtFun! terms => (-10) ≤ terms.n2 ∧ terms.n2 ≤ 10,
+    smtFun! terms => (-5) ≤ terms.n3 ∧ terms.n3 ≤ 5
   ]
-  let f : Fun State Int := smt! fun terms =>
+  let f : Fun State Int := smtFun! terms =>
     terms.n1 - 2 * terms.n2 + 3 * (terms.n3 - terms.n1)
   let minimized? ← minimize vars f constraints
   if let (some (val, model), count) := minimized? then

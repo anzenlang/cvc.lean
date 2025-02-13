@@ -4,6 +4,8 @@ import CvcTest.Safe.MinimizeSimpler
 
 namespace Cvc.Safe.Test.Minimize
 
+open scoped Term
+
 
 
 namespace Test1

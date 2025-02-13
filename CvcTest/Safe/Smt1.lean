@@ -51,6 +51,7 @@ Use `#eval!` to evaluate nevertheless (which may cause lean to crash).
 
 
 
+open scoped Cvc.Safe.Term in
 #test do
   setLogic Logic.qf_lia.uf
 

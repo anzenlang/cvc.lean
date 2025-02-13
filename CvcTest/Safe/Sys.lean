@@ -266,6 +266,7 @@ def checkTrans : SmtT m self.Model2? := do
       return some (prev, curr))
     (ifUnsat := return none)
 
+open scoped Term in
 /-- Computes the pre-image of `preds` assuming `assumptions` as a conjunction.
 
 Using suffix `v@0` (`v@1`) for instantiation at the previous (current) state, this function

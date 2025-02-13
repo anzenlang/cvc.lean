@@ -84,6 +84,7 @@ def findModel? [Vars S] [Monad m]
 
 abbrev Minimized? (S : (Type → Type) → Type) := Option (Int × S Id)
 
+open scoped Term in
 partial def minimize
   [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m]
   [Vars S] (vars : S Decl)

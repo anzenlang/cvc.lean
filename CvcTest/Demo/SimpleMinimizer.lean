@@ -16,6 +16,8 @@ minimum for `f` over some domain specified by constraints over the arguments.
 -/
 namespace Cvc.Safe.Test.Minimize
 
+open scoped Cvc.Safe.Term
+
 
 
 /-! ## Boilerplate -/
@@ -160,10 +162,10 @@ def findModel?Demo : IO Unit := do
   let vars : MyVars String := ⟨"n1", "n2", "n3"⟩
 
   let constraints : Array (Pred MyVars) := #[
-    smt! fun terms => 0 < terms.n1,
-    smt! fun terms => terms.n2 < 0,
-    smt! fun terms => 0 < terms.n3,
-    smt! fun terms => 2 * terms.n1 + 3 * terms.n2 = 7 * terms.n3
+    smtFun! terms => 0 < terms.n1,
+    smtFun! terms => terms.n2 < 0,
+    smtFun! terms => 0 < terms.n3,
+    smtFun! terms => 2 * terms.n1 + 3 * terms.n2 = 7 * terms.n3
   ]
 
   let model? ← findModel? vars constraints |>.run!
@@ -251,12 +253,12 @@ namespace User
 def minimize?Demo : IO Unit := do
   let vars : MyVars String := ⟨"n1", "n2", "n3"⟩
   let constraints : Array (Pred MyVars) := #[
-    smt! fun terms => (-10) ≤ terms.n1 ∧ terms.n1 ≤ 10,
-    smt! fun terms => (-10) ≤ terms.n2 ∧ terms.n2 ≤ 10,
-    smt! fun terms => (-5) ≤ terms.n3 ∧ terms.n3 ≤ 5
+    smtFun! terms => (-10) ≤ terms.n1 ∧ terms.n1 ≤ 10,
+    smtFun! terms => (-10) ≤ terms.n2 ∧ terms.n2 ≤ 10,
+    smtFun! terms => (-5) ≤ terms.n3 ∧ terms.n3 ≤ 5
   ]
   let f : Fun MyVars Int :=
-    smt! fun terms => -- n1 - 2*n2 + 3* (n3 - n1)
+    smtFun! terms => -- n1 - 2*n2 + 3* (n3 - n1)
       terms.n1 - 2 * terms.n2 + 3 * (terms.n3 - terms.n1)
   let minimized? ← minimize? vars f constraints
   if let (some (val, model), count) := minimized? then
