@@ -376,7 +376,7 @@ def mkForall (bvars : BVars) (t : Term Bool) : ManagerM (Term Bool) :=
 def mkIte (cnd : Term Bool) (thn els : Term α) : ManagerM (Term α) :=
   ofUnsafe <$> Cvc.Term.mkIte cnd.toUnsafe thn.toUnsafe els.toUnsafe
 @[inherit_doc Cvc.Term.mkIte]
-def ite := @mkIte
+protected def ite := @mkIte
 
 @[inherit_doc Cvc.Term.mkEqN]
 def mkEqN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
@@ -387,7 +387,7 @@ def mkEqN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : Mana
 def mkEq (lhs rhs : Term α) : ManagerM (Term Bool) :=
   ofUnsafe <$> Cvc.Term.mkEq lhs.toUnsafe rhs.toUnsafe
 @[inherit_doc Cvc.Term.mkEq]
-def eq := @mkEq
+protected def eq := @mkEq
 
 @[inherit_doc Cvc.Term.mkDistinct]
 def mkDistinct
