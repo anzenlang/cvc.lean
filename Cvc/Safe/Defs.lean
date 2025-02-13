@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2023-2024 by the authors listed in the file AUTHORS and their
+Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
 institutional affiliations. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
@@ -376,7 +376,7 @@ def mkForall (bvars : BVars) (t : Term Bool) : ManagerM (Term Bool) :=
 def mkIte (cnd : Term Bool) (thn els : Term α) : ManagerM (Term α) :=
   ofUnsafe <$> Cvc.Term.mkIte cnd.toUnsafe thn.toUnsafe els.toUnsafe
 @[inherit_doc Cvc.Term.mkIte]
-def ite := @mkIte
+protected def ite := @mkIte
 
 @[inherit_doc Cvc.Term.mkEqN]
 def mkEqN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : ManagerM (Term Bool) :=
@@ -387,7 +387,7 @@ def mkEqN (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp) : Mana
 def mkEq (lhs rhs : Term α) : ManagerM (Term Bool) :=
   ofUnsafe <$> Cvc.Term.mkEq lhs.toUnsafe rhs.toUnsafe
 @[inherit_doc Cvc.Term.mkEq]
-def eq := @mkEq
+protected def eq := @mkEq
 
 @[inherit_doc Cvc.Term.mkDistinct]
 def mkDistinct
@@ -661,12 +661,16 @@ private instance : MonadLift (cvc5.SolverT m) (SmtT m) where
 @[inherit_doc Cvc.Smt.runWith]
 def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) :=
   code.toUnsafe.runWith tm
+@[inherit_doc runWith]
+def runIOWith := @runWith (m := IO)
 
 @[inherit_doc Cvc.Smt.run]
 def run [MonadLiftT BaseIO m]
   (code : SmtT m α)
 : ExceptT Error m α :=
   code.toUnsafe.run
+@[inherit_doc run]
+def runIO := @run (m := IO)
 
 @[inherit_doc Cvc.Smt.run!]
 def run! [MonadLiftT BaseIO m] [Inhabited α]
@@ -674,6 +678,8 @@ def run! [MonadLiftT BaseIO m] [Inhabited α]
   (handleError : Error → m α := fun e => panic! s!"{e}")
 : m α :=
   code.toUnsafe.run! handleError
+@[inherit_doc run!]
+def runIO! := @run! (m := IO)
 
 end SmtT
 
@@ -811,8 +817,7 @@ end Unknown
 - `ifUnknown`: Runs when (un)satisfiability cannot be established, produces an unexpected-style
   error by default.
 -/
-def checkSat
-  [Monad m]
+def checkSat [Monad m]
   (terms : Array (Term Bool) := #[])
   (ifSat : Smt.SatT m α := Smt.Sat.unexpected)
   (ifUnsat : Smt.UnsatT m α := Smt.Unsat.unexpected)

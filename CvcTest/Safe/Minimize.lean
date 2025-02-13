@@ -1,3 +1,10 @@
+/-
+Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
 import CvcTest.Safe.Init
 
 
@@ -84,6 +91,7 @@ def findModel? [Vars S] [Monad m]
 
 abbrev Minimized? (S : (Type → Type) → Type) := Option (Int × S Id)
 
+open scoped Term in
 partial def minimize
   [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m]
   [Vars S] (vars : S Decl)

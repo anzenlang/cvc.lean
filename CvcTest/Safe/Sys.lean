@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2023-2024 by the authors listed in the file AUTHORS and their
+Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
 institutional affiliations. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
@@ -266,6 +266,7 @@ def checkTrans : SmtT m self.Model2? := do
       return some (prev, curr))
     (ifUnsat := return none)
 
+open scoped Term in
 /-- Computes the pre-image of `preds` assuming `assumptions` as a conjunction.
 
 Using suffix `v@0` (`v@1`) for instantiation at the previous (current) state, this function

@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2023-2024 by the authors listed in the file AUTHORS and their
+Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
 institutional affiliations. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
@@ -126,6 +126,7 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 
 
 open Smt in
+open scoped Term in
 def cvcSafeDemo' : SmtT IO (Option (Int × Bool)) := do
   setLogic Logic.lia.qf.uf
   setOption .produceModels

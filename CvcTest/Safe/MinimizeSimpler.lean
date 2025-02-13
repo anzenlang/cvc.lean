@@ -1,3 +1,10 @@
+/-
+Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
 import CvcTest.Safe.Init
 
 
@@ -65,6 +72,7 @@ def findModel? [Monad m] [Vars V]
 /-- Minimization result: smallest value found and its corresponding model. -/
 abbrev Minimized? (S : Type → Type) := Option (Int × S Int)
 
+open scoped Term in
 /-- Finds a minimum for `f(vars)` in the space delimited by `constraints`.
 
 **NB**: without proper `constraints`, this function may not terminate.
