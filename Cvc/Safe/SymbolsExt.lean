@@ -66,7 +66,9 @@ def stateStructure := leading_parser
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
 scoped syntax (name := stateStructureSyntax)
-  declModifiers symbolTk structureTk stateStructure
+  declModifiers symbolTk
+    structureTk stateStructure
+    -- Lean.Parser.Command.«structure»
 : command
 
 @[command_elab stateStructureSyntax]
@@ -90,6 +92,8 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
   let ident_Concrete := Lean.mkIdent `Concrete
   let ident_Model := Lean.mkIdent `Model
   let ident_Terms := Lean.mkIdent `Terms
+  let ident_Fun := Lean.mkIdent `Fun
+  let ident_Function := Lean.mkIdent `Function
   let ident_Pred := Lean.mkIdent `Pred
   let ident_Predicate := Lean.mkIdent `Predicate
   let ident_Rel := Lean.mkIdent `Rel
@@ -138,6 +142,8 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
     abbrev $ident_Concrete := $ident_Values
     abbrev $ident_Model := $ident_Values
     abbrev $ident_Terms := $ident_inst.{0, 0}.$ident_Terms
+    protected abbrev $ident_Fun := $ident_inst.{0, 0}.$ident_Fun
+    protected abbrev $ident_Function := $ident_inst.{0, 0}.$ident_Function
     abbrev $ident_Pred := $ident_inst.{0, 0}.$ident_Pred
     abbrev $ident_Predicate := $ident_Pred
     abbrev $ident_Rel := $ident_inst.{0, 0}.$ident_Rel
