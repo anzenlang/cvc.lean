@@ -83,12 +83,24 @@ Is there a valuation `vals` of `f`'s inputs that verifies some condition `c (f v
 end Trash
 
 /-!
-Let's solve this problem with cvc5 and `cvc.lean`
+Let's solve this problem with cvc5 and `cvc.lean`. (Or at least *pretend to* for now.)
 -/
 
 /-- info: Cvc.Term : Type -/
 #guard_msgs(info) in
 #check Term
+
+/-!
+So the result we want is `Option (Term × SymbolMap Term)`:
+
+- `Option` because the domain might be empty (yielding `none`)
+
+- the first `Cvc.Term` is the (term) *value* of `f` verifying the constraints
+
+- the `SymbolMap` gives (term) *value* to identifiers
+
+  (here: `"n1"`, `"n2"`, `"n3"`, and `"flag"`)
+-/
 
 /-- info: Cvc.SmtM (α : Type) : Type -/
 #guard_msgs(info) in
@@ -117,12 +129,7 @@ def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap 
   -- use the cvc5 term factory to build relevant terms
   let cst_m10 ← Term.mkInt (-10)
   let cst_10 ← Term.mkInt 10
-  let cst_m5 ← Term.mkInt (-5)
-  let cst_0 ← Term.mkInt 0
-  let cst_2 ← Term.mkInt 2
-  let cst_3 ← Term.mkInt 3
-  let cst_4 ← Term.mkInt 4
-  let cst_5 ← Term.mkInt 5
+  -- [...] *etc.*
 
   -- assert our constraints
   Smt.assert (← cst_m10.le n1) -- `-10 ≤ n1`
@@ -136,6 +143,7 @@ def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap 
   -- ready to build and assert the condition now
   let condition ← c f
   assert condition
+
   -- just ask cvc5
   match ← checkSat? with
   | none =>
