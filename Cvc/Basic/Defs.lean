@@ -204,6 +204,8 @@ def runWith (tm : Term.Manager) (code : SmtT m α) : m (Except Error α) := do
       let (res, ⟨_, s, _⟩) ← code ⟨tm, solver, 0⟩
       return (res.mapError Error.toCvc5, s)
   return res.mapError Error.ofCvc5
+@[inherit_doc runWith]
+def runIOWith := @runWith (m := IO)
 
 /-- Runs `SmtT` code, creates the term manager and the solver. -/
 def run [MonadLiftT BaseIO m]
@@ -211,6 +213,8 @@ def run [MonadLiftT BaseIO m]
 : ExceptT Error m α := do
   let tm ← Term.Manager.mk
   code.runWith tm
+@[inherit_doc run]
+def runIO := @run (m := IO)
 
 /-- Runs `SmtT` code, panics on errors by default. -/
 def run! [MonadLiftT BaseIO m] [Inhabited α]
@@ -220,6 +224,8 @@ def run! [MonadLiftT BaseIO m] [Inhabited α]
   match ← run code with
   | .ok res => return res
   | .error e => handleError e
+@[inherit_doc run!]
+def runIO! := @run! (m := IO)
 
 end SmtT
 

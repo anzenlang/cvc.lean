@@ -112,11 +112,15 @@ abbrev apply := mkApply
 /-- If-then-else, `cnd : Bool` and `thn els : α`. -/
 def mkIte (cnd thn els : Term) : ManagerM Term :=
   mk .ITE #[cnd, thn, els]
+@[inherit_doc mkIte]
+protected abbrev ite := mkIte
 
 /-- Equality between two terms or more. -/
 def mkEqN (terms : Array Term) (valid : 2 ≤ terms.size := by simp) : ManagerM Term :=
   let _ := valid
   mk .EQUAL terms
+@[inherit_doc mkEqN]
+protected abbrev eqN := @mkEqN
 
 /-- Equality between two terms -/
 def mkEq (lhs rhs : Term) : ManagerM Term :=
