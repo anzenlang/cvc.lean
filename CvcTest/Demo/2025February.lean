@@ -40,15 +40,7 @@ open Lean (RBMap)
 abbrev SymbolMap (α : Type) :=
   RBMap String α compare
 
-namespace SymbolMap
-def empty : SymbolMap α := RBMap.empty
-
-def ofList (l : List (String × α)) : SymbolMap α := Id.run do
-  let mut map := empty
-  for (key, val) in l do
-    map := map.insert key val
-  return map
-end SymbolMap
+def SymbolMap.empty : SymbolMap α := RBMap.empty
 
 
 
@@ -132,8 +124,8 @@ def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap 
   -- [...] *etc.*
 
   -- assert our constraints
-  Smt.assert (← cst_m10.le n1) -- `-10 ≤ n1`
-  Smt.assert (← n1.le cst_10)  --       `n1 ≤ 10`
+  assert (← cst_m10.le n1) -- `-10 ≤ n1`
+  assert (← n1.le cst_10)  --       `n1 ≤ 10`
   -- [...] same for the other constraints
 
   -- build the term corresponding to the function we're analyzing so that we can build `c f`
