@@ -76,7 +76,7 @@ Is there a valuation `vals` of `f`'s inputs that verifies some condition `c (f v
 end Trash
 
 /-!
-Let's solve this problem with cvc5 and `cvc.lean`. (Or at least *pretend to* for now.)
+Let's solve this problem with cvc5 and `cvc.lean`.
 -/
 
 /-- info: Cvc.Term : Type -/
