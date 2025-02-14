@@ -160,7 +160,7 @@ creating system...
 
 currently at 0
 - check done, now at 0
-  zeroLtCount → Status [[ cex 1 ]]
+  zeroLtCount → Status [[ cex 0 ]]
 - failed to prove anything
 - just falsified
 
@@ -186,7 +186,7 @@ creating system...
 
 currently at 0
 - check done, now at 1
-  countPos → Status [[ invariant 2, strengthened by 0 lemmas ]]
+  countPos → Status [[ invariant 1, strengthened by 0 lemmas ]]
 - just proved
   - `countPos`
 - no cex found
@@ -205,7 +205,7 @@ creating system...
 
 currently at 0
 - check done, now at 1
-  resetInv → Status [[ invariant 2, strengthened by 0 lemmas ]]
+  resetInv → Status [[ invariant 1, strengthened by 0 lemmas ]]
 - just proved
   - `resetInv`
 - no cex found
@@ -224,9 +224,9 @@ creating system...
 
 currently at 0
 - check done, now at 1
-  countPos → Status [[ invariant 2, strengthened by 0 lemmas ]]
-  resetInv → Status [[ invariant 2, strengthened by 0 lemmas ]]
-  CountNeqN7 → Status [[ invariant 2, strengthened by 0 lemmas ]]
+  countPos → Status [[ invariant 1, strengthened by 0 lemmas ]]
+  resetInv → Status [[ invariant 1, strengthened by 0 lemmas ]]
+  CountNeqN7 → Status [[ invariant 1, strengthened by 0 lemmas ]]
 - just proved
   - `countPos`
   - `resetInv`
@@ -289,7 +289,7 @@ currently at 6
 
 currently at 7
 - check done, now at 7
-  CountNeq7 → Status [[ cex 8 ]]
+  CountNeq7 → Status [[ cex 7 ]]
 - failed to prove anything
 - just falsified
 
