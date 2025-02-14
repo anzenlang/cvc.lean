@@ -14,11 +14,11 @@ import Cvc.TSys
 
 ## Abstract
 
-The [cvc5] SMT solver is a state-of-art constraint solver used in a wide
-array of automatic formal verification use cases. Such solvers often expose their APIs in various
-programming language so that developers can easily implement constraint solving in specific
-contexts, in particular static analyzers for a certain language or kind of programs. Exposing a
-clean, ergonomic API is crucial as SMT solvers are relatively technical tools to use correctly.
+The [cvc5] SMT solver is a state-of-art constraint solver used in a wide array of automatic formal
+verification use cases. Such solvers often expose their APIs in various programming language so that
+developers can easily implement constraint solving in specific contexts, in particular static
+analyzers for a certain language or kind of programs. Exposing a clean, ergonomic API is crucial as
+SMT solvers are relatively technical tools to use correctly.
 
 This talk discusses [cvc.lean], a public-but-not-released-yet [Lean 4] library developed with the
 University of Iowa and the cvc5 team. It exposes a powerful and *safe* version of the cvc5's API:
