@@ -19,11 +19,14 @@ namespace Symbols
 inductive CandidateStatus (State : Symbols S)
 | initValidUntil (k? : Option Nat) (stepCex? : Option Nat)
 | invariant (k : Nat) (strength : Set String)
-| cex (k : Nat) (trace : State.Unrolling State.Model k)
+| cex (k : Nat) (trace : State.Unrolling State.Model (k + 1))
 
 namespace CandidateStatus
 
 variable {State : Symbols S}
+
+def mkCex (trace : State.Unrolling State.Model (k + 1)) : CandidateStatus State :=
+  .cex k trace
 
 protected def toString : CandidateStatus State → String
 | initValidUntil k? stepCex? =>
@@ -194,22 +197,20 @@ def mk
 
 variable {State : Symbols S} (sys : TSys State)
 
-def initDepth := sys.depthSucc.pred
-
 def getUnknownCandidates : Array State.Candidate :=
   sys.candidates.filter Symbols.Candidate.isUnknown
 
 def getJustProved : Array State.Candidate :=
   sys.candidates.filter fun candidate =>
     match candidate.status with
-    | .invariant k _ => sys.depthSucc = k
+    | .invariant k _ => k = sys.depth
     | .initValidUntil _ _ | .cex _ _ => false
 
 def getFalsifiedAt (depth : Nat) : Array (State.Candidate × State.Trace depth.succ) :=
   sys.candidates.filterMap fun candidate =>
     match candidate.status with
     | .cex k' trace =>
-      if h : k' = depth.succ then some (candidate, h ▸ trace) else none
+      if h : k' = depth then some (candidate, h ▸ trace) else none
     | .invariant _ _ | .initValidUntil _ _ => none
 
 def countUnknownCandidates : Nat := Id.run do
@@ -224,7 +225,7 @@ abbrev isDone : Bool :=
 
 /-- Positively activates **unknown** candidates at `sys.depthSucc`. -/
 def activateOldestNegativeCandidates
-  (svars : State.TermsAt sys.depthSucc)
+  (svars : State.TermsAt sys.depth.succ)
 : (h : ¬ sys.isDone := by assumption) → SmtM Unit := fun _ =>
   for candidate in sys.candidates do
     if candidate.isUnknown then
@@ -245,48 +246,34 @@ def unrollOnce (h : ¬ sys.isDone := by assumption) : SmtM State.TSys :=
 
 def registerCex (inInit : Bool) : Smt.SatT IO State.TSys := do
   let cex ← sys.toUnroller.extractCexTrace
-  -- println! "cex"
-  -- for ⟨i, svars⟩ in sys.unrolling do
-  --   println! "|==| @{i}"
-  --   for ⟨_, svar⟩ in svars.state do
-  --     let _ := svar.inst
-  --     let val ← Smt.getValue svar.get
-  --     println! "| {svar.get} = {val}"
-  -- println! "|==|"
   let candidates ← sys.candidates.mapM fun candidate => do
-    -- println! "  - `{candidate.name}`"
     if let some (initK?, stepCexK?) := candidate.unknownInfo? then
-      -- println! "    unknown"
       if ¬ (← candidate.isFalsified) then
-        -- println! "    not falsified"
         return candidate
-      -- println! "    falsified"
-      -- sanity
       if inInit then
         if let some k := initK? then
-          if sys.depthSucc ≤ k then
+          if sys.depth.succ ≤ k then
             throw $ .internal s!"\
-              extracting init CEX at {sys.depthSucc} but `{candidate.name}` is init-confirmed at {k}\
+              extracting init CEX at {sys.depth} \
+              but `{candidate.name}` is init-confirmed at {k}\
             "
-          else if sys.depthSucc ≠ k.succ then
+          else if sys.depth.succ ≠ k.succ then
             throw $ .internal s!"\
-              extracting init CEX at {sys.depthSucc} but `{candidate.name}` \
+              extracting init CEX at {sys.depth} but `{candidate.name}` \
               is only init-confirmed at {k}\
             "
       else
         if let some k := stepCexK? then
-          if sys.depthSucc ≤ k then
+          if sys.depth.succ ≤ k then
             throw $ .internal s!"\
-              extracting step CEX at {sys.depthSucc} \
+              extracting step CEX at {sys.depth} \
               but a step CEX at {k} exists for candidate `{candidate.name}`\
             "
       let candidate ←
         if inInit then
-          -- println! "    registering init cex"
-          pure {candidate with status := .cex sys.depthSucc cex}
+          pure { candidate with status := .mkCex cex }
         else
-          -- println! "    registering step cex"
-          pure {candidate with status := .initValidUntil initK? sys.depthSucc}
+          pure {candidate with status := .initValidUntil initK? sys.depth.succ}
       pure candidate
     else
       pure candidate
@@ -297,18 +284,17 @@ def registerNoInitCex
 : (h : ¬ sys.isDone := by assumption) → Smt.UnsatM State.TSys := fun _ => do
   let candidates ← sys.candidates.mapM fun candidate =>
     candidate.updateInitValidUntil (initValidDo := fun old => do
-      let expected := if let d + 1 := sys.initDepth then some d.succ else none
+      let expected := if let d + 1 := sys.depth then some d.succ else none
       if old ≠ expected then
         throw $ .internal s!"\
-          cannot register no-init-cex for `{candidate.name}` at {sys.initDepth}: \
+          cannot register no-init-cex for `{candidate.name}` at {sys.depth}: \
           expected valid-init status `{expected}` but found `{old}`\
         "
-      pure sys.depthSucc
+      pure sys.depth.succ
     )
   return { sys with candidates }
 
 def registerNoStepCex
-  (h_depth : 0 < sys.depthSucc := by first | assumption | omega)
 : (h_not_done : ¬ sys.isDone := by assumption) → Smt.UnsatT IO State.TSys := fun _ => do
   -- println! "  - registerNoStepCex"
   let candidates ← sys.candidates.mapM fun candidate => do
@@ -318,18 +304,18 @@ def registerNoStepCex
     | some (k?, badAtStep?) =>
       -- println! "      unknown info: {k?}, {badAtStep?}"
       let confirmed :=
-        badAtStep?.map (fun k => k.blt sys.depthSucc) |>.getD true
+        badAtStep?.map (fun k => k.blt sys.depth.succ) |>.getD true
       if confirmed then
-        let expected := match h_depth_val : sys.depthSucc with
-          | 0 => by simp only [h_depth_val, Nat.lt_irrefl] at h_depth
+        let expected := match h_depth_val : sys.depth.succ with
+          | 0 => by simp only [Nat.succ_eq_add_one, Nat.add_one_ne_zero] at h_depth_val
           | d + 1 => some d
         if expected ≠ k? then
           throw $ .internal s!"\
-            cannot register no-step-cex for `{candidate.name}` at {sys.depthSucc}: \
+            cannot register no-step-cex for `{candidate.name}` at {sys.depth}: \
             expected valid-init status `{expected}` but found `{k?}`\
           "
         else
-          pure { candidate with status := .invariant sys.depthSucc Set.empty }
+          pure { candidate with status := .invariant sys.depth Set.empty }
       else
         pure candidate
   return { sys with candidates }
@@ -338,7 +324,7 @@ def getInitActlits : (h : ¬ sys.isDone := by assumption) → Array (Term Bool) 
   let mut actlits := #[]
   for c in sys.candidates do
     if let some (initK?, _) := c.unknownInfo? then
-      let ignore := initK?.map (sys.depthSucc ≤ · : Nat → Bool) |>.getD false
+      let ignore := initK?.map (sys.depth.succ ≤ · : Nat → Bool) |>.getD false
       if ¬ ignore then
         actlits :=
           Term.ofActlit c.currentNegativeActlit
@@ -349,7 +335,7 @@ def getStepActlits : (h : ¬ sys.isDone := by assumption) → Array (Term Bool) 
   let mut actlits := #[]
   for c in sys.candidates do
     if let some (_, stepCexK?) := c.unknownInfo? then
-      let ignore := stepCexK?.map (sys.depthSucc ≤ · : Nat → Bool) |>.getD false
+      let ignore := stepCexK?.map (sys.depth.succ ≤ · : Nat → Bool) |>.getD false
       if ¬ ignore then
         actlits :=
           Term.ofActlit c.currentNegativeActlit
@@ -379,9 +365,7 @@ def checkInit (sys : State.TSys) (h : ¬ sys.isDone := by assumption) : SmtIO St
 
 partial
 def checkStep
-  (sys : State.TSys)
-  (h_depth : 0 < sys.depthSucc := by first | assumption | omega)
-  (h_not_done : ¬ sys.isDone := by assumption)
+  (sys : State.TSys) (h_not_done : ¬ sys.isDone := by assumption)
 : SmtIO State.TSys := do
   let actlits := sys.getStepActlits
   if actlits.isEmpty then
@@ -397,11 +381,7 @@ def checkStep
       return (false, sys))
   if gotCex then
     if h_not_done : ¬ sys.isDone then
-      if h_depth : 0 < sys.depthSucc then
-        sys.checkStep
-      else
-        -- #TODO prove this can't happen
-        throw $ .internal s!"🙀 CEX registration changed the depth of the unroller 🙀"
+      sys.checkStep
     else
       -- #TODO prove this can't happen
       throw $ .internal s!"🙀 CEX registration changed the *not-done* status of the system 🙀"
@@ -417,16 +397,21 @@ def check
   if h : ¬ sys.isDone then
     let sys ← sys.unrollOnce
     if h : ¬ sys.isDone then
-      if h' : 0 < sys.depthSucc then
-        let sys ← sys.checkStep
-        return sys
-      else
-        -- #TODO prove this can't happen
-        throw $ .internal s!"🙀 `unrollOnce`'s result does not verify `0 < depth` 🙀"
+      let sys ← sys.checkStep
+      return sys
     else
       -- #TODO prove this can't happen
       throw $ .internal s!"🙀 `unrollOnce` changed `isDone` value 🙀"
   else
     return sys
+
+def kInduction (sys : State.TSys) : (maxK : Nat) → SmtIO State.TSys
+| 0 => return sys
+| maxK + 1 => do
+  if h : sys.isDone
+  then return sys
+  else
+    let sys ← sys.check
+    sys.kInduction maxK
 
 end TSys

@@ -6,6 +6,7 @@ Authors: Adrien Champion
 -/
 
 import Cvc.Safe
+import Cvc.TSys
 
 
 
@@ -40,15 +41,7 @@ open Lean (RBMap)
 abbrev SymbolMap (α : Type) :=
   RBMap String α compare
 
-namespace SymbolMap
-def empty : SymbolMap α := RBMap.empty
-
-def ofList (l : List (String × α)) : SymbolMap α := Id.run do
-  let mut map := empty
-  for (key, val) in l do
-    map := map.insert key val
-  return map
-end SymbolMap
+def SymbolMap.empty : SymbolMap α := RBMap.empty
 
 
 
@@ -83,12 +76,24 @@ Is there a valuation `vals` of `f`'s inputs that verifies some condition `c (f v
 end Trash
 
 /-!
-Let's solve this problem with cvc5 and `cvc.lean`
+Let's solve this problem with cvc5 and `cvc.lean`. (Or at least *pretend to* for now.)
 -/
 
 /-- info: Cvc.Term : Type -/
 #guard_msgs(info) in
 #check Term
+
+/-!
+So the result we want is `Option (Term × SymbolMap Term)`:
+
+- `Option` because the domain might be empty (yielding `none`)
+
+- the first `Cvc.Term` is the (term) *value* of `f` verifying the constraints
+
+- the `SymbolMap` gives (term) *value* to identifiers
+
+  (here: `"n1"`, `"n2"`, `"n3"`, and `"flag"`)
+-/
 
 /-- info: Cvc.SmtM (α : Type) : Type -/
 #guard_msgs(info) in
@@ -96,10 +101,9 @@ Let's solve this problem with cvc5 and `cvc.lean`
 
 open Smt in
 
-/-- warning: declaration uses 'sorry' -/
-#guard_msgs(warning) in
-
-def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap Term)) := do
+def adHocMinimizeSmt
+  (c : Term → SmtM Term)
+: SmtM (Option (Term × SymbolMap Term)) := do
   -- don't forget to set the options we need, *model production* here
   setOption .produceModels
 
@@ -112,7 +116,9 @@ def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap 
 
   -- declare our function symbols (variables)
   let n1 ← declareFun' "n1" #[] int
-  -- [...] same for the other variables
+  let n2 ← declareFun' "n2" #[] int
+  let n3 ← declareFun' "n3" #[] int
+  let flag ← declareFun' "flag" #[] bool
 
   -- use the cvc5 term factory to build relevant terms
   let cst_m10 ← Term.mkInt (-10)
@@ -125,32 +131,70 @@ def adHocMinimizeSmt (c : Term → SmtM Term) : SmtM (Option (Term × SymbolMap 
   let cst_5 ← Term.mkInt 5
 
   -- assert our constraints
-  Smt.assert (← cst_m10.le n1) -- `-10 ≤ n1`
-  Smt.assert (← n1.le cst_10)  --       `n1 ≤ 10`
-  -- [...] same for the other constraints
+  assert (← cst_m10.le n1) -- `-10 ≤ n1`
+  assert (← n1.le cst_10)  --       `n1 ≤ 10`
+  Smt.assert (← cst_m10.le n2) -- `-10 ≤ n2`
+  Smt.assert (← n2.le cst_10)  --       `n2 ≤ 10`
+  Smt.assert (← cst_m5.le n3)  --  `-5 ≤ n3`
+  Smt.assert (← n3.le cst_5)   --  `     n3 ≤  5`
+  Smt.assert                   -- `(0 < n2) → flag`
+    (← (← cst_0.le n2).implies flag )
 
   -- build the term corresponding to the function we're analyzing so that we can build `c f`
-  let f : Term ← do
-    sorry -- more tedious `Term` factory invocations
+  let f ← do
+    let two_n2 ← cst_2.mul n2
+    let ite ←
+      flag.ite
+        (← cst_3.mul (← (← n3.add n1).sub n2))
+        (← cst_4.mul (← n1.sub n3))
+    (← n1.sub two_n2).add ite
 
   -- ready to build and assert the condition now
   let condition ← c f
   assert condition
+
   -- just ask cvc5
   match ← checkSat? with
   | none =>
     -- cvc5 could not decide (timeout/gave up), only on big problem or in complex logics
-    throw (Error.internal "solver failed to answer check-sat command")
+    throw (Cvc.Error.internal "solver failed to answer check-sat command")
   | some true =>
     -- cvc5 found a solution, we must retrieve the values we need
-    let mut vals := SymbolMap.empty
-    vals := vals.insert "n1" (← getValue n1)
-    -- [...] same for the other variables
+    let mut inputs := SymbolMap.empty
+    let vals ← getValues #[n1, n2, n3, flag, f]
+    inputs := inputs.insert "n1" vals[0]!
+    inputs := inputs.insert "n2" vals[1]!
+    inputs := inputs.insert "n3" vals[2]!
+    inputs := inputs.insert "flag" vals[3]!
     let fVal ← getValue f
-    return (fVal, vals)
+    return (fVal, inputs)
   | some false =>
     -- cvc5 proved there is no `vals` such that `c (f vals)` is true
     return none
+
+def adHocMinimize (c : Term → SmtM Term) : IO Unit := do
+  let work := adHocMinimizeSmt c
+  let res? ← work.runIO
+  match res? with
+  | .error e => println! "something went wrong: {e}"
+  | .ok none => println! "no solution exists"
+  | .ok (some (fVal, inputs)) =>
+    println! "found a solution with `f ... = {fVal}` for"
+    for (var, val) in inputs do
+      println! "- {var} := {val}"
+
+/-- info: found a solution with `f ... = (- 11)` for
+- flag := true
+- n1 := (- 4)
+- n2 := (- 4)
+- n3 := (- 5)
+-/
+#guard_msgs in
+#eval adHocMinimize (fun f => do f.lt (← Term.mkInt (-10)))
+
+/-- info: no solution exists -/
+#guard_msgs in
+#eval adHocMinimize (fun f => do f.lt (← Term.mkInt (-1000)))
 
 end adhoc
 
@@ -190,7 +234,7 @@ def adHocMinimizeSmt
 
   -- `f`'s definition is nice and readable now
   let f ←
-    smt! n1 - 2 * n2 + (if flag then (3 * (n3 + n1 - n2)) else (4 * (n1 - n3)))
+    smt! n1 - 2 * n2 + if flag then (3 * (n3 + n1 - n2)) else (4 * (n1 - n3))
 
   assert (← c f)
 
@@ -203,12 +247,10 @@ def adHocMinimizeSmt
   | some true =>
     -- cvc5 found a solution, we must retrieve the values we need
     let mut inputs := SymbolMap.empty
-    -- using `getValues` instead of individual `getValue`-s to mix things up
-    let vals ← getValues #[n1, n2, n3, flag, f]
-    inputs := inputs.insert "n1" vals[0]!
-    inputs := inputs.insert "n2" vals[1]!
-    inputs := inputs.insert "n3" vals[2]!
-    inputs := inputs.insert "flag" vals[3]!
+    inputs := inputs.insert "n1" (← getValue n1)
+    inputs := inputs.insert "n2" (← getValue n2)
+    inputs := inputs.insert "n3" (← getValue n3)
+    inputs := inputs.insert "flag" (← getValue flag)
     let fVal ← getValue f
     return (fVal, inputs)
 
@@ -218,10 +260,11 @@ def adHocMinimizeSmt
 
 def adHocMinimize (c : Term → SmtM Term) : IO Unit := do
   let work := adHocMinimizeSmt c
-  let res? ← work.runIO!
+  let res? ← work.runIO
   match res? with
-  | none => println! "no solution exists"
-  | some (fVal, inputs) =>
+  | .error e => println! "something went wrong: {e}"
+  | .ok none => println! "no solution exists"
+  | .ok (some (fVal, inputs)) =>
     println! "found a solution with `f ... = {fVal}` for"
     for (var, val) in inputs do
       println! "- {var} := {val}"
@@ -335,11 +378,11 @@ def adHocMinimizeSmt
 
 def adHocMinimize (c : Term Int → SmtM (Term Bool)) : IO Unit := do
   let work := adHocMinimizeSmt c
-  let res? ← work.runIO!
+  let res? ← work.runIO
   match res? with
-  | none =>
-    println! "no solution exists"
-  | some fVal =>
+  | .error e => println! "something went wrong: {e}"
+  | .ok none => println! "no solution exists"
+  | .ok (some fVal) =>
     println! "found a solution with `f ... = {fVal}`"
 
 /-- info: found a solution with `f ... = -11` -/
@@ -529,3 +572,150 @@ found a minimum :)
 
 
 namespace betterSafer
+
+
+
+/-! # (Extra) Casually switching to `k`-induction
+
+(We won't have time for this in the talk, unfortunately.)n
+
+Turns out the `Symbols` and `symbol structure ...` workflow is useful in many contexts, for instance
+it is used by `cvc.lean`'s `k`-induction engine.
+-/
+
+namespace kInduction
+
+open Cvc.Safe
+open scoped Term
+open scoped Symbols
+
+symbol structure MyState where
+  startStop : Bool
+  reset : Bool
+  counting : Bool
+  counter : Int
+
+namespace MyState
+
+def toString (model : Model) : String := s!"\{\
+  startStop := {model.startStop!}, \
+  reset := {model.reset!}, \
+  counting := {model.counting!}, \
+  counter := {model.counter!} \
+}"
+
+def init : Predicate :=
+  fun state =>
+    smt! state.counting! = false ∧ 0 = state.counter!
+
+def step : Relation :=
+  fun state state' =>
+    smt!
+      (
+        state'.counting! =
+          if state'.startStop! ∧ ¬ state.startStop!
+          then ¬ state.counting!
+          else state.counting!
+      ) ∧ (
+          state'.counter! = (
+            if state'.reset! ∧ ¬ state.reset! then 0
+            else
+              if state'.counting! then state.counter! + 1
+              else state.counter!
+          )
+      )
+
+section candidateInvariants
+
+def counterPositive : String × Predicate :=
+  ("counter positive", fun state => smt! 0 ≤ state.counter!)
+
+def resetValid : String × Predicate :=
+  ("reset valid", fun state => smt! state.reset! → state.counter! = 0)
+
+def counterNot_m7 : String × Predicate :=
+  ("counter not -7", fun state => smt! state.reset! → state.counter! ≠ (-7))
+
+def Bad.counterLt_7 : String × Predicate :=
+  ("counter lt 7", fun state => smt! state.counter! < 7)
+
+end candidateInvariants
+
+/-! Can be generated automatically, like `Predicate`, `Relation`... -/
+section willBeGeneratedAutomatically
+
+def Sys := Cvc.Safe.TSys.{0, 0} instSymbols
+
+def sys (props : Array (String × Predicate)) : SmtM Sys :=
+  TSys.mk .qf_lia idents init step props
+
+def analyze (maxK : Nat) (props : Array (String × Predicate)) : SmtIO Sys := do
+  let sys ← sys props
+  sys.kInduction maxK
+
+end willBeGeneratedAutomatically
+
+end MyState
+
+def run (props : Array (String × MyState.Predicate)) : IO Unit := do
+  let work := MyState.analyze 10 props
+  match ← work.run with
+  | .error e => println! "something went wrong: {e}"
+  | .ok sys =>
+    println! "analysis result:"
+    for candidate in sys.candidates do
+      println! "- candidate `{candidate.name}`:"
+      match candidate.status with
+      | .initValidUntil k? _ =>
+        println! "  → failed to prove"
+        if let some k := k? then
+          println! "    **valid until step {k}**"
+      | .invariant 1 _ =>
+        println! "  → proved to be inductive"
+      | .invariant k _ =>
+        println! "  → proved to be `{k}`-inductive"
+      | .cex 0 cex =>
+        println! "  → falsifiable in the initial states"
+        for ⟨_, state⟩ in cex do
+          println! "    - {MyState.toString state}"
+      | .cex k cex =>
+        println! "  → falsifiable `{k}` transition(s) away from the initial states"
+        for ⟨idx, state⟩ in cex do
+          println! "    - state `{idx}`"
+          println! "      {MyState.toString state}"
+
+/-- info:
+analysis result:
+- candidate `counter positive`:
+  → proved to be inductive
+- candidate `reset valid`:
+  → proved to be inductive
+-/
+#guard_msgs in
+#eval run #[MyState.counterPositive, MyState.resetValid]
+
+/--info:
+analysis result:
+- candidate `counter lt 7`:
+  → falsifiable `7` transition(s) away from the initial states
+    - state `7`
+      {startStop := true, reset := false, counting := true, counter := 7 }
+    - state `6`
+      {startStop := true, reset := false, counting := true, counter := 6 }
+    - state `5`
+      {startStop := true, reset := false, counting := true, counter := 5 }
+    - state `4`
+      {startStop := true, reset := true, counting := true, counter := 4 }
+    - state `3`
+      {startStop := true, reset := true, counting := true, counter := 3 }
+    - state `2`
+      {startStop := true, reset := true, counting := true, counter := 2 }
+    - state `1`
+      {startStop := true, reset := true, counting := true, counter := 1 }
+    - state `0`
+      {startStop := false, reset := true, counting := false, counter := 0 }
+-/
+#guard_msgs in
+#eval run #[MyState.Bad.counterLt_7]
+
+end kInduction

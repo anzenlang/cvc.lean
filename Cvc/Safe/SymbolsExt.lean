@@ -92,6 +92,7 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
   let ident_get := Lean.mkIdent `get
   let ident_Symbols := Lean.mkIdent ``Cvc.Safe.Symbols
   let ident_inst := Lean.mkIdent `instSymbols
+  let ident_Spec := Lean.mkIdent `Spec
   let ident_toSymbols := Lean.mkIdent `toSymbols
   let ident_Idents := Lean.mkIdent `Idents
   let ident_idents := Lean.mkIdent `idents
@@ -141,6 +142,7 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
       idents' := ⟨ $[ $fieldNameStrings ],* ⟩
 
     abbrev $ident_toSymbols := $ident_inst
+    abbrev $ident_Spec := $ident_inst
 
 
     abbrev $ident_Idents := $ident_inst.{0, 0}.$ident_Idents
