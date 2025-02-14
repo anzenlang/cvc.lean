@@ -24,9 +24,8 @@ private mkRaw ::
   symbols : State.Idents
   init : State.Predicate
   step : State.Relation
-  depthSucc : Nat
-  unrolling : State.Unrolling State.UFrame depthSucc
-  zero_lt_depthSucc : 0 < depthSucc := by omega
+  depth : Nat
+  unrolling : State.Unrolling State.UFrame (depth + 1)
 
 namespace Unroller
 
@@ -40,29 +39,23 @@ def mk [Monad m] [State : Symbols S]
   return {
     logic, symbols
     init, step
-    depthSucc := 1,
+    depth := 0,
     unrolling := Symbols.Unrolling.empty.cons ⟨svars0⟩
   }
-
-def depth : Unroller State → Nat
-| { depthSucc := depth + 1, .. } => depth
 
 variable (sys : Unroller State)
 
 abbrev CexTrace :=
-  State.Unrolling State.Model sys.depthSucc
+  State.Unrolling State.Model (sys.depth + 1)
 
-@[simp]
-theorem inv_depthSucc : 0 < sys.depthSucc := sys.zero_lt_depthSucc
-
-def getUFrameAt (i : Fin sys.depthSucc) : State.UFrame i :=
+def getUFrameAt (i : Fin sys.depth.succ) : State.UFrame i :=
   sys.unrolling.get i
 
-def getSymbolsAt (i : Fin sys.depthSucc) :=
+def getSymbolsAt (i : Fin sys.depth.succ) :=
   sys.getUFrameAt i |>.state
 
-abbrev currentOffset : Fin sys.depthSucc :=
-  ⟨0, sys.inv_depthSucc⟩
+abbrev currentOffset : Fin sys.depth.succ :=
+  ⟨0, by simp only [Nat.succ_eq_add_one, Nat.zero_lt_succ]⟩
 
 def getCurrentUFrame : State.UFrame 0 :=
   sys.getUFrameAt sys.currentOffset
@@ -70,8 +63,10 @@ def getCurrentUFrame : State.UFrame 0 :=
 def getCurrentSymbols :=
   sys.getCurrentUFrame |>.state
 
-abbrev oldestOffset : Fin sys.depthSucc :=
-  ⟨sys.depthSucc.pred, Nat.pred_lt_of_lt sys.inv_depthSucc⟩
+abbrev oldestOffset : Fin sys.depth.succ := ⟨
+  sys.depth.succ.pred,
+  by simp only [Nat.succ_eq_add_one, Nat.pred_eq_sub_one, Nat.add_one_sub_one, Nat.lt_add_one]
+⟩
 
 def getOldestUFrame : State.UFrame sys.oldestOffset :=
   sys.getUFrameAt sys.oldestOffset
@@ -83,20 +78,19 @@ def unroll (sys : Unroller State) : Nat → SmtM (Unroller State)
 | 0 => return sys
 | n + 1 => do
   let svars' := sys.getOldestSymbols
-  let svars ← sys.symbols.declareAt sys.depthSucc
+  let svars ← sys.symbols.declareAt sys.depth.succ
   let step ← sys.step svars svars'
   Smt.assert step
   let unrolling := sys.unrolling.cons ⟨svars⟩
   let sys := { sys with
     unrolling
-    depthSucc := sys.depthSucc + 1
-    zero_lt_depthSucc := Nat.zero_lt_succ sys.depthSucc
+    depth := sys.depth + 1
   }
   sys.unroll n
 
 def unrollOnce
   (sys : Unroller State)
-: SmtM (State.TermsAt sys.depthSucc.succ × Unroller State) := do
+: SmtM (State.TermsAt sys.depth.succ.succ × Unroller State) := do
   let sys ← sys.unroll 1
   return (sys.getOldestSymbols, sys)
 
