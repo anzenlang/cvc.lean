@@ -81,10 +81,9 @@ def cvcBasicDemo : SmtIO (Option Term) := do
 /-- info: 2 -/
 #guard_msgs in
 #eval do
-  if let some nVal ← cvcBasicDemo.run! then
-    return nVal
-  else
-    IO.throwServerError "expected sat result"
+  if let some nVal ← cvcBasicDemo.run!
+  then println! "{nVal}"
+  else println! "expected sat result"
 
 end
 
@@ -118,10 +117,9 @@ def cvcSafeDemo : SmtT IO (Option Int) := do
 /-- info: 2 -/
 #guard_msgs in
 #eval do
-  if let some nVal ← cvcSafeDemo.run! then
-    return nVal
-  else
-    IO.throwServerError "expected sat result"
+  if let some nVal ← cvcSafeDemo.run!
+  then println! "{nVal}"
+  else println! "expected sat result"
 
 
 
