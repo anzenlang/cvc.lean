@@ -1,2 +1,1 @@
-# cvc.lean
-Relatively high-level cvc5 API.
+High-level, strongly-typed cvc5 API.

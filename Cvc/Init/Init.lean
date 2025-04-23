@@ -5,6 +5,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
+import Batteries.Data.Rat.Basic
+
 import cvc5
 
 
@@ -13,18 +15,28 @@ import cvc5
 namespace Cvc
 
 
+abbrev RBMap (α β : Type) [Ord α] :=
+  Lean.RBMap α β compare
 
-abbrev Set (α : Type) [Ord α] :=
-  Lean.RBMap α Unit compare
-
-namespace Set
+namespace RBMap
 variable {α : Type} [Ord α]
 
-def empty : Set α := Lean.RBMap.empty
-end Set
+def empty : RBMap α β := Lean.RBMap.empty
+end RBMap
 
 
-export Lean (Rat)
+
+abbrev RBSet (α : Type) [Ord α] :=
+  RBMap α Unit
+
+namespace RBSet
+variable {α : Type} [Ord α]
+
+def empty : RBSet α := Lean.RBMap.empty
+end RBSet
+
+
+export _root_ (Rat)
 
 
 
@@ -33,11 +45,12 @@ abbrev 𝕂 (val : α) (_ : β) : α := val
 
 /-! ## Re-exports from `cvc5` -/
 
-inductive Error : Type u
+inductive Error : Type
 | internal (msg : String)
 | unsupported (msg : String)
 | userError (msg : String)
 deriving Inhabited
+
 
 namespace Error
 
@@ -81,6 +94,46 @@ instance instToString : ToString Error :=
 
 end Error
 
+/-- Alias for `Except Error`. -/
+abbrev Res := Except Error
+
+namespace Res
+@[inherit_doc Except.ok]
+abbrev ok : α → Res α := Except.ok
+@[inherit_doc Except.error]
+abbrev error : Error → Res α := Except.error
+
+instance : MonadLift (Except cvc5.Error) Res :=
+  ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
+
+instance : MonadLift (Except cvc5.Error) Res.{0} :=
+  ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
+
+def fail (e : Error) : Res α :=
+  .error e
+def failInternal (e : String) : Res α :=
+  Except.error.{0} <| .internal e
+def failUser (e : String) : Res α :=
+  Except.error.{0} <| .userError e
+def failTodo (e : String) : Res α :=
+  Except.error.{0} <| .unsupported e
+
+def lcontext : Res α → (Unit → String) → Res α
+| .ok a, _ => .ok a
+| .error e, f => f () |> e.append |> .error
+
+def context (res : Res α) (s : String) : Res α :=
+  res.lcontext fun () => s
+
+def lift : Except cvc5.Error α → Res α := liftM
+
+def up1 {α : Type} : (res : Res α) → Res.{1} (ULift α)
+| .ok a => .ok (.up a) | .error e => .error e
+
+def lift1 {α : Type} : Except.{0} cvc5.Error α → Res.{1} (ULift α) :=
+  up1 ∘ lift
+
+end Res
 
 
 /-! ## Helpers -/
@@ -126,12 +179,13 @@ theorem min_le_size : n ≤ self.size := by
 def get : (i : Fin self.size) → α
 | ⟨i, h_i⟩ =>
   if h : i < n then
-    self.pref.get ⟨i, by simp only [pref_size, h]⟩
+    have := self.pref_size ▸ h
+    self.pref[i]
   else
-    let h' : i - n < self.suff.size := by
-      simp [size] at h_i
+    have : i - n < self.suff.size := by
+      simp only [size] at h_i
       exact Nat.sub_lt_left_of_lt_add (Nat.le_of_not_lt h) h_i
-    self.suff.get ⟨i - n, by simp only [pref_size, h']⟩
+    self.suff[i - n]
 
 instance instGetElem : GetElem (ArrayMin n α) Nat α (fun arr i => i < arr.size) where
   getElem self i h_i := self.get ⟨i, h_i⟩
@@ -147,11 +201,12 @@ def get! [Inhabited α] (self : ArrayMin n α) (i : Nat) : α :=
   else panic! s!"illegal index {i} for `ArrayMin {n} _` of size {self.size}"
 
 def getN (i : Nat) (h : i < n := by decide) : α :=
-  self.pref.get ⟨i, by simp [h]⟩
+  have := self.pref_size ▸ h
+  self.pref[i]
 
 def toArray : Array α := self.pref ++ self.suff
 
-def toList : List α := self.pref.data ++ self.suff.data
+def toList : List α := self.pref.toList ++ self.suff.toList
 
 def push (a : α) : ArrayMin n α :=
   {self with suff := self.suff.push a }

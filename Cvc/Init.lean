@@ -5,6 +5,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init.Basic
+import Cvc.Init.Init
 import Cvc.Init.Logic
 import Cvc.Init.Option

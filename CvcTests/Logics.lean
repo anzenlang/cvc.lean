@@ -15,7 +15,6 @@ namespace Cvc.Test
 
 open Logic
 
-/-- info: -/
 #guard_msgs in #eval do
   assertEq "LIA"  lia.toSmtLib
   assertEq "LRA"  lra.toSmtLib

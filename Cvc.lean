@@ -6,6 +6,4 @@ Authors: Adrien Champion
 -/
 
 import Cvc.Init
-import Cvc.Basic
-import Cvc.Safe
-import Cvc.TSys
+import Cvc.Srt
