@@ -18,10 +18,16 @@ namespace Cvc
 abbrev RBMap (α β : Type) [Ord α] :=
   Lean.RBMap α β compare
 
-namespace RBMap
-variable {α : Type} [Ord α]
+namespace RBMap variable [Ord α]
 
 def empty : RBMap α β := Lean.RBMap.empty
+
+def insert : RBMap α β → α → β → RBMap α β :=
+  Lean.RBMap.insert
+
+def erase : RBMap α β → α → RBMap α β :=
+  Lean.RBMap.erase
+
 end RBMap
 
 
@@ -29,10 +35,16 @@ end RBMap
 abbrev RBSet (α : Type) [Ord α] :=
   RBMap α Unit
 
-namespace RBSet
-variable {α : Type} [Ord α]
+namespace RBSet variable [Ord α]
 
 def empty : RBSet α := Lean.RBMap.empty
+
+def insert : RBSet α → α → RBSet α :=
+  (RBMap.insert · · ())
+
+def erase : RBSet α → α → RBSet α :=
+  (RBMap.erase · ·)
+
 end RBSet
 
 
