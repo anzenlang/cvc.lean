@@ -7,136 +7,348 @@ Authors: Adrien Champion
 
 import Init.Data.Nat.Power2
 
-import cvc5
-
 import Cvc.Init
 
 
 
 namespace Cvc
 
-open _root_ renaming ULift → Up
-
 open cvc5 renaming TermManager → Tm
 
 
+open Lean.Parser.Command (ctor)
+
+local syntax
+  declModifiers
+  withPosition("Cvc.mkSrt!" declId ", " declId ppLine
+    (
+      colGt (docComment)? ppLine
+      colGt "| " ident "[" ident "]" optDeclSig
+      -- colGt ctor -- " ← " ident
+    )*
+  )
+: command
+
+open Lean Elab Command in
+elab_rules : command
+| `(
+  $mods:declModifiers
+  Cvc.mkSrt! $Srt:ident, $Kind:ident $[
+    $[ $doc?:docComment ]?
+    | $variantId:ident [ $variantSortId:ident ] $variantSig:optDeclSig
+  ]*
+) => do
+  let variantId' := variantId
+  let variantStr := variantId.map fun v => Id.run do
+    let mut s := toString v
+    if let some s' := s.dropPrefix? "`" then
+      s := s'.toString
+    Lean.Syntax.mkStrLit s
+  let identOfString := Lean.mkIdent ∘ Lean.Name.mkSimple
+  let kindId := identOfString "kind"
+  let ofSrtId := identOfString "ofSrt"
+  let ofSortId := identOfString "ofSort"
+  let toSortId := identOfString "toSort"
+  let toStringId := identOfString "toString"
+  let kind_ToStringId :=
+    Lean.Name.mkStr2 Kind.getId.toString "toString"
+    |> Lean.mkIdent
+  let ToStringId ← ``(ToString)
+  let cvc5SortKindId ← ``(cvc5.SortKind)
+  let ResId ← ``(Res)
+  let errorResId ← ``(Res.error)
+  let internalErrorId ← ``(Error.internal)
+
+  elabCommand <| ← `(
+    $mods:declModifiers
+    inductive $Srt:declId $[
+      $[ $doc?:docComment ]?
+      | $variantId:ident $variantSig:optDeclSig
+    ]*
+    deriving Inhabited, Hashable
+
+    namespace $Srt
+    /-- A sort kind. -/
+    inductive $Kind:declId $[ | $variantId:ident ]*
+    deriving Inhabited, Hashable, DecidableEq, Ord
+
+    /-- Turns a sort into a sort kind. -/
+    def $kindId:declId : $Srt → $Kind $[ | .$variantId .. => .$variantId' ]*
+
+    namespace $Kind
+    @[inherit_doc $kindId]
+    def $ofSrtId:declId := $kindId
+
+    /-- Constructor from an unsafe sort. -/
+    def $ofSortId:declId (sort : $cvc5SortKindId) : $ResId $Kind :=
+      aux sort |>.context ls!"failed to convert unsafe sort `{sort}` to `Cvc.Srt.Kind`"
+    where aux : $cvc5SortKindId → $ResId $Kind
+      $[ | .$variantSortId:ident => return .$variantId ]*
+      | k => $errorResId ($internalErrorId s!"unexpected unsafe sort kind `{k}`")
+
+    /-- Turns itself into an unsafe sort. -/
+    def $toSortId:declId : $Kind → $cvc5SortKindId
+    $[ | .$variantId => .$variantSortId ]*
+
+    /-- String representation. -/
+    protected
+    def $toStringId : $Kind:term → String $[ | .$variantId => $variantStr:str ]*
+
+    instance : $ToStringId $Kind := ⟨$kind_ToStringId:term⟩
+    end $Kind
+    end $Srt
+  )
 
 /-- A cvc sort, `Sort`-coercion realized by `Srt.toType`. -/
-inductive Srt
-| abstract (args : Array Srt)
-| array (idx elm : Srt)
-| bag (elm : Srt)
-| bool
-| bitVec (exp : Nat)
-| datatype (args : Array Srt)
-| finiteField (size : Nat)
-| float (exp sig : UInt32)
-| function (dom : Array Srt) (cod : Srt)
-| int | real
-| regex
-| roundingMode
-| seq (elm : Srt)
-| set (elm : Srt)
-| string
-| tuple (elms : Array Srt)
-| uninterpreted (constructor : Srt)
+Cvc.mkSrt! Srt, Kind
+  -- -- | abstract (kind : cvc5.SortKind)
+  | array[ARRAY_SORT] : (idx elm : Srt) → Srt
+  | bag[BAG_SORT] : (elm : Srt) → Srt
+  -- /-- Boolean sort. -/
+  | bool[BOOLEAN_SORT] : Srt
+  | bitVec[BITVECTOR_SORT] : (size : Nat) → Srt
+  | datatype[DATATYPE_SORT] : (args : Array Srt) → Srt
+  | finiteField[FINITE_FIELD_SORT] : (size : Nat) → Srt
+  | float[FLOATINGPOINT_SORT] : (exp sig : UInt32) → Srt
+  | function[FUNCTION_SORT] : (domainPref : Array Srt) → (domainLast : Srt) → (cod : Srt) → Srt
+  /-- Integer sort. -/
+  | int[INTEGER_SORT]
+  /-- Real sort. -/
+  | real[REAL_SORT]
+  | regex[REGLAN_SORT]
+  | roundingMode[ROUNDINGMODE_SORT]
+  | seq[SEQUENCE_SORT] : (elm : Srt) → Srt
+  | set[SET_SORT] : (elm : Srt) → Srt
+  /-- String sort. -/
+  | string[STRING_SORT]
+  | tuple[TUPLE_SORT] : (elms : Array Srt) → Srt
+  | uninterpreted[UNINTERPRETED_SORT] : (cons : Srt) → Srt
 
 namespace Srt
 
+/-! # `DecidableEq` instance -/
+mutual
+
+instance instDecidableEqListSrt : DecidableEq (List Srt)
+| hd1::tl1, hd2::tl2 => by
+  cases hd1.instDecidableEq hd2
+  case isFalse h => exact isFalse (by simp only [List.cons.injEq, h, false_and, not_false_eq_true])
+  cases instDecidableEqListSrt tl1 tl2
+  case isFalse h => exact isFalse (by simp only [List.cons.injEq, h, and_false, not_false_eq_true])
+  exact isTrue (by simp [*])
+| [], _::_ | _::_, [] => isFalse (by simp only [reduceCtorEq, not_false_eq_true])
+| [], [] => isTrue rfl
+
+instance instDecidableEqArraySrt : DecidableEq (Array Srt)
+| ⟨l1⟩, ⟨l2⟩ => by
+  cases instDecidableEqListSrt l1 l2
+  · apply isFalse ; simp only [Array.mk.injEq, not_false_eq_true, *]
+  · apply isTrue ; simp only [*]
+
+instance instDecidableEq : DecidableEq Srt := fun s1 s2 => by
+  cases s1
+  <;> cases s2
+  <;> (
+    try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
+    try (
+      simp only [
+        -- abstract.injEq,
+        array.injEq, bag.injEq, bitVec.injEq, datatype.injEq,
+        finiteField.injEq, float.injEq, function.injEq, seq.injEq, set.injEq,
+        tuple.injEq, uninterpreted.injEq,
+      ]
+      try exact inferInstance
+      try exact instDecidableEq ..
+      try exact instDecidableEqArraySrt ..
+      try exact Decidable.conj' (instDecidableEq ..) (instDecidableEq ..)
+      try
+        exact
+          Decidable.conj'
+            (instDecidableEqArraySrt ..)
+            (Decidable.conj' (instDecidableEq ..) (instDecidableEq ..))
+    )
+  )
+
+end
+
+/-- Boolean equality.
+
+# TODO
+
+- Probably should not use `instDecidableEq` for boolean equality; I'm not sure how efficient the
+  code generated is.
+-/
 protected
-abbrev sigOfSortKind : cvc5.SortKind → Type
-| .INTERNAL_SORT_KIND
-| .UNDEFINED_SORT_KIND
-| .NULL_SORT => Empty
-| .ABSTRACT_SORT => Array cvc5.Sort
-| .ARRAY_SORT => cvc5.Sort × cvc5.Sort
-| .BAG_SORT => cvc5.Sort
-| .BOOLEAN_SORT => Unit
-| .BITVECTOR_SORT => Nat
-| .DATATYPE_SORT => Array cvc5.Sort
-| .FINITE_FIELD_SORT => Nat
-| .FLOATINGPOINT_SORT => UInt32 × UInt32
-| .FUNCTION_SORT => Array cvc5.Sort × cvc5.Sort
-| .INTEGER_SORT
-| .REAL_SORT
-| .REGLAN_SORT
-| .ROUNDINGMODE_SORT => Unit
-| .SEQUENCE_SORT => cvc5.Sort
-| .SET_SORT => cvc5.Sort
-| .STRING_SORT => Unit
-| .TUPLE_SORT => Array cvc5.Sort
-| .NULLABLE_SORT => Empty
-| .UNINTERPRETED_SORT => cvc5.Sort
+def beq : Srt → Srt → Bool :=
+  (instDecidableEq · · |>.decide)
 
-def sigDataOfSort (s : cvc5.Sort) : Res (Srt.sigOfSortKind s.getKind) := by
-  cases s.getKind <;> (simp only [Srt.sigOfSortKind] ; try exact .ok ())
-  case INTERNAL_SORT_KIND => exact failKind s.getKind
-  case UNDEFINED_SORT_KIND => exact failKind s.getKind
-  case NULL_SORT => exact failKind s.getKind
-  case ABSTRACT_SORT => exact .ok s.getInstantiatedParameters
-  case ARRAY_SORT => exact do
-    let idx ← s.getArrayIndexSort
-    let elm ← s.getArrayElementSort
-    return (idx, elm)
-  case BAG_SORT => exact liftM s.getBagElementSort
-  case BITVECTOR_SORT => exact do
-    let size ← s.getBitVectorSize
-    return size.toNat.nextPowerOfTwo
-  case DATATYPE_SORT => exact .ok s.getInstantiatedParameters
-  case FINITE_FIELD_SORT => exact liftM s.getFiniteFieldSize
-  case FLOATINGPOINT_SORT => exact do
-    let exp ← s.getFloatingPointExponentSize
-    let sig ← s.getFloatingPointSignificandSize
-    return (exp, sig)
-  case FUNCTION_SORT => exact do
-    let args ← s.getFunctionDomainSorts
-    let cod ← s.getFunctionCodomainSort
-    return (args, cod)
-  case SEQUENCE_SORT => exact liftM s.getSequenceElementSort
-  case SET_SORT => exact liftM s.getSetElementSort
-  case TUPLE_SORT => exact liftM s.getTupleSorts
-  case NULLABLE_SORT => exact failKind s.getKind
-  case UNINTERPRETED_SORT => exact liftM s.getUninterpretedSortConstructor
+
+
+namespace toString
+
+/-- Specifies how to paren the string representation of a sort.
+
+This only impacts the sort's top-level, paren for sub-sorts are decided by their super-sorts.
+-/
+inductive Paren
+/-- Don't paren the sort at all. -/
+| none
+/-- Only paren if it's a function. -/
+| ifFunction
+/-- Only paren argument-having type constructors such as `(Array Bool)`. -/
+| ifArgs
+/-- Always paren *composite* sorts `(Array Bool)` but not leaf-sorts `Bool`. -/
+| composite
+deriving Inhabited, Hashable, DecidableEq, Ord
+
+namespace Paren
+/-- Maximum paren-ing.
+
+**NB**: leaf-sorts such as `Srt.bool` are never paren-ed.
+-/
+def max : Paren := .composite
+
+def fun? : Paren → Bool
+| .none | .ifArgs => false
+| .ifFunction | .composite => true
+
+def args? : Paren → Bool
+| .none | ifFunction => false
+| .ifArgs | .composite => true
+
+def apply? (self : Paren) : Paren → Bool
+| .none => false
+| .ifFunction => self.fun?
+| .ifArgs => self.args?
+| .composite => self = .composite
+
+def apply (self : Paren) (that : Paren) (s : String) : String :=
+  if self.apply? that then s!"({s})" else s
+end Paren
+
+end toString
+
+open toString (Paren) in
+/-- String representation. -/
+protected partial
+def toString (srt : Srt) (paren : Paren := .none) : String :=
+  match srt with
+  -- | .abstract args =>
+  --   "abstract" |> args.foldl fun acc arg => s!"{acc} →"
+  | .array idx elm =>
+    s!"Array {idx.toString .max} {elm.toString .max}"
+    |> paren.apply .ifArgs
+  | .bag elm =>
+    s!"Bag {elm.toString .max}"
+    |> paren.apply .ifArgs
+  | .bool => "Bool"
+  | .bitVec n =>
+    s!"BitVec {n}"
+    |> paren.apply .ifArgs
+  | .datatype args =>
+    "Datatype"
+    |> args.foldl fun s arg => s!"{s} {arg.toString .max}"
+    |> paren.apply .ifArgs
+  | .finiteField n =>
+    s!"FiniteField {n}"
+    |> paren.apply .ifArgs
+  | .float exp sig => s!"Float {exp} {sig}" |> paren.apply .ifArgs
+  | .function domPref domLast cod =>
+    paren.apply .ifFunction <|
+      if domPref.isEmpty then
+        s!"{domLast.toString .ifFunction} → {cod.toString}"
+      else
+        let dom := Srt.tuple (domPref.push domLast) |>.toString .ifFunction
+        s!"{dom} → {cod.toString .none}"
+  | .int => "Int"
+  | .real => "Real"
+  | .regex => "Regex"
+  | .roundingMode => "RoundingMode"
+  | .seq elm =>
+    s!"Seq {elm.toString .max}"
+    |> paren.apply .ifArgs
+  | .set elm =>
+    s!"Set {elm.toString .max}"
+    |> paren.apply .ifArgs
+  | .string => "String"
+  | .tuple prod =>
+    if _h : prod.isEmpty then "()"
+    else if _h : prod.size = 1 then prod[0].toString paren
+    else Id.run do
+      let mut s := ""
+      for srt in prod do
+        s :=
+          if s.isEmpty
+          then srt.toString .ifFunction
+          else s!"{s} × {srt.toString .ifFunction}"
+      paren.apply .ifArgs s
+  | uninterpreted cons =>
+    s!"Uninterpreted {cons.toString paren}"
+    |> paren.apply .ifArgs
+
+instance : ToString Srt := ⟨Srt.toString⟩
+
+
+
+/-- Constructor from unsafe sorts. -/
+def ofSort (sort : cvc5.Sort) (maxDepth : Nat := 100_000) : Res Srt :=
+  aux sort maxDepth
+  |>.context ls!"failed to convert cvc5 sort {sort} to `Cvc.Srt`"
 where
-  failKind {α} (k : cvc5.SortKind) (desc? : Option String := none) : Res α := do
+  failKind {α} (k : cvc5.SortKind) : Res α := do
     let mut msg := s!"unexpected sort-kind `{k}`"
-    if let some desc := desc? then
-      msg := s!"{desc}, {msg}"
     Res.failInternal msg
-
-/-- Unsafe-to-safe sort conversion with a max depth to avoid `partial` annotation. -/
-def ofSort.withMaxDepth : (maxDepth : Nat) → cvc5.Sort → Res Srt
-| 0, s => Res.failInternal s!"\
-  maximum depth reached during unsafe sort conversion, current sub-sort is `{s}`\
-"
-| maxDepth + 1, s => do
-  let ofSort := withMaxDepth maxDepth
-  let data ← sigDataOfSort s
-  by
-    revert data
-    cases s.getKind <;> (simp only [Srt.sigOfSortKind] ; intro data ; try contradiction)
-    case ABSTRACT_SORT => exact .abstract <$> data.mapM ofSort
-    case ARRAY_SORT => exact return .array (← ofSort data.fst) (← ofSort data.snd)
-    case BAG_SORT => exact .bag <$> ofSort data
-    case BOOLEAN_SORT => exact return .bool
-    case BITVECTOR_SORT => exact return .bitVec data
-    case DATATYPE_SORT => exact .datatype <$> data.mapM ofSort
-    case FINITE_FIELD_SORT => exact return .finiteField data
-    case FLOATINGPOINT_SORT => exact return .float data.fst data.snd
-    case FUNCTION_SORT => exact return .function (← data.fst.mapM ofSort) (← ofSort data.snd)
-    case INTEGER_SORT => exact return .int
-    case REAL_SORT => exact return .real
-    case REGLAN_SORT => exact return .regex
-    case ROUNDINGMODE_SORT => exact return .roundingMode
-    case SEQUENCE_SORT => exact .seq <$> ofSort data
-    case SET_SORT => exact .set <$> ofSort data
-    case STRING_SORT => exact return .string
-    case TUPLE_SORT => exact .tuple <$> data.mapM ofSort
-    case UNINTERPRETED_SORT => exact .uninterpreted <$> ofSort data
-
-def ofSort (s : cvc5.Sort) : Res Srt :=
-  ofSort.withMaxDepth 100_000 s
-  |>.lcontext fun () => s!"failed to convert unsafe sort `{s}`"
+  aux (sort : cvc5.Sort) : Nat → Res Srt
+  | 0 => Res.failUser s!"maximum depth `{maxDepth}` reached"
+  | maxDepth + 1 => do
+    -- helpers
+    let ofSort (s : cvc5.Sort) : Res Srt := aux s maxDepth
+    let ofSorts (s : Array cvc5.Sort) : Res (Array Srt) := s.mapM ofSort
+    let ofSort? (s? : Except cvc5.Error cvc5.Sort) : Res Srt :=
+      s? >>= ofSort
+    let ofSorts? (s? : Except cvc5.Error (Array cvc5.Sort)) : Res (Array Srt) :=
+      s? >>= ofSorts
+    -- let's do this
+    match sort.getKind with
+    | .ARRAY_SORT =>
+      let idx ← ofSort? sort.getArrayIndexSort
+      let elm ← ofSort? sort.getArrayElementSort
+      return .array idx elm
+    | .BAG_SORT =>
+      let elm ← ofSort? sort.getBagElementSort
+      return .bag elm
+    | .BITVECTOR_SORT =>
+      let size ← UInt32.toNat <$> sort.getBitVectorSize
+      return .bitVec size
+    | .DATATYPE_SORT =>
+      let args ← ofSorts sort.getInstantiatedParameters
+      return .datatype args
+    | .FINITE_FIELD_SORT =>
+      let size ← sort.getFiniteFieldSize
+      return .finiteField size
+    | .FLOATINGPOINT_SORT =>
+      let exp ← sort.getFloatingPointExponentSize
+      let sig ← sort.getFloatingPointSignificandSize
+      return .float exp sig
+    | .FUNCTION_SORT =>
+      let dom ← ofSorts? sort.getFunctionDomainSorts
+      if h : 0 < dom.size then
+        let domLast := dom[Fin.mk dom.size.pred (by exact Nat.pred_lt_of_lt h)]
+        let domPref := dom.pop
+        let cod ← ofSort? sort.getFunctionCodomainSort
+        return .function domPref domLast cod
+      else
+        Res.failInternal s!"illegal function sort, domain is empty"
+    | .SEQUENCE_SORT =>
+      let elm ← ofSort? sort.getSequenceElementSort
+      return .seq elm
+    | .SET_SORT =>
+      let elm ← ofSort? sort.getSetElementSort
+      return .set elm
+    | .TUPLE_SORT =>
+      let args ← ofSorts? sort.getTupleSorts
+      return .tuple args
+    | k => failKind k
 
 end Srt
 
@@ -222,7 +434,7 @@ variable [A : ToSrt α] [B : ToSrt β]
 instance instToSrtCvcArray : ToSrt (Cvc.Array α β) := ⟨.array A.srt B.srt⟩
 instance instToSrtBitVec : ToSrt (BitVec exp) := ⟨.bitVec exp⟩
 instance instToSrtBag : ToSrt (Cvc.Bag α) := ⟨.bag A.srt⟩
-instance instToSrtFunction : ToSrt (α → β) := ⟨.function #[A.srt] B.srt⟩
+instance instToSrtFunction : ToSrt (α → β) := ⟨.function #[] A.srt B.srt⟩
 instance instToSrtRegex : ToSrt Regex := ⟨.regex⟩
 /-- Conversion from arrays ("sequences" in SMT-LIB) to sort. -/
 instance instToSrtArray : ToSrt (Array α) := ⟨.seq A.srt⟩
@@ -457,7 +669,7 @@ end ToSrt
 --         (ppSpace bracketedBinder)*
 --         " : " term
 --         -- declSig
---       " :="
+--       " :="←
 --       ppLine colGt term
 --     )
 --   )*

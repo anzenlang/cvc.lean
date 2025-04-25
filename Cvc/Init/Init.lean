@@ -36,6 +36,22 @@ def empty : RBSet α := Lean.RBMap.empty
 end RBSet
 
 
+
+def Decidable.conj {p q : Prop} [Decidable p] [Decidable q] : Decidable (p ∧ q) :=
+  inferInstance
+
+def Decidable.conj' {p q : Prop} (ip : Decidable p) (iq : Decidable q) : Decidable (p ∧ q) :=
+  inferInstance
+
+
+
+scoped
+syntax:max "ls!" interpolatedStr(term) : term
+macro_rules
+| `(ls! $interpSrt) => `( (fun () => s!$interpSrt : Unit → String)  )
+
+
+
 export _root_ (Rat)
 
 
@@ -53,6 +69,14 @@ deriving Inhabited
 
 
 namespace Error
+
+/-- Used to allow `String` and `Unit → String` as context messages. -/
+class AsString (α : Type) : Type where
+  /-- Conversion to strings. -/
+  asString : α → String
+
+instance : AsString String := ⟨id⟩
+instance : AsString (Unit → String) := ⟨fun f => f ()⟩
 
 def mapMsg (f : String → String) : Error → Error
 | .internal msg => f msg |> .internal
@@ -118,12 +142,9 @@ def failUser (e : String) : Res α :=
 def failTodo (e : String) : Res α :=
   Except.error.{0} <| .unsupported e
 
-def lcontext : Res α → (Unit → String) → Res α
-| .ok a, _ => .ok a
-| .error e, f => f () |> e.append |> .error
-
-def context (res : Res α) (s : String) : Res α :=
-  res.lcontext fun () => s
+def context [A : Error.AsString S] (s : S) : Res α → Res α
+| .ok val => .ok val
+| .error e => .error <| e.mapMsg (s!"{·}\n{A.asString s}")
 
 def lift : Except cvc5.Error α → Res α := liftM
 
