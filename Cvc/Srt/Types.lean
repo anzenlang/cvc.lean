@@ -44,7 +44,7 @@ end ToSrt
 
 /-- Total map from `Idx` to `Elm`, called *array* in SMT-LIB/cvc. -/
 protected
-structure Array (Idx Elm : Type) extends Ord Idx where
+structure TMap (Idx Elm : Type) extends Ord Idx where
 mk' ::
   /-- Red-black map representation containing indices with known value. -/
   toRBMap : RBMap Idx Elm
@@ -53,21 +53,21 @@ mk' ::
   /-- `Elm → Srt` conversion for user QoL. -/
   ElmToSrt : ToSrt Elm
 
-namespace Array variable [Ord Idx] [ToSrt Idx] [ToSrt Elm]
+namespace TMap  variable [Ord Idx] [ToSrt Idx] [ToSrt Elm]
 
 /-- Constructor. -/
 def ofRBMap [o : Ord Idx] [i : ToSrt Idx] [e : ToSrt Elm]
   (toRBMap : RBMap Idx Elm)
-: Cvc.Array Idx Elm :=
+: Cvc.TMap Idx Elm :=
   ⟨o, toRBMap, i, e⟩
 
 /-- A total map with unknown values for all indices. -/
-abbrev unspecified : Cvc.Array Idx Elm :=
+abbrev unspecified : Cvc.TMap Idx Elm :=
   ofRBMap .empty
 
-end Array
+end TMap
 
-namespace Array variable (array : Cvc.Array Idx Elm)
+namespace TMap variable (array : Cvc.TMap Idx Elm)
 
 /-- The known value of an index if any. -/
 def get (idx : Idx) : Option Elm :=
@@ -81,10 +81,10 @@ def getD (idx : Idx) (defaultVal : Elm) : Elm :=
 def getI [Inhabited Elm] (idx : Idx) : Elm :=
   array.get idx |>.getD default
 
-instance : GetElem (Cvc.Array Idx Elm) Idx (Option Elm) (fun _ _ => True) where
+instance : GetElem (Cvc.TMap Idx Elm) Idx (Option Elm) (fun _ _ => True) where
   getElem array idx _ := array.get idx
 
-end Array
+end TMap
 
 
 
@@ -215,7 +215,7 @@ namespace ToSrt
 variable [A : ToSrt α] [B : ToSrt β]
 
 /-- Conversion from maps ("arrays" in SMT-LIB) to sort. -/
-instance : ToSrt (Cvc.Array α β) := ⟨.array A.srt B.srt⟩
+instance : ToSrt (Cvc.TMap α β) := ⟨.array A.srt B.srt⟩
 instance : ToSrt (Cvc.Bag α) := ⟨.bag A.srt⟩
 instance : ToSrt (α → β) := ⟨.function #[] A.srt B.srt⟩
 -- instance : ToSrt Regex := ⟨.regex⟩
