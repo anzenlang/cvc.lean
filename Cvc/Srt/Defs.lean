@@ -120,8 +120,8 @@ Cvc.mkSrt! Srt, Kind
   /-- Sort of bit-vectors of length `size`. -/
   | bitVec[BITVECTOR_SORT] : (size : Nat) → Srt
 
-  /-- Datatype sort. -/
-  | datatype[DATATYPE_SORT] : (args : Array Srt) → Srt
+  -- /-- Datatype sort. -/
+  -- | datatype[DATATYPE_SORT] : (args : Array Srt) → Srt
 
   /-- Finite field sort. -/
   | finiteField[FINITE_FIELD_SORT] : (size : Nat) → Srt
@@ -136,7 +136,7 @@ Cvc.mkSrt! Srt, Kind
 
   Cvc also does not allow the codomain to be a function type.
   -/
-  | function[FUNCTION_SORT] : (domainPref : Array Srt) → (domainLast : Srt) → (cod : Srt) → Srt
+  | function[FUNCTION_SORT] : (dom  : Srt) → (dom : List Srt) → (cod : Srt) → Srt
   /-- Integer sort. -/
   | int[INTEGER_SORT]
   /-- Real sort. -/
@@ -155,7 +155,7 @@ Cvc.mkSrt! Srt, Kind
 
   Empty tuples are allowed.
   -/
-  | tuple[TUPLE_SORT] : (elms : Array Srt) → Srt
+  | tuple[TUPLE_SORT] : (elms : List Srt) → Srt
   /-- An uninterpreted sort. -/
   | uninterpreted[UNINTERPRETED_SORT] : (cons : Srt) → Srt
 
@@ -188,19 +188,19 @@ instance instDecidableEq : DecidableEq Srt := fun s1 s2 => by
     try (
       simp only [
         -- abstract.injEq,
-        array.injEq, bag.injEq, bitVec.injEq, datatype.injEq,
+        array.injEq, bag.injEq, bitVec.injEq,
+        -- datatype.injEq,
         finiteField.injEq, float.injEq, function.injEq, seq.injEq, set.injEq,
         tuple.injEq, uninterpreted.injEq,
       ]
       try exact inferInstance
       try exact instDecidableEq ..
-      try exact instDecidableEqArraySrt ..
+      try exact instDecidableEqListSrt ..
       try exact Decidable.conj' (instDecidableEq ..) (instDecidableEq ..)
       try
-        exact
-          Decidable.conj'
-            (instDecidableEqArraySrt ..)
-            (Decidable.conj' (instDecidableEq ..) (instDecidableEq ..))
+        exact Decidable.conj'
+          (instDecidableEq ..)
+          (Decidable.conj' (instDecidableEqListSrt ..) (instDecidableEq ..))
     )
   )
 
@@ -280,21 +280,19 @@ def toString (srt : Srt) (paren : Paren := .none) : String :=
   | .bitVec n =>
     s!"BitVec {n}"
     |> paren.apply .ifArgs
-  | .datatype args =>
-    "Datatype"
-    |> args.foldl fun s arg => s!"{s} {arg.toString .max}"
-    |> paren.apply .ifArgs
+  -- | .datatype args =>
+  --   "Datatype"
+  --   |> args.foldl fun s arg => s!"{s} {arg.toString .max}"
+  --   |> paren.apply .ifArgs
   | .finiteField n =>
     s!"FiniteField {n}"
     |> paren.apply .ifArgs
   | .float exp sig => s!"Float {exp} {sig}" |> paren.apply .ifArgs
-  | .function domPref domLast cod =>
+  | .function dom doms cod =>
     paren.apply .ifFunction <|
-      if domPref.isEmpty then
-        s!"{domLast.toString .ifFunction} → {cod.toString}"
-      else
-        let dom := Srt.tuple (domPref.push domLast) |>.toString .ifFunction
-        s!"{dom} → {cod.toString .none}"
+      let domStr := s!"{dom.toString .ifFunction} → "
+      let domsStr := domStr |> doms.foldl fun s srt => s!"{s} {srt.toString .ifFunction} →"
+      s!"{domsStr} → {cod.toString .none}"
   | .int => "Int"
   | .real => "Real"
   | .regex => "Regex"
@@ -308,7 +306,7 @@ def toString (srt : Srt) (paren : Paren := .none) : String :=
   | .string => "String"
   | .tuple prod =>
     if _h : prod.isEmpty then "()"
-    else if _h : prod.size = 1 then prod[0].toString paren
+    else if _h : prod.length = 1 then prod[0].toString paren
     else Id.run do
       let mut s := ""
       for srt in prod do
@@ -355,9 +353,9 @@ where
     | .BITVECTOR_SORT =>
       let size ← UInt32.toNat <$> sort.getBitVectorSize
       return .bitVec size
-    | .DATATYPE_SORT =>
-      let args ← ofSorts sort.getInstantiatedParameters
-      return .datatype args
+    -- | .DATATYPE_SORT =>
+    --   let args ← ofSorts sort.getInstantiatedParameters
+    --   return .datatype args
     | .FINITE_FIELD_SORT =>
       let size ← sort.getFiniteFieldSize
       return .finiteField size
@@ -366,14 +364,11 @@ where
       let sig ← sort.getFloatingPointSignificandSize
       return .float exp sig
     | .FUNCTION_SORT =>
-      let dom ← ofSorts? sort.getFunctionDomainSorts
-      if h : 0 < dom.size then
-        let domLast := dom[Fin.mk dom.size.pred (by exact Nat.pred_lt_of_lt h)]
-        let domPref := dom.pop
-        let cod ← ofSort? sort.getFunctionCodomainSort
-        return .function domPref domLast cod
-      else
-        Res.failInternal s!"illegal function sort, domain is empty"
+      let cod ← ofSort? sort.getFunctionCodomainSort
+      match ← ofSorts? sort.getFunctionDomainSorts with
+      | ⟨dom :: doms⟩ =>
+        return .function dom doms cod
+      | ⟨[]⟩ => Res.failInternal s!"illegal function sort, domain is empty"
     | .SEQUENCE_SORT =>
       let elm ← ofSort? sort.getSequenceElementSort
       return .seq elm
@@ -382,7 +377,7 @@ where
       return .set elm
     | .TUPLE_SORT =>
       let args ← ofSorts? sort.getTupleSorts
-      return .tuple args
+      return .tuple args.toList
     | k => failKind k
 
 end Srt

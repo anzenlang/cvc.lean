@@ -18,13 +18,14 @@ class ToSrt (α : Type) where private mk ::
   /-- `Srt` version of `α`. -/
   srt : Srt
 
-namespace ToSrt
+namespace ToSrt variable [A : ToSrt α] [B : ToSrt β]
 
-instance : ToSrt Unit := ⟨.tuple #[]⟩
+instance : ToSrt Unit := ⟨.tuple []⟩
 instance : ToSrt Bool := ⟨.bool⟩
 instance : ToSrt Int := ⟨.int⟩
 instance : ToSrt Rat := ⟨.real⟩
 instance : ToSrt String := ⟨.string⟩
+instance : ToSrt (α → β) := ⟨.function A.srt [] B.srt⟩
 
 /-- Enforces the IEEE 754 standard.
 
@@ -35,10 +36,21 @@ Based on [wikipedia].
 instance : ToSrt Float :=
   ⟨.float 11 53⟩
 
-instance [ToSrt α] : ToSrt (Array α) := ⟨.seq <| srt α⟩
+instance : ToSrt (Array α) := ⟨.seq A.srt⟩
 instance : ToSrt (BitVec size) := ⟨.bitVec size⟩
+instance : ToSrt (α × β) := ⟨.tuple [A.srt, B.srt]⟩
 
 end ToSrt
+
+
+
+structure AnyFloat (exp sig : UInt32)
+
+namespace AnyFloat
+
+instance : ToSrt (AnyFloat exp sig) := ⟨.float exp sig⟩
+
+end AnyFloat
 
 
 
@@ -53,17 +65,17 @@ mk' ::
   /-- `Elm → Srt` conversion for user QoL. -/
   ElmToSrt : ToSrt Elm
 
-namespace TMap  variable [Ord Idx] [ToSrt Idx] [ToSrt Elm]
+namespace TMap  variable [Ord Idx] [I : ToSrt Idx] [E : ToSrt Elm]
 
 /-- Constructor. -/
-def ofRBMap [o : Ord Idx] [i : ToSrt Idx] [e : ToSrt Elm]
-  (toRBMap : RBMap Idx Elm)
-: Cvc.TMap Idx Elm :=
-  ⟨o, toRBMap, i, e⟩
+def ofRBMap (toRBMap : RBMap Idx Elm) : Cvc.TMap Idx Elm :=
+  ⟨inferInstance, toRBMap, I, E⟩
 
 /-- A total map with unknown values for all indices. -/
 abbrev unspecified : Cvc.TMap Idx Elm :=
   ofRBMap .empty
+
+instance : ToSrt (Cvc.TMap Idx Elm) := ⟨.array I.srt E.srt⟩
 
 end TMap
 
@@ -106,6 +118,8 @@ def ofRBMap (toRBMap : RBMap Elm Nat) : Cvc.Bag Elm :=
 /-- Empty bag constructor. -/
 def empty : Cvc.Bag Elm :=
   ⟨inferInstance, RBMap.empty, inferInstance⟩
+
+instance : ToSrt (Cvc.Bag Elm) := ⟨.bag E.srt⟩
 
 end Bag
 
@@ -162,6 +176,40 @@ end Bag
 
 
 
+structure FiniteField (n : Nat)
+
+namespace FiniteField
+
+instance : ToSrt (Cvc.FiniteField n) := ⟨.finiteField n⟩
+
+end FiniteField
+
+
+
+structure RoundingMode
+
+namespace RoundingMode
+
+instance : ToSrt Cvc.RoundingMode := ⟨.roundingMode⟩
+
+end RoundingMode
+
+
+
+/-- Regular expression. -/
+protected
+structure Regex where
+  /-- String representation. -/
+  toString : String
+
+namespace Regex
+
+instance : ToSrt Cvc.Regex := ⟨.regex⟩
+
+end Regex
+
+
+
 /-- A set of elements. -/
 protected
 structure Set (Elm : Type) extends Ord Elm where
@@ -171,7 +219,7 @@ mk' ::
   /-- `Elm → Srt` conversion for user QoL. -/
   ElmToSrt : ToSrt Elm
 
-namespace Set variable [Ord Elm] [ToSrt Elm]
+namespace Set variable [Ord Elm] [E : ToSrt Elm]
 
 /-- Constructor. -/
 def ofRBSet (toRBSet : RBSet Elm) : Cvc.Set Elm :=
@@ -180,6 +228,8 @@ def ofRBSet (toRBSet : RBSet Elm) : Cvc.Set Elm :=
 /-- Empty set. -/
 def empty : Cvc.Set Elm :=
   ofRBSet .empty
+
+instance : ToSrt (Cvc.Set Elm) := ⟨.set E.srt⟩
 
 end Set
 
@@ -202,24 +252,58 @@ end Set
 
 
 
-/-- Regular expression. -/
+structure Uninterpreted (cons : Type)
+
+namespace Uninterpreted
+
+instance [A : ToSrt α] : ToSrt (Uninterpreted α) := ⟨.uninterpreted A.srt⟩
+
+end Uninterpreted
+
+
+
+namespace Srt
+
+class ToType (α : Type) where
+  toType : Srt → Type
+
+namespace ToType
+
+structure Builtin
+
+namespace Builtin
+
 protected
-structure Regex where
-  /-- String representation. -/
-  toString : String
+abbrev toType : Srt → Type
+| .array idx elm => Cvc.TMap (Builtin.toType idx) (Builtin.toType elm)
+| .bag elm => Cvc.Bag (Builtin.toType elm)
+| .bool => Bool
+| .bitVec n => BitVec n
+| .finiteField n => Cvc.FiniteField n
+| .float exp sig => AnyFloat exp sig
+| .function dom [] cod => Builtin.toType dom → Builtin.toType cod
+| .function dom (domsHd :: domsTl) cod =>
+  Builtin.toType dom → Builtin.toType (.function domsHd domsTl cod)
+| .int => Int
+| .real => Rat
+| .regex => Cvc.Regex
+| .roundingMode => Cvc.RoundingMode
+| .seq elm => Array (Builtin.toType elm)
+| .set elm => Cvc.Set (Builtin.toType elm)
+| .string => String
+| .tuple [] => Unit
+| .tuple [srt] => Builtin.toType srt
+| .tuple (hd::tl) => Builtin.toType hd × (Builtin.toType <| .tuple tl)
+| .uninterpreted cons => Uninterpreted (Builtin.toType cons)
 
+instance : ToType Builtin := ⟨Builtin.toType⟩
 
+end Builtin
 
-namespace ToSrt
+end ToType
 
-variable [A : ToSrt α] [B : ToSrt β]
+/-- Converts a sort into a type using a `ToType` driver/specification. -/
+abbrev toTypeUsing (Driver : Type) [T : ToType Driver] : Srt → Type :=
+  T.toType
 
-/-- Conversion from maps ("arrays" in SMT-LIB) to sort. -/
-instance : ToSrt (Cvc.TMap α β) := ⟨.array A.srt B.srt⟩
-instance : ToSrt (Cvc.Bag α) := ⟨.bag A.srt⟩
-instance : ToSrt (α → β) := ⟨.function #[] A.srt B.srt⟩
--- instance : ToSrt Regex := ⟨.regex⟩
-instance : ToSrt (Cvc.Set α) := ⟨.set A.srt⟩
-instance : ToSrt (α × β) := ⟨.tuple #[A.srt, B.srt]⟩
-
-end ToSrt
+end Srt
