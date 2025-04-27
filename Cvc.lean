@@ -7,3 +7,4 @@ Authors: Adrien Champion
 
 import Cvc.Init
 import Cvc.Srt
+import Cvc.Defs

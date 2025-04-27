@@ -1,8 +1,14 @@
 {
   "cSpell.words": [
     "Adrien",
+    "BITVECTOR",
+    "Codomain",
+    "FLOATINGPOINT",
     "Idents",
     "println",
+    "REGLAN",
+    "ROUNDINGMODE",
+    "Significand",
     "Unsat"
   ]
 }

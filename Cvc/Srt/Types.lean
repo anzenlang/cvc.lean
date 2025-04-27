@@ -18,14 +18,13 @@ class ToSrt (α : Type) where private mk ::
   /-- `Srt` version of `α`. -/
   srt : Srt
 
-namespace ToSrt variable [A : ToSrt α] [B : ToSrt β]
+namespace ToSrt
 
-instance : ToSrt Unit := ⟨.tuple []⟩
+instance : ToSrt Unit := ⟨.unit⟩
 instance : ToSrt Bool := ⟨.bool⟩
 instance : ToSrt Int := ⟨.int⟩
 instance : ToSrt Rat := ⟨.real⟩
 instance : ToSrt String := ⟨.string⟩
-instance : ToSrt (α → β) := ⟨.function A.srt [] B.srt⟩
 
 /-- Enforces the IEEE 754 standard.
 
@@ -36,21 +35,41 @@ Based on [wikipedia].
 instance : ToSrt Float :=
   ⟨.float 11 53⟩
 
+section variable [A : ToSrt α] [B : ToSrt β]
+
 instance : ToSrt (Array α) := ⟨.seq A.srt⟩
 instance : ToSrt (BitVec size) := ⟨.bitVec size⟩
-instance : ToSrt (α × β) := ⟨.tuple [A.srt, B.srt]⟩
+instance : ToSrt (α → β) := ⟨.function A.srt [] B.srt⟩
+instance : ToSrt (α × β) := ⟨.prod A.srt B.srt⟩
+
+end
 
 end ToSrt
 
 
 
+protected
 structure AnyFloat (exp sig : UInt32)
+
+protected
+abbrev Float := Cvc.AnyFloat 11 53
 
 namespace AnyFloat
 
-instance : ToSrt (AnyFloat exp sig) := ⟨.float exp sig⟩
+instance : ToSrt (Cvc.AnyFloat exp sig) := ⟨.float exp sig⟩
 
 end AnyFloat
+
+
+
+protected
+structure Abstract (kind : Srt.Kind)
+
+namespace Abstract
+
+instance : ToSrt (Cvc.Abstract kind) := ⟨.abstract kind⟩
+
+end Abstract
 
 
 
@@ -264,46 +283,115 @@ end Uninterpreted
 
 namespace Srt
 
-class ToType (α : Type) where
-  toType : Srt → Type
-
-namespace ToType
-
-structure Builtin
-
-namespace Builtin
-
-protected
+/-- Type corresponding to an `Srt`. -/
 abbrev toType : Srt → Type
-| .array idx elm => Cvc.TMap (Builtin.toType idx) (Builtin.toType elm)
-| .bag elm => Cvc.Bag (Builtin.toType elm)
+| .abstract kind => Cvc.Abstract kind
+| .array idx elm => Cvc.TMap (toType idx) (toType elm)
+| .bag elm => Cvc.Bag (toType elm)
 | .bool => Bool
 | .bitVec n => BitVec n
 | .finiteField n => Cvc.FiniteField n
-| .float exp sig => AnyFloat exp sig
-| .function dom [] cod => Builtin.toType dom → Builtin.toType cod
+| .float exp sig => Cvc.AnyFloat exp sig
+| .function dom [] cod => toType dom → toType cod
 | .function dom (domsHd :: domsTl) cod =>
-  Builtin.toType dom → Builtin.toType (.function domsHd domsTl cod)
+  toType dom → toType (.function domsHd domsTl cod)
 | .int => Int
+| .prod lft rgt => lft.toType × rgt.toType
 | .real => Rat
 | .regex => Cvc.Regex
 | .roundingMode => Cvc.RoundingMode
-| .seq elm => Array (Builtin.toType elm)
-| .set elm => Cvc.Set (Builtin.toType elm)
+| .seq elm => Array (toType elm)
+| .set elm => Cvc.Set (toType elm)
 | .string => String
-| .tuple [] => Unit
-| .tuple [srt] => Builtin.toType srt
-| .tuple (hd::tl) => Builtin.toType hd × (Builtin.toType <| .tuple tl)
-| .uninterpreted cons => Uninterpreted (Builtin.toType cons)
+| .unit => Unit
+| .uninterpreted cons => Uninterpreted (toType cons)
 
-instance : ToType Builtin := ⟨Builtin.toType⟩
 
-end Builtin
-
-end ToType
-
-/-- Converts a sort into a type using a `ToType` driver/specification. -/
-abbrev toTypeUsing (Driver : Type) [T : ToType Driver] : Srt → Type :=
-  T.toType
+instance : CoeSort Srt Type := ⟨toType⟩
 
 end Srt
+
+
+-- namespace Srt
+
+-- class ToType (α : Type) where
+--   toType : Srt → Type
+
+-- namespace ToType
+
+-- structure Driver.Builtin
+
+-- namespace Driver.Builtin
+
+-- protected
+-- abbrev toType : Srt → Type
+-- | .abstract kind => Cvc.Abstract kind
+-- | .array idx elm => Cvc.TMap (Builtin.toType idx) (Builtin.toType elm)
+-- | .bag elm => Cvc.Bag (Builtin.toType elm)
+-- | .bool => Bool
+-- | .bitVec n => BitVec n
+-- | .finiteField n => Cvc.FiniteField n
+-- | .float exp sig => Cvc.AnyFloat exp sig
+-- | .function dom [] cod => Builtin.toType dom → Builtin.toType cod
+-- | .function dom (domsHd :: domsTl) cod =>
+--   Builtin.toType dom → Builtin.toType (.function domsHd domsTl cod)
+-- | .int => Int
+-- | .real => Rat
+-- | .regex => Cvc.Regex
+-- | .roundingMode => Cvc.RoundingMode
+-- | .seq elm => Array (Builtin.toType elm)
+-- | .set elm => Cvc.Set (Builtin.toType elm)
+-- | .string => String
+-- | .tuple [] => Unit
+-- | .tuple [srt] => Builtin.toType srt
+-- | .tuple (hd::tl) => Builtin.toType hd × (Builtin.toType <| .tuple tl)
+-- | .uninterpreted cons => Uninterpreted (Builtin.toType cons)
+
+-- instance : ToType Builtin := ⟨Builtin.toType⟩
+
+-- end Driver.Builtin
+
+-- end ToType
+
+-- /-- Converts a sort into a type using a `ToType` driver/specification. -/
+-- abbrev toTypeUsing (Driver : Type) [T : ToType Driver ] : Srt → Type :=
+--   T.toType
+
+-- @[inherit_doc toTypeUsing]
+-- abbrev toType {Driver : Type} [T : ToType Driver] : Srt → Type :=
+--   T.toType
+
+-- end Srt
+
+
+
+class AsSrt (α : Type) extends ToSrt α where
+  eq_srt : α = toToSrt.srt := by
+    simp only [ToSrt.srt]
+    <;> try (unfold Srt.toType)
+    <;> try simp -- this is mostly just to trigger `rfl`/`AsSrt.type_eq_srt`
+
+namespace AsSrt
+
+@[simp]
+theorem type_eq_srt [A : AsSrt α] : α = A.srt :=
+  A.eq_srt
+
+instance : AsSrt Bool := {}
+instance : AsSrt Int := {}
+instance : AsSrt Rat := {}
+instance : AsSrt Cvc.Regex := {}
+instance : AsSrt String := {}
+instance : AsSrt Cvc.RoundingMode := {}
+instance : AsSrt (Cvc.FiniteField size) := {}
+instance : AsSrt (BitVec size) := {}
+instance : AsSrt (Cvc.AnyFloat exp sig) := {}
+
+instance [AsSrt cons] : AsSrt (Cvc.Uninterpreted cons) := {}
+instance [AsSrt α] : AsSrt (Cvc.Bag α) := {}
+instance [AsSrt α] : AsSrt (Array α) := {}
+instance [AsSrt α] : AsSrt (Cvc.Set α) := {}
+instance [AsSrt Idx] [AsSrt Elm] : AsSrt (Cvc.TMap Idx Elm) := {}
+-- instance [AsSrt Idx] [AsSrt Elm] : AsSrt (Cvc.TMap Idx Elm) := {}
+
+end AsSrt

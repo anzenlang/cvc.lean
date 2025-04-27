@@ -7,7 +7,7 @@ Authors: Adrien Champion
 
 import Lean.Server.Utils
 
-import Cvc
+import Cvc.Init
 
 namespace Cvc.Test
 

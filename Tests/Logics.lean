@@ -7,7 +7,7 @@ Authors: Adrien Champion
 
 import Cvc.Init.Logic
 
-import CvcTest.Init
+import Tests.Init
 
 
 
