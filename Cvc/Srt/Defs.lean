@@ -323,16 +323,14 @@ where
     let mut msg := s!"unexpected sort-kind `{k}`"
     Res.failInternal msg
   aux (sort : cvc5.Sort) : Nat → Res Srt
-
   | 0 => Res.failUser s!"maximum depth `{maxDepth}` reached"
-
   | maxDepth + 1 => do
 
     -- helpers
     let ofSort (s : cvc5.Sort) : Res Srt := aux s maxDepth
-    let ofSorts (s : Array cvc5.Sort) : Res (Array Srt) := s.mapM ofSort
+    let ofSorts (s : Array cvc5.Sort) : Res (List Srt) := Array.toList <$> s.mapM ofSort
     let ofSort? (s? : Except cvc5.Error cvc5.Sort) : Res Srt := s? >>= ofSort
-    let ofSorts? (s? : Except cvc5.Error (Array cvc5.Sort)) : Res (Array Srt) := s? >>= ofSorts
+    let ofSorts? (s? : Except cvc5.Error (Array cvc5.Sort)) : Res (List Srt) := s? >>= ofSorts
 
     -- let's do this
     match sort.getKind with
@@ -363,11 +361,11 @@ where
         | [] => acc .unit
         | [srt] => srt
         | hd::tl@(_::_) => doit (acc <| Srt.prod hd ·) tl
-      (doit id ∘ Array.toList) <$> ofSorts? sort.getTupleSorts
+      doit id <$> ofSorts? sort.getTupleSorts
     | .FUNCTION_SORT =>
       match ← ofSorts? sort.getFunctionDomainSorts with
-      | ⟨dom :: doms⟩ => .function dom doms <$> ofSort? sort.getFunctionCodomainSort
-      | ⟨[]⟩ => Res.failInternal s!"illegal function sort, domain is empty"
+      | dom :: doms => .function dom doms <$> ofSort? sort.getFunctionCodomainSort
+      | [] => Res.failInternal s!"illegal function sort, domain is empty"
 
     -- currently unsupported sorts
     | k@.ABSTRACT_SORT =>

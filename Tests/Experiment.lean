@@ -11,6 +11,7 @@ import Cvc.Init
 
 namespace Cvc.Test
 
+
 def lift {α : Type} [ToString E] : (t? : Except E α) → IO α
 | .ok res => return res
 | .error e => do
@@ -22,6 +23,7 @@ open cvc5 in
 boolSort := Bool
 intSort := Int
 intToBoolSort := (-> Int Bool)
+funTest := (-> Int (Tuple (-> Int Bool)))
 arraySort := (Array (-> Int Bool) Int)
 tupleSort := UnitTuple
 tupleSort' := (Tuple Bool)
@@ -43,6 +45,15 @@ sat
   println! "intSort := {intSort}"
   let intToBoolSort ← lift <| tm.mkFunctionSort #[intSort] boolSort
   println! "intToBoolSort := {intToBoolSort}"
+
+  -- -- cvc5 rejects function-sorts with a function-sort codomain, so this fails
+  -- let funTest ← lift <| tm.mkFunctionSort #[intSort] intToBoolSort
+  -- -- but it's fine if we wrap the function-sort into a 1-tuple
+  let tupledFun ← lift <| tm.mkTupleSort #[intToBoolSort]
+  let funTest ← lift <| tm.mkFunctionSort #[intSort] tupledFun
+  println! "funTest := {funTest}"
+
+  -- arrays with a function-sort index are fine
   let arraySort ← lift <| tm.mkArraySort intToBoolSort intSort
   println! "arraySort := {arraySort}"
   let tupleSort ← lift <| tm.mkTupleSort #[]

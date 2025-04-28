@@ -18,6 +18,9 @@ class ToSrt (α : Type) where private mk ::
   /-- `Srt` version of `α`. -/
   srt : Srt
 
+abbrev Srt.ofType (α : Type) [I : ToSrt α] : Srt :=
+  I.srt
+
 namespace ToSrt
 
 instance : ToSrt Unit := ⟨.unit⟩
@@ -307,9 +310,24 @@ abbrev toType : Srt → Type
 | .uninterpreted cons => Uninterpreted (toType cons)
 
 
-instance : CoeSort Srt Type := ⟨toType⟩
+-- instance : CoeSort Srt Type := ⟨toType⟩
+
+class ToType (Driver : Type) where
+  srtToType : Srt → Type
+
+namespace ToType.Builtin
+
+structure Driver
+
+scoped
+instance instToType : ToType Driver where
+  srtToType := Srt.toType
+
+end ToType.Builtin
 
 end Srt
+
+abbrev srtToType [I : Srt.ToType Driver] := I.srtToType
 
 
 -- namespace Srt
@@ -365,33 +383,33 @@ end Srt
 
 
 
-class AsSrt (α : Type) extends ToSrt α where
-  eq_srt : α = toToSrt.srt := by
-    simp only [ToSrt.srt]
-    <;> try (unfold Srt.toType)
-    <;> try simp -- this is mostly just to trigger `rfl`/`AsSrt.type_eq_srt`
+-- class AsSrt (α : Type) extends ToSrt α where
+--   eq_srt : α = toToSrt.srt := by
+--     simp only [ToSrt.srt]
+--     <;> try (unfold Srt.toType)
+--     <;> try simp -- this is mostly just to trigger `rfl`/`AsSrt.type_eq_srt`
 
-namespace AsSrt
+-- namespace AsSrt
 
-@[simp]
-theorem type_eq_srt [A : AsSrt α] : α = A.srt :=
-  A.eq_srt
+-- @[simp]
+-- theorem type_eq_srt [A : AsSrt α] : α = A.srt :=
+--   A.eq_srt
 
-instance : AsSrt Bool := {}
-instance : AsSrt Int := {}
-instance : AsSrt Rat := {}
-instance : AsSrt Cvc.Regex := {}
-instance : AsSrt String := {}
-instance : AsSrt Cvc.RoundingMode := {}
-instance : AsSrt (Cvc.FiniteField size) := {}
-instance : AsSrt (BitVec size) := {}
-instance : AsSrt (Cvc.AnyFloat exp sig) := {}
+-- instance : AsSrt Bool := {}
+-- instance : AsSrt Int := {}
+-- instance : AsSrt Rat := {}
+-- instance : AsSrt Cvc.Regex := {}
+-- instance : AsSrt String := {}
+-- instance : AsSrt Cvc.RoundingMode := {}
+-- instance : AsSrt (Cvc.FiniteField size) := {}
+-- instance : AsSrt (BitVec size) := {}
+-- instance : AsSrt (Cvc.AnyFloat exp sig) := {}
 
-instance [AsSrt cons] : AsSrt (Cvc.Uninterpreted cons) := {}
-instance [AsSrt α] : AsSrt (Cvc.Bag α) := {}
-instance [AsSrt α] : AsSrt (Array α) := {}
-instance [AsSrt α] : AsSrt (Cvc.Set α) := {}
-instance [AsSrt Idx] [AsSrt Elm] : AsSrt (Cvc.TMap Idx Elm) := {}
+-- instance [AsSrt cons] : AsSrt (Cvc.Uninterpreted cons) := {}
+-- instance [AsSrt α] : AsSrt (Cvc.Bag α) := {}
+-- instance [AsSrt α] : AsSrt (Array α) := {}
+-- instance [AsSrt α] : AsSrt (Cvc.Set α) := {}
 -- instance [AsSrt Idx] [AsSrt Elm] : AsSrt (Cvc.TMap Idx Elm) := {}
+-- -- instance [AsSrt Idx] [AsSrt Elm] : AsSrt (Cvc.TMap Idx Elm) := {}
 
-end AsSrt
+-- end AsSrt
