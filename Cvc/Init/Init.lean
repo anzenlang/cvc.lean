@@ -71,7 +71,30 @@ export _root_ (Rat)
 /-- The `𝕂`onstant combinator. -/
 abbrev 𝕂 (val : α) (_ : β) : α := val
 
-/-! ## Re-exports from `cvc5` -/
+
+
+/-- A check-sat result.-/
+inductive CheckSat
+/-- Formulas asserted are satisfiable, *i.e.* a model exists. -/
+| sat
+/-- Formulas are unsatisfiable, no assignment of the symbols makes them true. -/
+| unsat
+/-- Solver returned unknown. -/
+| unknown (desc : String)
+/-- Solver returned some unexpected result. -/
+| other (desc : String)
+
+namespace CheckSat
+
+/-- Conversion to a simple *is sat?* flag, `none` on unknown/unexpected results. -/
+def isSat? : CheckSat → Option Bool
+| sat => true
+| unsat => false
+| unknown _ | other _ => none
+
+end CheckSat
+
+
 
 inductive Error : Type
 | internal (msg : String)

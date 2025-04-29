@@ -23,8 +23,22 @@ inductive Term {γ : Type u} : γ → Type u
 /-- **[private]** Constructor from an unsafe term.
 
 Private as this would allow user creating term of any `Srt`/`Type`
+
+- `toUnsafe`: raw cvc5 term.
+- `hasSymbols`: experimental, **only really valid in the `Term.Build` monad**, indicates whether the
+  term is known to mention symbols. Once we're in the `Smt` monad, we would need to check terms
+  created by the solver.
+
+  Currently, one can trigger logic-unsafety by
+  - running `Smt` code in a non-linear logic,
+  - having the solver generate a non-linear term `t`,
+  - exit `Smt` returning `t`,
+  - running `Smt` code in a linear logic,
+  - using `t`.
 -/
-| private ofUnsafe {a : γ} (toUnsafe : cvc5.Term) : Term a
+| private ofUnsafe {a : γ} (hasSymbols : Bool) (toUnsafe : cvc5.Term) : Term a
+
+abbrev Pred := Term Srt.bool
 
 abbrev Term0 := Term (γ := Srt)
 
@@ -51,7 +65,7 @@ namespace Term
 
 /-- **[private]** Monadic term constructor. -/
 def ofUnsafeM [Monad m] : m cvc5.Term → m (Term α) :=
-  (Term.ofUnsafe <$> ·)
+  (Term.ofUnsafe false <$> ·)
 
 protected
 def srt {srt : Srt} : Term srt → Srt :=
@@ -59,11 +73,26 @@ def srt {srt : Srt} : Term srt → Srt :=
 
 /-- Unsafe term accessor. -/
 def toUnsafe : Term α → cvc5.Term
-| Term.ofUnsafe term => term
+| Term.ofUnsafe _ term => term
+
+/-- Experimental, **only really valid in the `Term.Build` monad**, indicates whether the term is
+known to mention symbols. Once we're in the `Smt` monad, we would need to check terms created by the
+solver.
+
+Currently, one can trigger logic-unsafety by
+- running `Smt` code in a non-linear logic,
+- having the solver generate a non-linear term `t`,
+- exit `Smt` returning `t`,
+- running `Smt` code in a linear logic,
+- using `t`.
+-/
+private
+def hasSymbols : Term α → Bool
+| Term.ofUnsafe hs _ => hs
 
 /-- Turns a `Term0` into a `Term1`. -/
 def liftWith (Driver : Type) [I : Srt.ToType Driver] : Term srt → Term (I.srtToType srt)
-| Term.ofUnsafe term => Term.ofUnsafe term
+| Term.ofUnsafe hs term => Term.ofUnsafe hs term
 
 @[inherit_doc liftWith]
 def lift {Driver} [I : Srt.ToType Driver] (term : Term srt) : Term (I.srtToType srt) :=
@@ -71,7 +100,7 @@ def lift {Driver} [I : Srt.ToType Driver] (term : Term srt) : Term (I.srtToType 
 
 /-- Turns a `Term1` into a `Term0`. -/
 def asSrt [ToSrt α] : Term α → Term (Srt.ofType α)
-| Term.ofUnsafe term => Term.ofUnsafe term
+| Term.ofUnsafe hs term => Term.ofUnsafe hs term
 
 /-- Facilitates pattern-matching on the `Srt` of a `Term1`. -/
 def inspectSrt [ToSrt α] (t : Term α) (f : (srt : Srt) → Term srt → γ) : γ :=
@@ -81,7 +110,7 @@ def inspectSrt [ToSrt α] (t : Term α) (f : (srt : Srt) → Term srt → γ) : 
 /-- SMT-LIB string representation. -/
 protected
 def toSmtString : Term α → String
-| Term.ofUnsafe t => t.toString
+| Term.ofUnsafe _ t => t.toString
 
 instance : ToString (Term α) := ⟨Term.toSmtString⟩
 
@@ -90,16 +119,16 @@ instance : ToString (Term α) := ⟨Term.toSmtString⟩
 section abbrevs
 
 protected
-abbrev bool := Term0 .bool
+abbrev Bool := Term0 .bool
 
 protected
-abbrev int := Term0 .int
+abbrev Int := Term0 .int
 
 protected
-abbrev abstract (kind : Srt.Kind) := Term0 (.abstract kind)
+abbrev Abstract (kind : Srt.Kind) := Term0 (.abstract kind)
 
 protected
-abbrev array (idx elm : Srt) := Term0 (.array idx elm)
+abbrev Array (idx elm : Srt) := Term0 (.array idx elm)
 
 end abbrevs
 
@@ -108,9 +137,16 @@ open cvc5 renaming TermManager → Tm
 
 
 
+/-- Term builder state. -/
+structure Build.State where
+  /-- The term manager. -/
+  private tm : Tm
+  /-- The logic. -/
+  private logic : Logic.Builder
+
 /-- Cvc term builder transformer monad. -/
 abbrev Build :=
-  ExceptT Error (StateM Tm)
+  ExceptT Error (StateM Build.State)
 
 instance : MonadLift (Except cvc5.Error) Build where
   monadLift code tm := do
@@ -118,32 +154,169 @@ instance : MonadLift (Except cvc5.Error) Build where
     | .ok res => return (.ok res, tm)
     | .error e => return (.error <| Error.ofCvc5 e, tm)
 
-/-- Type-unsafe term constructor. -/
+/-- **[private]** Type-unsafe term constructor. -/
 private
-def mkTerm (k : cvc5.Kind) (args : Array cvc5.Term) : Build (Term0 srt) := do
-  let tm ← get
-  let uTerm ← tm.mkTerm k args
-  return Term.ofUnsafe uTerm
+def mkTerm (hasSymbols : Bool) (k : cvc5.Kind) (args : Array cvc5.Term) : Build (Term0 srt) := do
+  let state ← get
+  let uTerm ← state.tm.mkTerm k args
+  -- no `set`, just `state.tm` side-effects
+  return Term.ofUnsafe hasSymbols uTerm
 
 private
 def tmDoM [Monad m] [MonadLiftT m Build] (f : Tm → m γ) : Build γ :=
-  get >>= (liftM <| f ·)
+  get >>= liftM ∘ f ∘ Build.State.tm
 
 private
 def tmDo (f : Tm → γ) : Build γ := tmDoM (m := Id) f
 
-namespace mk
+private
+def logicDo (f : Logic.Builder → Logic.Builder) : Build Unit := fun state =>
+  let logic := f state.logic
+  return (.ok (), {state with logic})
+
+end Term
+
+
+
+namespace Term variable {α : Srt}
 
 /-- Boolean constant constructor. -/
 protected
-def bool (b : Bool) : Build Term.bool :=
-  tmDo (· |>.mkBoolean b |> Term.ofUnsafe)
+def bool (b : Bool) : Build Pred :=
+  tmDo (fun tm => tm.mkBoolean b |> Term.ofUnsafe false)
 
-/-- Integer constant constructor.-/
+/-- Integer constant constructor. -/
 protected
-def int (i : Int) : Build Term.bool :=
-  tmDo (· |>.mkInteger i |> Term.ofUnsafe)
+def int (i : Int) : Build Term.Int := do
+  logicDo .int
+  tmDo (· |>.mkInteger i |> Term.ofUnsafe false)
 
 /-- If-then-else constructor. -/
-def mkIte (cnd : Term.bool) (thn els : Term0 α) : Build (Term0 α) :=
-  mkTerm .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
+def ite (cnd : Pred) (thn els : Term α) : Build (Term α) :=
+  mkTerm (cnd.hasSymbols ∨ thn.hasSymbols ∨ els.hasSymbols)
+    .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
+
+section nary2 variable (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp <;> omega)
+
+/-- N-ary equality constructor. -/
+def mkEqual : Build Pred :=
+  let _ := valid
+  mkTerm (terms.any hasSymbols) .EQUAL (terms.map toUnsafe)
+
+/-- N-ary less-than constructor. -/
+def mkLt : Build Pred :=
+  let _ := valid
+  mkTerm (terms.any hasSymbols) .LT (terms.map toUnsafe)
+
+/-- N-ary less-than-or-equal-to constructor. -/
+def mkLe : Build Pred :=
+  let _ := valid
+  mkTerm (terms.any hasSymbols) .LEQ (terms.map toUnsafe)
+
+/-- N-ary greater-than-or-equal-to constructor. -/
+def mkGe : Build Pred :=
+  let _ := valid
+  mkTerm (terms.any hasSymbols) .GEQ (terms.map toUnsafe)
+
+/-- N-ary greater-than constructor. -/
+def mkGt : Build Pred :=
+  let _ := valid
+  mkTerm (terms.any hasSymbols) .GT (terms.map toUnsafe)
+
+/-- N-ary addition. -/
+def mkAdd : Build (Term α) := do
+  let _ := valid
+  logicDo .nonDiff
+  mkTerm (terms.any hasSymbols)
+    .ADD (terms.map toUnsafe)
+
+/-- N-ary multiplication. -/
+def mkMul : Build (Term α) := do
+  let _ := valid
+  let mut nl? := none
+  for term in terms do
+    if term.hasSymbols then
+      match nl? with
+      | none => nl? := some false
+      | some false =>
+        nl? := some true
+        break
+      | _ => break -- unreachable
+  let nl := nl?.getD false
+  let hs := nl?.isSome
+  if nl then
+    logicDo .nonLinear
+  mkTerm hs .MULT (terms.map toUnsafe)
+
+end nary2
+
+/-- Binary equality. -/
+def equal (lft rgt : Term α) : Build Pred :=
+  mkEqual #[lft, rgt]
+
+/-- Binary less-than. -/
+def lt (lft rgt : Term α) : Build Pred :=
+  mkLt #[lft, rgt]
+
+/-- Binary less-than-or-equal-to. -/
+def le (lft rgt : Term α) : Build Pred :=
+  mkEqual #[lft, rgt]
+
+/-- Binary greater-than-or-equal-to. -/
+def ge (lft rgt : Term α) : Build Pred :=
+  mkEqual #[lft, rgt]
+
+/-- Binary greater-than. -/
+def gt (lft rgt : Term α) : Build Pred :=
+  mkEqual #[lft, rgt]
+
+/-- Binary addition. -/
+def add (lft rgt : Term α) : Build (Term α) := do
+  mkAdd #[lft, rgt]
+
+/-- Binary multiplication. -/
+def mul (lft rgt : Term α) : Build (Term α) := do
+  mkMul #[lft, rgt]
+
+end Term
+
+
+
+structure Smt.State where
+private mk ::
+  private solver : cvc5.Solver
+
+abbrev SmtT (m : Type → Type u) :=
+  ExceptT Error (StateT Smt.State m)
+
+abbrev Smt := SmtT (m := Id)
+
+namespace Smt variable [Monad m]
+
+instance : MonadLift Smt (SmtT m) :=
+  ⟨fun code state => return code state⟩
+
+instance : MonadLift (cvc5.SolverT m) (SmtT m) where
+  monadLift code state := do
+    let (res, solver) ← code state.solver
+    return (res, {state with solver})
+
+private
+def liftRes : Except cvc5.Error α → Except Error α :=
+  Except.mapError Error.ofCvc5
+
+def assert (formula : Term Bool) : SmtT m Unit := do
+  cvc5.Solver.assertFormula (m := m) formula.toUnsafe
+
+def checkSat : SmtT m CheckSat := do
+  let res ← cvc5.Solver.checkSat (m := m)
+  pure <|
+    if res.isSat then CheckSat.sat
+    else if res.isUnsat then CheckSat.unsat
+    else if res.isUnknown then CheckSat.unknown res.toString
+    else CheckSat.other res.toString
+
+def checkSat? : SmtT m (Option Bool) :=
+  CheckSat.isSat? <$> checkSat
+
+end Smt
