@@ -38,7 +38,8 @@ Private as this would allow user creating term of any `Srt`/`Type`
 -/
 | private ofUnsafe {a : γ} (hasSymbols : Bool) (toUnsafe : cvc5.Term) : Term a
 
-abbrev Pred := Term Srt.bool
+/-- Abbreviation for a formula (`Srt.bool`) term. -/
+abbrev Formula := Term Srt.bool
 
 abbrev Term0 := Term (γ := Srt)
 
@@ -182,7 +183,7 @@ namespace Term variable {α : Srt}
 
 /-- Boolean constant constructor. -/
 protected
-def bool (b : Bool) : Build Pred :=
+def bool (b : Bool) : Build Formula :=
   tmDo (fun tm => tm.mkBoolean b |> Term.ofUnsafe false)
 
 /-- Integer constant constructor. -/
@@ -192,34 +193,34 @@ def int (i : Int) : Build Term.Int := do
   tmDo (· |>.mkInteger i |> Term.ofUnsafe false)
 
 /-- If-then-else constructor. -/
-def ite (cnd : Pred) (thn els : Term α) : Build (Term α) :=
+def ite (cnd : Formula) (thn els : Term α) : Build (Term α) :=
   mkTerm (cnd.hasSymbols ∨ thn.hasSymbols ∨ els.hasSymbols)
     .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
 
 section nary2 variable (terms : Array (Term α)) (valid : 2 ≤ terms.size := by simp <;> omega)
 
 /-- N-ary equality constructor. -/
-def mkEqual : Build Pred :=
+def mkEqual : Build Formula :=
   let _ := valid
   mkTerm (terms.any hasSymbols) .EQUAL (terms.map toUnsafe)
 
 /-- N-ary less-than constructor. -/
-def mkLt : Build Pred :=
+def mkLt : Build Formula :=
   let _ := valid
   mkTerm (terms.any hasSymbols) .LT (terms.map toUnsafe)
 
 /-- N-ary less-than-or-equal-to constructor. -/
-def mkLe : Build Pred :=
+def mkLe : Build Formula :=
   let _ := valid
   mkTerm (terms.any hasSymbols) .LEQ (terms.map toUnsafe)
 
 /-- N-ary greater-than-or-equal-to constructor. -/
-def mkGe : Build Pred :=
+def mkGe : Build Formula :=
   let _ := valid
   mkTerm (terms.any hasSymbols) .GEQ (terms.map toUnsafe)
 
 /-- N-ary greater-than constructor. -/
-def mkGt : Build Pred :=
+def mkGt : Build Formula :=
   let _ := valid
   mkTerm (terms.any hasSymbols) .GT (terms.map toUnsafe)
 
@@ -251,23 +252,23 @@ def mkMul : Build (Term α) := do
 end nary2
 
 /-- Binary equality. -/
-def equal (lft rgt : Term α) : Build Pred :=
+def equal (lft rgt : Term α) : Build Formula :=
   mkEqual #[lft, rgt]
 
 /-- Binary less-than. -/
-def lt (lft rgt : Term α) : Build Pred :=
+def lt (lft rgt : Term α) : Build Formula :=
   mkLt #[lft, rgt]
 
 /-- Binary less-than-or-equal-to. -/
-def le (lft rgt : Term α) : Build Pred :=
+def le (lft rgt : Term α) : Build Formula :=
   mkEqual #[lft, rgt]
 
 /-- Binary greater-than-or-equal-to. -/
-def ge (lft rgt : Term α) : Build Pred :=
+def ge (lft rgt : Term α) : Build Formula :=
   mkEqual #[lft, rgt]
 
 /-- Binary greater-than. -/
-def gt (lft rgt : Term α) : Build Pred :=
+def gt (lft rgt : Term α) : Build Formula :=
   mkEqual #[lft, rgt]
 
 /-- Binary addition. -/
@@ -282,41 +283,175 @@ end Term
 
 
 
+/-- Opaque solver state. -/
 structure Smt.State where
+/-- **[private]** Constructor. -/
 private mk ::
+  /-- **[private]** Solver accessor. -/
   private solver : cvc5.Solver
 
-abbrev SmtT (m : Type → Type u) :=
+/-- Smt error-`Smt.State`-monad.
+
+Cannot run sat/unsat/unknown-specific command such as get-value, get-proof, *etc.* See `Smt.Sat`,
+`Smt.Unsat`, and `Smt.Unknown`.
+-/
+abbrev Smt (m : Type → Type u) :=
   ExceptT Error (StateT Smt.State m)
 
-abbrev Smt := SmtT (m := Id)
+namespace Smt variable [M : Monad m]
 
-namespace Smt variable [Monad m]
+protected
+instance : MonadLift m (Smt m) :=
+  ⟨fun code state => return (.ok (← code), state)⟩
 
-instance : MonadLift Smt (SmtT m) :=
-  ⟨fun code state => return code state⟩
-
-instance : MonadLift (cvc5.SolverT m) (SmtT m) where
-  monadLift code state := do
-    let (res, solver) ← code state.solver
-    return (res, {state with solver})
-
+/-- **[private]** Lifts `cvc5.SolverT` code. -/
 private
-def liftRes : Except cvc5.Error α → Except Error α :=
-  Except.mapError Error.ofCvc5
+def lift5 (code : cvc5.SolverT m α) : Smt m α := do
+  let state ← get
+  let (res, solver) ← code state.solver
+  set {state with solver}
+  return ← Res.lift res
 
-def assert (formula : Term Bool) : SmtT m Unit := do
-  cvc5.Solver.assertFormula (m := m) formula.toUnsafe
+/-- Throws an `Error.userError`. -/
+protected
+def throwUser [MonadExcept Error m] (msg : String) : m α := do
+  throw <| Error.userError msg
 
-def checkSat : SmtT m CheckSat := do
-  let res ← cvc5.Solver.checkSat (m := m)
+/-- Asserts a formula. -/
+def assert (formula : Formula) : Smt m Unit := do
+  lift5 <| cvc5.Solver.assertFormula (m := m) formula.toUnsafe
+
+section variable (assuming : Option (Array Formula) := none)
+
+/-- Checks the satisfiability of the formulas asserted with `Smt.assert`. -/
+def checkSat : Smt m CheckSat := do
+  let res ←
+    match assuming with
+    | none | some #[] => lift5 <| cvc5.Solver.checkSat (m := m)
+    | some assuming =>
+      assuming.map Term.toUnsafe
+      |> cvc5.Solver.checkSatAssuming (m := m)
+      |> lift5
   pure <|
     if res.isSat then CheckSat.sat
     else if res.isUnsat then CheckSat.unsat
     else if res.isUnknown then CheckSat.unknown res.toString
     else CheckSat.other res.toString
 
-def checkSat? : SmtT m (Option Bool) :=
-  CheckSat.isSat? <$> checkSat
+/-- Simplified `Smt.checkSat`, returns true/false for sat/unsat, `none` for unknown/unexpected. -/
+def checkSat? : Smt m (Option Bool) :=
+  CheckSat.isSat? <$> checkSat assuming
+
+end
+
+
+
+
+/-- Sat-mode state. -/
+structure Sat.State extends Smt.State where
+/-- **[private]** Constructor. -/
+private mk ::
+
+/-- Unsat-mode state. -/
+structure Unsat.State extends Smt.State where
+/-- **[private]** Constructor. -/
+private mk ::
+
+/-- Unknown-mode state. -/
+structure Unknown.State extends Smt.State where
+/-- **[private]** Constructor. -/
+private mk ::
+
+/-- Sat-mode monad, allows running commands such as get-value.
+
+`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
+different solver mode.
+-/
+abbrev Sat (m : Type → Type u) :=
+  ExceptT Error (StateT Sat.State m)
+
+/-- Unsat-mode monad, allows running commands such as get-proof.
+
+`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
+different solver mode.
+-/
+abbrev Unsat (m : Type → Type u) :=
+  ExceptT Error (StateT Unsat.State m)
+
+/-- Unknown-mode monad, allows running unknown-mode-specific commands.
+
+`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
+different solver mode.
+-/
+abbrev Unknown (m : Type → Type u) :=
+  ExceptT Error (StateT Unknown.State m)
+
+
+
+/-- Performs a check-sat and runs sat/unsat/unknown-specific code. -/
+def checkSatAnd
+  (assuming : Option (Array Formula) := none)
+  (ifSat : Smt.Sat m α := Smt.throwUser "unexpected sat result")
+  (ifUnsat : Smt.Unsat m α := Smt.throwUser "unexpected unsat result")
+  (ifUnknown : Smt.Unknown m α := Smt.throwUser "unexpected unknown result")
+: Smt m α := do
+  if let some isSat ← checkSat? assuming then
+    let state ← get
+    if isSat then
+      let (res, state) ← ifSat ⟨state⟩
+      set state.toState
+      return ← res
+    else
+      let (res, state) ← ifUnsat ⟨state⟩
+      set state.toState
+      return ← res
+  else
+    let state ← get
+    let (res, state) ← ifUnknown ⟨state⟩
+    set state.toState
+    return ← res
+
+
+
+namespace Sat
+
+private
+def lift5 (code : cvc5.SolverT m α) : Sat m α := fun state => do
+  let (res, solver) ← code state.solver
+  return (Res.lift res, ⟨⟨solver⟩⟩)
+
+def getValue {α : Srt} (term : Term α) : Sat m (Term α) := do
+  let term! ← lift5 <| cvc5.Solver.getValue term.toUnsafe
+  return Term.ofUnsafe false term!
+
+def getValues {α : Srt} (terms : Array (Term α)) : Sat m (Array (Term α × Term α)) := do
+  let mut values := Array.mkEmpty terms.size
+  for term in terms do
+    let value ← getValue term
+    values := values.push (term, value)
+  return values
+
+end Sat
+
+namespace Unsat
+
+private
+def lift5 (code : cvc5.SolverT m α) : Unsat m α := fun state => do
+  let (res, solver) ← code state.solver
+  return (Res.lift res, ⟨⟨solver⟩⟩)
+
+def getProof : Unsat m (Array cvc5.Proof) := do
+  lift5 <| cvc5.Solver.getProof
+
+end Unsat
+
+namespace Unknown
+
+private
+def lift5 (code : cvc5.SolverT m α) : Unknown m α := fun state => do
+  let (res, solver) ← code state.solver
+  return (Res.lift res, ⟨⟨solver⟩⟩)
+
+end Unknown
 
 end Smt
