@@ -16,7 +16,7 @@ docUpdate:
 
 doc:
 	lake build
-	cd docbuild ; lake build Cvc:docs
+	cd docbuild ; lake update Cvc ; lake build Cvc:docs
 
 docServe: doc
 	python3 -m http.server -d docbuild/.lake/build/doc

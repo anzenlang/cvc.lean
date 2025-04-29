@@ -5,282 +5,343 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init.Init
-import Cvc.Init.Logic
-import Cvc.Init.Option
+import Batteries.Data.Rat.Basic
+
+import cvc5
 
 
 
+/-! # Library setup: re-exports and helpers -/
 namespace Cvc
 
 
--- open Res renaming failInternal → fail
+abbrev RBMap (α β : Type) [Ord α] :=
+  Lean.RBMap α β compare
 
+namespace RBMap variable [Ord α]
 
--- inductive Srt
--- | bool | int
--- | bitVec (size : Nat)
--- | array (idx elm : Srt)
--- | tuple (srts : Array Srt)
--- | function (dom : Array Srt) (cod : Srt)
--- deriving Inhabited, Hashable
+def empty : RBMap α β := Lean.RBMap.empty
 
--- namespace Srt
+def insert : RBMap α β → α → β → RBMap α β :=
+  Lean.RBMap.insert
 
--- mutual
+def erase : RBMap α β → α → RBMap α β :=
+  Lean.RBMap.erase
 
--- instance instDecidableEqListSrt : DecidableEq (List Srt)
--- | hd1::tl1, hd2::tl2 => by
---   cases hd1.instDecidableEq hd2
---   case isFalse h => exact isFalse (by simp only [List.cons.injEq, h, false_and, not_false_eq_true])
---   cases instDecidableEqListSrt tl1 tl2
---   case isFalse h => exact isFalse (by simp only [List.cons.injEq, h, and_false, not_false_eq_true])
---   exact isTrue (by simp [*])
--- | [], _::_ | _::_, [] => isFalse (by simp only [reduceCtorEq, not_false_eq_true])
--- | [], [] => isTrue rfl
-
--- instance instDecidableEqArraySrt : DecidableEq (Array Srt)
--- | ⟨l1⟩, ⟨l2⟩ => by
---   cases instDecidableEqListSrt l1 l2
---   · apply isFalse ; simp only [Array.mk.injEq, not_false_eq_true, *]
---   · apply isTrue ; simp only [*]
-
--- instance instDecidableEq : DecidableEq Srt
--- | .bool => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case bool => exact isTrue rfl
--- | .int => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case int => exact isTrue rfl
--- | .bitVec n1 => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case bitVec n2 =>
---     if h : n1 = n2
---     then apply isTrue ; simp [h]
---     else apply isFalse ; simp [h]
--- | .array idx1 elm1 => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case array idx2 elm2 =>
---   cases instDecidableEq idx1 idx2
---   <;> cases instDecidableEq elm1 elm2
---   <;> try (
---     apply isFalse
---     simp only [array.injEq, and_false, false_and, not_false_eq_true, *]
---     done
---   )
---   apply isTrue ; simp only [*]
--- | .tuple prod1 => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case tuple prod2 =>
---   cases instDecidableEqArraySrt prod1 prod2
---   · apply isFalse ; simp only [tuple.injEq, not_false_eq_true, *]
---   · apply isTrue ; simp only [*]
--- | .function dom1 elm1 => fun s2 => by
---   cases s2 <;> try (apply isFalse ; simp only [reduceCtorEq, not_false_eq_true] ; done)
---   case function dom2 elm2 =>
---   cases instDecidableEqArraySrt dom1 dom2
---   <;> cases instDecidableEq elm1 elm2
---   <;> try (
---     apply isFalse
---     simp only [function.injEq, and_false, false_and, not_false_eq_true, *]
---     done
---   )
---   apply isTrue ; simp only [*]
-
--- end
+end RBMap
 
 
 
--- protected
--- def toString : Srt → String
--- | .bool => "Bool"
--- | .int => "Int"
--- | .bitVec n => s!"BitVec {n}"
--- | .array idx elm => s!"Array ({idx.toString}) ({elm.toString})"
--- | .tuple prod => Id.run do
---   let mut s := ""
---   for srt in prod do
---     if s.isEmpty
---     then s := srt.toString
---     else s := s!"{s} × {srt.toString}"
---   s
--- | .function dom cod =>
---   if dom.isEmpty then cod.toString
---   else
---     let dom :=
---       "" |> dom.foldl fun s d => if s.isEmpty then d.toString else s!"{s} × ({d.toString})"
---     s!"({dom}) → ({cod.toString})"
+abbrev RBSet (α : Type) [Ord α] :=
+  RBMap α Unit
 
--- instance : ToString Srt := ⟨Srt.toString⟩
+namespace RBSet variable [Ord α]
 
--- def ofUnsafe (s : cvc5.Sort) : (maxDepth : Nat := 100_000) → Res Srt
--- | maxDepth + 1 => do
---   let ofUnsafe := ofUnsafe (maxDepth := maxDepth)
---   match s.getKind with
---   | .ARRAY_SORT =>
---     let idx ← s.getArrayIndexSort >>= ofUnsafe
---     let elm ← s.getArrayElementSort >>= ofUnsafe
---     return .array idx elm
---   | .BOOLEAN_SORT => return .bool
---   | .BITVECTOR_SORT =>
---     let size ← s.getBitVectorSize
---     return .bitVec size.toNat
---   | .FUNCTION_SORT =>
---     let doms ← s.getFunctionDomainSorts >>= Array.mapM ofUnsafe
---     let cod ← s.getFunctionCodomainSort >>= ofUnsafe
---     return .function doms cod
---   | .INTEGER_SORT => return .int
---   | k => fail s!"unexpected/unsupported sort-kind `{k}`"
--- | 0 => fail "maximum depth reached during `cvc5.Sort → Srt` conversion"
+def empty : RBSet α := Lean.RBMap.empty
 
--- def FArray (Idx : Type) (Elm : Type) : Type :=
---   List (Idx × Elm)
+def insert : RBSet α → α → RBSet α :=
+  (RBMap.insert · · ())
 
--- namespace FArray
+def erase : RBSet α → α → RBSet α :=
+  (RBMap.erase · ·)
 
--- def ofList : List (Idx × Elm) → FArray Idx Elm := id
-
--- def empty : FArray Idx Elm := ofList []
-
--- def store [DecidableEq Idx] (key : Idx) (val : Elm) : (a : FArray Idx Elm) → FArray Idx Elm
--- | (key', val') :: tail =>
---   if key = key' then
---     (key, val) :: tail
---   else
---     (key', val') :: store key val tail
--- | [] => [(key, val)]
-
--- def select [DecidableEq Idx] [Inhabited Elm] (key : Idx) : (a : FArray Idx Elm) → Elm
--- | (key', val) :: tail =>
---   if key = key' then val else select key tail
--- | [] => default
-
--- end FArray
-
-
--- protected
--- class OfType (α : Type) where
---   srt : Srt
-
--- abbrev ofType (α : Type) [T : Srt.OfType α] : Srt :=
---   T.srt
-
--- instance : Srt.OfType Bool := ⟨.bool⟩
--- instance : Srt.OfType Int := ⟨.int⟩
--- instance : Srt.OfType (BitVec n) := ⟨.bitVec n⟩
--- instance [Srt.OfType Idx] [Srt.OfType Elm] : Srt.OfType (FArray Idx Elm) :=
---   ⟨.array (ofType Idx) (ofType Elm)⟩
--- instance [Srt.OfType Dom] [Srt.OfType Cod] : Srt.OfType (Dom → Cod) :=
---   ⟨.function #[(ofType Dom)] (ofType Cod)⟩
-
--- end Srt
+end RBSet
 
 
 
--- open cvc5 renaming TermManager → Tm
+def Decidable.conj {p q : Prop} [Decidable p] [Decidable q] : Decidable (p ∧ q) :=
+  inferInstance
 
--- structure Term (α : Type) : Type extends Srt.OfType α where
--- private ofUnsafe'' ::
---   toUnsafe : cvc5.Term
-
--- namespace Term
-
--- private
--- def ofUnsafe' (α : Type) [I : Srt.OfType α] (toUnsafe : cvc5.Term) : Term α :=
---   ofUnsafe'' I toUnsafe
-
--- private
--- def ofUnsafe [I : Srt.OfType α] (toUnsafe : cvc5.Term) : Term α :=
---   ofUnsafe' α toUnsafe
-
--- def mkBool (tm : Tm) (b : Bool) : Term Bool :=
---   ofUnsafe <| tm.mkBoolean b
-
--- def mkEq (tm : Tm) (lft rgt : Term α) : Res (Term Bool) := do
---   let term ← tm.mkTerm .EQUAL #[lft.toUnsafe, rgt.toUnsafe]
---   return ofUnsafe term
-
--- def kind (t : Term α) : cvc5.Kind := t.toUnsafe.getKind
--- def kids (t : Term α) : Array cvc5.Term := t.toUnsafe.getChildren
-
--- inductive Variant : Srt → Type
--- | funSym (name : String) (srt : Srt) (t : cvc5.Term) : Variant srt
--- | bool (b : Bool) : Variant .bool
--- | int (i : Int) : Variant .int
--- | equal (lft rhs : Variant α) : Variant .bool
--- | store (arr : Variant (.array idx elm))
---   (key : Variant idx) (val : Variant elm)
--- : Variant (.array idx elm)
--- | select (arr : Variant (.array idx elm))
---   (val : Variant idx)
--- : Variant elm
--- deriving Hashable -- , DecidableEq
-
--- namespace Variant
-
--- protected
--- def toString : Variant srt → String
--- | .funSym name srt _ => s!"{name}"
--- | .bool b => toString b
--- | .int i => toString i
--- | .equal lhs rhs => s!"{lhs.toString} = {rhs.toString}"
--- | .store arr key val => s!"({arr.toString}).store ({key.toString}) ({val.toString})"
--- | .select arr key => s!"({arr.toString}).select ({key.toString})"
-
--- instance : ToString (Variant srt) := ⟨Variant.toString⟩
-
--- end Variant
+def Decidable.conj' {p q : Prop} (ip : Decidable p) (iq : Decidable q) : Decidable (p ∧ q) :=
+  inferInstance
 
 
--- open Res renaming failInternal → fail in
--- def unsafeToVariant (t : cvc5.Term) : (maxDepth : Nat := 100_000) → Res ((α : Srt) × Variant α)
--- | maxDepth + 1 =>
---   match t.getKind with
---   | .CONST_BOOLEAN => do
---     let b ← t.getBooleanValue
---     return ⟨.bool, .bool b⟩
---   | .CONST_INTEGER => do
---     let i ← t.getIntegerValue
---     return ⟨.int, .int i⟩
---   | .CONSTANT => do
---     let name ← t.getSymbol
---     let srt ← Srt.ofUnsafe t.getSort
---     return ⟨srt, .funSym name srt t⟩
---   | .EQUAL => do
---     let kids := t.getChildren
---     let ⟨lftSrt, lft⟩ ← unsafeToVariant kids[0]! maxDepth
---     let ⟨rgtSrt, rgt⟩ ← unsafeToVariant kids[1]! maxDepth
---     if h_Srt : rgtSrt = lftSrt then
---       return ⟨.bool, .equal lft <| h_Srt ▸ rgt⟩
---     else fail s!"illegal equality between\n- `{lft} : {lftSrt}`\n- `{rgt} : {rgtSrt}`"
---   | .STORE => do
---     let kids := t.getChildren
---     let ⟨arrSrt, arr⟩ ← unsafeToVariant kids[0]! maxDepth
---     if let .array idx elm := arrSrt then
---       let ⟨keySrt, key⟩ ← unsafeToVariant kids[1]! maxDepth
---       if h_key : keySrt = idx then
---         let ⟨valSrt, val⟩ ← unsafeToVariant kids[2]! maxDepth
---         if h_val : valSrt = elm then
---           return ⟨.array idx elm, .store arr (h_key ▸ key) (h_val ▸ val)⟩
---         else fail s!"expected elem-sort `{elm}` for `store`, got `{valSrt}`"
---       else fail s!"expected index-sort `{idx}` for `store`, got `{keySrt}`"
---     else fail s!"expected array-sort for `store` term-kind, got `{arrSrt}`"
---   | .SELECT => do
---     let kids := t.getChildren
---     let ⟨arrSrt, arr⟩ ← unsafeToVariant kids[0]! maxDepth
---     let ⟨keySrt, key⟩ ← unsafeToVariant kids[1]! maxDepth
---     if let .array idx elm := arrSrt then
---       if h_key : keySrt = idx then
---         return ⟨elm, .select arr (h_key ▸ key)⟩
---       else fail s!"expected index-sort `{idx}` for `select`, got `{keySrt}`"
---     else fail s!"expected array-sort for `store` term-kind, got `{arrSrt}`"
---   | k => fail s!"unsupported/unexpected term-kind `{k}`"
--- | 0 => fail "maximum depth reached during `Term → Term.Variant` conversion"
 
--- def toVariant (t : Term α) : Res (Variant t.srt) := do
---   let ⟨srt, variant⟩ ← unsafeToVariant t.toUnsafe
---   if h : srt = t.srt
---   then return h ▸ variant
---   else Res.failInternal s!"conversion to variant failed: expected sort `{t.srt}`, got `{srt}`"
+scoped
+syntax:max "ls!" interpolatedStr(term) : term
+macro_rules
+| `(ls! $interpSrt) => `( (fun () => s!$interpSrt : Unit → String)  )
 
--- end Term
+
+
+export _root_ (Rat)
+
+
+
+/-- The `𝕂`onstant combinator. -/
+abbrev 𝕂 (val : α) (_ : β) : α := val
+
+
+
+/-- A check-sat result.-/
+inductive CheckSat
+/-- Formulas asserted are satisfiable, *i.e.* a model exists. -/
+| sat
+/-- Formulas are unsatisfiable, no assignment of the symbols makes them true. -/
+| unsat
+/-- Solver returned unknown. -/
+| unknown (desc : String)
+/-- Solver returned some unexpected result. -/
+| other (desc : String)
+
+namespace CheckSat
+
+/-- Conversion to a simple *is sat?* flag, `none` on unknown/unexpected results. -/
+def isSat? : CheckSat → Option Bool
+| sat => true
+| unsat => false
+| unknown _ | other _ => none
+
+end CheckSat
+
+
+
+inductive Error : Type
+| internal (msg : String)
+| unsupported (msg : String)
+| userError (msg : String)
+deriving Inhabited
+
+
+namespace Error
+
+/-- Used to allow `String` and `Unit → String` as context messages. -/
+class AsString (α : Type) : Type where
+  /-- Conversion to strings. -/
+  asString : α → String
+
+instance : AsString String := ⟨id⟩
+instance : AsString (Unit → String) := ⟨fun f => f ()⟩
+
+def mapMsg (f : String → String) : Error → Error
+| .internal msg => f msg |> .internal
+| .unsupported msg => f msg |> .unsupported
+| .userError msg => f msg |> .userError
+
+def append (self : Error) (txt : String) (newline := true) : Error :=
+  let txt := if newline then "\n"++txt else txt
+  self.mapMsg (· ++ txt)
+
+
+def toCvc5 : Error → cvc5.Error
+| .internal "a value is missing" => .missingValue
+| .internal msg => .error msg
+| .unsupported msg => .unsupported msg
+| .userError msg => .error msg
+
+def ofCvc5 : cvc5.Error → Error
+| .missingValue => .internal "a value is missing"
+| .error msg => .internal s!"{msg}"
+| .option msg => .internal s!"option error: {msg}"
+| .unsupported msg => .unsupported msg
+| .recoverable msg => .internal s!"recoverable: {msg}"
+
+instance : MonadLift (Except cvc5.Error) (Except Error) where
+  monadLift
+  | .ok res => .ok res
+  | .error e => .error (ofCvc5 e)
+
+instance : Coe cvc5.Error Error := ⟨ofCvc5⟩
+
+protected def toString : Error → String
+| .internal msg => "internal error: " ++ msg
+| .unsupported msg => "unsupported: " ++ msg
+| .userError msg => "user error: " ++ msg
+
+instance instToString : ToString Error :=
+  ⟨Error.toString⟩
+
+end Error
+
+/-- Alias for `Except Error`. -/
+abbrev Res := Except Error
+
+namespace Res
+@[inherit_doc Except.ok]
+abbrev ok : α → Res α := Except.ok
+@[inherit_doc Except.error]
+abbrev error : Error → Res α := Except.error
+
+instance : MonadLift (Except cvc5.Error) Res :=
+  ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
+
+instance : MonadLift (Except cvc5.Error) Res.{0} :=
+  ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
+
+def fail (e : Error) : Res α :=
+  .error e
+def failInternal (e : String) : Res α :=
+  Except.error.{0} <| .internal e
+def failUser (e : String) : Res α :=
+  Except.error.{0} <| .userError e
+def failTodo (e : String) : Res α :=
+  Except.error.{0} <| .unsupported e
+
+def context [A : Error.AsString S] (s : S) : Res α → Res α
+| .ok val => .ok val
+| .error e => .error <| e.mapMsg (s!"{·}\n{A.asString s}")
+
+def lift : Except cvc5.Error α → Res α := liftM
+
+def up1 {α : Type} : (res : Res α) → Res.{1} (ULift α)
+| .ok a => .ok (.up a) | .error e => .error e
+
+def lift1 {α : Type} : Except.{0} cvc5.Error α → Res.{1} (ULift α) :=
+  up1 ∘ lift
+
+end Res
+
+
+/-! ## Helpers -/
+
+
+
+structure ArrayMin (n : Nat) (α : Type u) : Type u where
+mk' ::
+  pref : Array α
+  inv : pref.size = n := by rfl
+  suff : Array α := #[]
+deriving Hashable
+
+namespace ArrayMin
+
+instance [Inhabited α] : Inhabited (ArrayMin n α) where
+  default := ⟨Array.mkArray n default, by simp, #[]⟩
+
+def mk (pref : Array α) (suff : Array α := #[]) : ArrayMin pref.size α :=
+  ⟨pref, rfl, suff⟩
+
+protected def toString [ToString α] (self : ArrayMin n α) : String :=
+  if self.suff.isEmpty then
+    toString self.pref
+  else
+    s!"{self.pref}{self.suff}"
+
+instance [ToString α] : ToString (ArrayMin n α) := ⟨ArrayMin.toString⟩
+
+
+variable (self : ArrayMin n α)
+
+@[simp]
+theorem pref_size : self.pref.size = n :=
+  self.inv
+
+abbrev size : Nat := n + self.suff.size
+
+@[simp]
+theorem min_le_size : n ≤ self.size := by
+  simp only [Nat.le_add_right]
+
+def get : (i : Fin self.size) → α
+| ⟨i, h_i⟩ =>
+  if h : i < n then
+    have := self.pref_size ▸ h
+    self.pref[i]
+  else
+    have : i - n < self.suff.size := by
+      simp only [size] at h_i
+      exact Nat.sub_lt_left_of_lt_add (Nat.le_of_not_lt h) h_i
+    self.suff[i - n]
+
+instance instGetElem : GetElem (ArrayMin n α) Nat α (fun arr i => i < arr.size) where
+  getElem self i h_i := self.get ⟨i, h_i⟩
+
+def get? (self : ArrayMin n α) (i : Nat) : Option α :=
+  if h : i < self.size
+  then self.get ⟨i, h⟩
+  else none
+
+def get! [Inhabited α] (self : ArrayMin n α) (i : Nat) : α :=
+  if let some a := self.get? i
+  then a
+  else panic! s!"illegal index {i} for `ArrayMin {n} _` of size {self.size}"
+
+def getN (i : Nat) (h : i < n := by decide) : α :=
+  have := self.pref_size ▸ h
+  self.pref[i]
+
+def toArray : Array α := self.pref ++ self.suff
+
+def toList : List α := self.pref.toList ++ self.suff.toList
+
+def push (a : α) : ArrayMin n α :=
+  {self with suff := self.suff.push a }
+
+def drainFirst : ArrayMin n.succ α → α × ArrayMin n α
+| ⟨⟨fst::pref⟩, h_pref', suff⟩ =>
+  (fst, ⟨
+    ⟨pref⟩,
+    by
+      simp at h_pref'
+      assumption,
+    suff
+  ⟩)
+
+instance instForIn : ForIn m (ArrayMin n α) α where
+  forIn self init f := do
+    let mut acc := init
+    for a in self.pref do
+      match ← f a acc with
+      | .done a => return a
+      | .yield a => acc := a
+    for a in self.suff do
+      match ← f a acc with
+      | .done a => return a
+      | .yield a => acc := a
+    return acc
+
+structure Frame (n : Nat) (α : Type u) : Type u where
+private mk ::
+  private pref : Array α := #[]
+  private suff : Array α := #[]
+deriving Inhabited
+
+namespace Frame
+def new (n : Nat) : Frame n α :=
+  ⟨#[], #[]⟩
+
+variable (self : Frame n α)
+
+def push (a : α) : Frame n α :=
+  if self.pref.size < n then
+    {self with pref := self.pref.push a}
+  else
+    {self with suff := self.suff.push a}
+
+def finalize [Inhabited α] : ArrayMin n α :=
+  if h : self.pref.size = n then
+    ⟨self.pref, h, self.suff⟩
+  else
+    panic! s!"[ArrayMin.finalize] unexpected prefix of size {self.pref.size}, expected {n}"
+end Frame
+
+def newFrame : ArrayMin n α → Frame n β
+| _ => Frame.new n
+
+structure Iter (n : Nat) (α : Type u) : Type u where
+private mk ::
+  val : ArrayMin n α
+  pos : Nat
+
+namespace Iter
+variable (self : Iter n α)
+
+abbrev isNotDone : Bool :=
+  self.pos < self.val.size
+abbrev isDone : Bool :=
+  ¬ self.isNotDone
+
+def next? : Option α × Iter n α :=
+  if h : self.isNotDone then
+    let next := self.val.get ⟨
+      self.pos,
+      by simp [isNotDone] at h ; simp [h]
+    ⟩
+    (next, {self with pos := self.pos.succ})
+  else (none, self)
+end Iter
+
+def iter : Iter n α :=
+  ⟨self, 0⟩
+
+end ArrayMin

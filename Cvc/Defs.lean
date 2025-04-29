@@ -5,12 +5,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init
+import Cvc.Logic
 import Cvc.Srt
 
 
 
 namespace Cvc
+
+
 
 /-- Strongly-typed term.
 
