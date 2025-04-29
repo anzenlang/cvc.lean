@@ -415,15 +415,18 @@ def checkSatAnd
 
 namespace Sat
 
+/-- **[private]** Unsafe solver monad lift. -/
 private
 def lift5 (code : cvc5.SolverT m α) : Sat m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, ⟨⟨solver⟩⟩)
 
+/-- Retrieves the value of a term in `Sat` mode. -/
 def getValue {α : Srt} (term : Term α) : Sat m (Term α) := do
   let term! ← lift5 <| cvc5.Solver.getValue term.toUnsafe
   return Term.ofUnsafe false term!
 
+/-- Retrieves the values of some terms of the same sort in `Sat` mode. -/
 def getValues {α : Srt} (terms : Array (Term α)) : Sat m (Array (Term α × Term α)) := do
   let mut values := Array.mkEmpty terms.size
   for term in terms do
@@ -433,20 +436,27 @@ def getValues {α : Srt} (terms : Array (Term α)) : Sat m (Array (Term α × Te
 
 end Sat
 
+
+
 namespace Unsat
 
+/-- **[private]** Unsafe solver monad lift. -/
 private
 def lift5 (code : cvc5.SolverT m α) : Unsat m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, ⟨⟨solver⟩⟩)
 
+/-- Retrieves the unsat-proofs in `Unsat` mode. -/
 def getProof : Unsat m (Array cvc5.Proof) := do
   lift5 <| cvc5.Solver.getProof
 
 end Unsat
 
+
+
 namespace Unknown
 
+/-- **[private]** Unsafe solver monad lift. -/
 private
 def lift5 (code : cvc5.SolverT m α) : Unknown m α := fun state => do
   let (res, solver) ← code state.solver
