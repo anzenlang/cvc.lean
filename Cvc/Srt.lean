@@ -7,3 +7,11 @@ Authors: Adrien Champion
 
 import Cvc.Srt.Defs
 import Cvc.Srt.Types
+
+
+/-! # Smt sorts
+
+- `Cvc.Srt.Defs`: main `Srt` type and its basic features.
+- `Cvc.Srt.Types`: helper types, relation between `Srt` and lean types.
+
+-/

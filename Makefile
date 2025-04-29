@@ -11,6 +11,9 @@
 
 all: docServe
 
+docClean:
+	cd docbuild ; lake clean
+
 docUpdate:
 	cd docbuild ; lake update 
 
