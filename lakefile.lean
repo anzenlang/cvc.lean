@@ -13,10 +13,9 @@ package cvc {
   testDriver := "tests"
 }
 
-require "leanprover-community" / "batteries" @ "git#v4.18.0"
+require "leanprover-community" / batteries
 
-require cvc5 from
-  git "https://github.com/anzenlang/lean-cvc5" @ "cvc.lean"
+require "abdoo8080" / cvc5
 
 @[default_target]
 lean_lib Cvc {}
