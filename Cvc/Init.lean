@@ -206,7 +206,7 @@ deriving Hashable
 namespace ArrayMin
 
 instance [Inhabited α] : Inhabited (ArrayMin n α) where
-  default := ⟨Array.mkArray n default, by simp, #[]⟩
+  default := ⟨Array.replicate n default, by simp, #[]⟩
 
 def mk (pref : Array α) (suff : Array α := #[]) : ArrayMin pref.size α :=
   ⟨pref, rfl, suff⟩
