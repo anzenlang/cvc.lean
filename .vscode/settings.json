@@ -5,14 +5,31 @@
     "BITVECTOR",
     "Codomain",
     "datatypes",
+    "decons",
     "elab",
+    "eprintln",
     "FLOATINGPOINT",
     "Idents",
+    "interp",
+    "MULT",
+    "nequal",
     "println",
     "REGLAN",
     "ROUNDINGMODE",
     "satisfiability",
     "Significand",
+    "smtlib",
+    "substs",
+    "succ",
+    "suff",
     "Unsat"
-  ]
+  ],
+  "cSpell.customDictionaries": {
+    "custom-dictionary-workspace": {
+      "name": "custom-dictionary-workspace",
+      "path": "${workspaceFolder:test}/.cspell/custom-dictionary-workspace.txt",
+      "addWords": true,
+      "scope": "workspace"
+    }
+  }
 }

@@ -68,7 +68,7 @@ export _root_ (Rat)
 
 
 
-/-- The `𝕂`onstant combinator. -/
+/-- The constant combinator. -/
 abbrev 𝕂 (val : α) (_ : β) : α := val
 
 
@@ -151,7 +151,28 @@ protected def toString : Error → String
 instance instToString : ToString Error :=
   ⟨Error.toString⟩
 
+section variable [Monad m] [MonadExcept Error m] (msg : String)
+
+/-- Throws an `Error.userError`. -/
+protected def throwUser : m α := do
+  throw <| Error.userError msg
+
+/-- Throws an `Error.internal`. -/
+protected def throwInternal : m α := do
+  throw <| Error.internal msg
+
+/-- Throws an `Error.internal` about unreachable code. -/
+protected def throwUnreachable (msg : String := "") : m α := do
+  let sep := if msg.isEmpty then "" else ": "
+  throw <| Error.internal s!"reached unreachable code{sep}{msg}"
+
+end
+
 end Error
+
+export Error (throwUser throwInternal throwUnreachable)
+
+
 
 /-- Alias for `Except Error`. -/
 abbrev Res := Except Error

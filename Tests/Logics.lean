@@ -5,9 +5,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init.Logic
+import Cvc.Logic
 
-import Tests.Init
+import Tests.Basic
 
 
 

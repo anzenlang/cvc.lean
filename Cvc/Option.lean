@@ -8,7 +8,7 @@ Authors: Adrien Champion
 /-! # Cvc5 options. -/
 namespace Cvc
 
-namespace Opt
+namespace Option
 
 /-- (De)activates non-clausal simplification. -/
 inductive SimpMode
@@ -311,46 +311,46 @@ def keyVal : Expert → String × String
 | abstractValues b => ("abstract-values", toString b)
 end Expert
 
-end Opt
+end Option
 
 
 
-inductive Opt
-| common (c : Opt.Common)
-| regular (r : Opt.Regular)
-| expert (e : Opt.Expert)
+inductive Option
+| common (c : Option.Common)
+| regular (r : Option.Regular)
+| expert (e : Option.Expert)
 
-namespace Opt
-instance instCoeCommon : Coe Common Opt := ⟨Opt.common⟩
-instance instCoeRegular : Coe Regular Opt := ⟨Opt.regular⟩
-instance instCoeExpert : Coe Expert Opt := ⟨Opt.expert⟩
+namespace Option
+instance instCoeCommon : Coe Common Option := ⟨Option.common⟩
+instance instCoeRegular : Coe Regular Option := ⟨Option.regular⟩
+instance instCoeExpert : Coe Expert Option := ⟨Option.expert⟩
 
 @[inherit_doc Common.produceModels]
-def produceModels (active : Bool := true) : Opt :=
+def produceModels (active : Bool := true) : Option :=
   Common.produceModels active
 
 @[inherit_doc Regular.produceProofs]
-def produceProofs (active : Bool := true) : Opt :=
+def produceProofs (active : Bool := true) : Option :=
   Regular.produceProofs active
 
 @[inherit_doc Regular.produceUnsatCores]
-def produceUnsatCores (active : Bool := true) : Opt :=
+def produceUnsatCores (active : Bool := true) : Option :=
   Regular.produceUnsatCores active
 
 @[inherit_doc Regular.produceInterpolants]
-def produceInterpolants (active : Bool := true) : Opt :=
+def produceInterpolants (active : Bool := true) : Option :=
   Regular.produceInterpolants active
 
 @[inherit_doc Regular.produceAssignments]
-def produceAssignments (active : Bool := true) : Opt :=
+def produceAssignments (active : Bool := true) : Option :=
   Regular.produceAssignments active
 
 @[inherit_doc Regular.produceAssertions]
-def produceAssertions (active : Bool := true) : Opt :=
+def produceAssertions (active : Bool := true) : Option :=
   Regular.produceAssertions active
 
-def keyVal : Opt → String × String
+def keyVal : Option → String × String
 | common c => c.keyVal
 | regular r => r.keyVal
 | expert e => e.keyVal
-end Opt
+end Option

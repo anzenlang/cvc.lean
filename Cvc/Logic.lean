@@ -293,10 +293,14 @@ end
 
 
 
-structure Builder extends Logic
-where private mk ::
+structure Builder extends toLogic : Logic
+where private mk' ::
 
 namespace Builder
+
+def mk : Builder where
+  toLogic := {}
+
 variable (self : Builder)
 
 def ho : Builder := {self with ho? := true}

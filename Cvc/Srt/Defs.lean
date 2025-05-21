@@ -7,7 +7,7 @@ Authors: Adrien Champion
 
 import Init.Data.Nat.Power2
 
-import Cvc.Init
+import Cvc.Basic
 
 
 
@@ -139,12 +139,11 @@ Cvc.mkSrt! Srt, Kind
 
   /-- Function sort.
 
-  Functions are un-curried in cvc and do not allow empty domain-tuples. The full domain of a
-  `function` is `domainPref.push domainLast`.
-
-  Cvc also does not allow the codomain to be a function type.
+  Cvc5 actually takes an array of domains, and I think, does not allow the codomain to be a function
+  sort. We're trying to adapt cvc5 sorts for a lean world by pretending they behave as lean function
+  types.
   -/
-  | function[FUNCTION_SORT] : (dom  : Srt) → (dom : List Srt) → (cod : Srt) → Srt
+  | function[FUNCTION_SORT] : (dom : Srt) → (cod : Srt) → Srt
   /-- Integer sort. -/
   | int[INTEGER_SORT]
   /-- Product sort.
@@ -289,13 +288,9 @@ def toString (srt : Srt) (paren : Paren := .none) : String :=
   --   |> paren.apply .ifArgs
   | .finiteField n => s!"FiniteField {n}" |> paren.apply .ifArgs
   | .float exp sig => s!"Float {exp} {sig}" |> paren.apply .ifArgs
-  | .function dom doms cod =>
-    let domStr := s!"{dom.toString .ifFunction} → "
-    let domsStr := domStr |> doms.foldl fun s srt => s!"{s} {srt.toString .ifFunction} →"
-    s!"{domsStr} → {cod.toString .none}" |> paren.apply .ifFunction
+  | .function dom cod => s!"{dom.toString .ifFunction} → {cod.toString .none}"
   | .int => "Int"
-  | .prod lft rgt =>
-    s!"{lft.toString .max} × {rgt.toString .ifFunction}"
+  | .prod lft rgt => s!"{lft.toString .max} × {rgt.toString .ifFunction}"
   | .real => "Real"
   | .regex => "Regex"
   | .roundingMode => "RoundingMode"
@@ -363,8 +358,11 @@ where
         | hd::tl@(_::_) => doit (acc <| Srt.prod hd ·) tl
       doit id <$> ofSorts? sort.getTupleSorts
     | .FUNCTION_SORT =>
+      let cod ← ofSort? sort.getFunctionCodomainSort
       match ← ofSorts? sort.getFunctionDomainSorts with
-      | dom :: doms => .function dom doms <$> ofSort? sort.getFunctionCodomainSort
+      | doms@(_ :: _) =>
+         -- careful that it must be a `foldr` here
+        return doms.foldr .function cod
       | [] => Res.failInternal s!"illegal function sort, domain is empty"
 
     -- currently unsupported sorts
@@ -382,6 +380,25 @@ where
     | k@.NULL_SORT => failKind k
     | k@.UNDEFINED_SORT_KIND => failKind k
     | k@.INTERNAL_SORT_KIND => failKind k
+
+
+
+abbrev isFunction : Srt → Bool
+| .function _ _ => true
+| _ => false
+
+abbrev is_function (srt : Srt) : Prop := srt.isFunction
+
+example : DecidablePred is_function := inferInstance
+
+
+abbrev isArith : Srt → Bool
+| .int | .real => true
+| _ => false
+
+abbrev is_arith (srt : Srt) : Prop := srt.isArith
+
+example : DecidablePred is_arith := inferInstance
 
 end Srt
 

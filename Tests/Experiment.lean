@@ -5,7 +5,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init
+import Cvc.Logic
+import Cvc.Srt
+
+import Tests.Basic
 
 
 
@@ -85,7 +88,7 @@ sat
     let arrayGetEq ← lift <| tm.mkTerm .EQUAL #[arrayGet, tm.mkInteger 1]
 
     -- println! "\n|================|"
-    -- let keySrt ← lift <| Srt.ofUnsafe key.getSort
+    -- let keySrt := key.getSort
     -- println! "keySrt : {keySrt} := {key}"
     -- let ⟨keySrt', keyVariant⟩ ← lift <| Term.unsafeToVariant key
     -- println! "  → {keyVariant} : {keySrt'}"

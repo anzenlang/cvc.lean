@@ -5,9 +5,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Init
+import Cvc.Basic
 import Cvc.Logic
-import Cvc.Opt
+import Cvc.Option
 import Cvc.Srt
 import Cvc.Defs
 
@@ -58,9 +58,9 @@ appropriate mode.
 
 ## Top-level modules
 
-- `Cvc.Init`: basic helpers.
+- `Cvc.Basic`: basic helpers.
 - `Cvc.Logic`: SMT-LIB logic definition and helpers.
-- `Cvc.Opt`: cvc5's options definition and helpers.
+- `Cvc.Option`: cvc5's options definition and helpers.
 - `Cvc.Srt`: SMT-LIB sort definition and helpers.
 - `Cvc.Defs`: strongly-typed `Cvc.Term`s, `Cvc.Term.Build`er, and `Cvc.Smt`-like monadic
   environments and associated SMT-LIB commands including `Cvc.Smt.Sat`, `Cvc.Smt.Unsat`, and

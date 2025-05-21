@@ -13,92 +13,43 @@ namespace Cvc
 
 
 
-/-- Denotes a conversion from the `α` type (not its values) to `Srt`. -/
-class ToSrt (α : Type) where private mk ::
-  /-- `Srt` version of `α`. -/
-  srt : Srt
+/-- A float with generic exponent and significand, see also `Cvc.Float`. -/
+protected structure AnyFloat (exp sig : UInt32)
 
-abbrev Srt.ofType (α : Type) [I : ToSrt α] : Srt :=
-  I.srt
+/-- Equivalent of `Float` by enforcing the [IEEE 754 standard][wiki], see also `Cvc.AnyFloat`.
 
-namespace ToSrt
-
-instance : ToSrt Unit := ⟨.unit⟩
-instance : ToSrt Bool := ⟨.bool⟩
-instance : ToSrt Int := ⟨.int⟩
-instance : ToSrt Rat := ⟨.real⟩
-instance : ToSrt String := ⟨.string⟩
-
-/-- Enforces the IEEE 754 standard.
-
-Based on [wikipedia].
-
-[wikipedia]: https://en.wikipedia.org/wiki/Double-precision_floating-point_format#IEEE_754_double-precision_binary_floating-point_format:_binary64
+[wiki]: https://en.wikipedia.org/wiki/Double-precision_floating-point_format#IEEE_754_double-precision_binary_floating-point_format:_binary64
 -/
-instance : ToSrt Float :=
-  ⟨.float 11 53⟩
-
-section variable [A : ToSrt α] [B : ToSrt β]
-
-instance : ToSrt (Array α) := ⟨.seq A.srt⟩
-instance : ToSrt (BitVec size) := ⟨.bitVec size⟩
-instance : ToSrt (α → β) := ⟨.function A.srt [] B.srt⟩
-instance : ToSrt (α × β) := ⟨.prod A.srt B.srt⟩
-
-end
-
-end ToSrt
-
-
-
-protected
-structure AnyFloat (exp sig : UInt32)
-
-protected
-abbrev Float := Cvc.AnyFloat 11 53
+protected abbrev Float := Cvc.AnyFloat 11 53
 
 namespace AnyFloat
-
-instance : ToSrt (Cvc.AnyFloat exp sig) := ⟨.float exp sig⟩
 
 end AnyFloat
 
 
 
-protected
-structure Abstract (kind : Srt.Kind)
+protected structure Abstract (kind : Srt.Kind)
 
 namespace Abstract
-
-instance : ToSrt (Cvc.Abstract kind) := ⟨.abstract kind⟩
 
 end Abstract
 
 
 
 /-- Total map from `Idx` to `Elm`, called *array* in SMT-LIB/cvc. -/
-protected
-structure TMap (Idx Elm : Type) extends Ord Idx where
-mk' ::
+protected structure TMap (Idx Elm : Type) extends Ord Idx where
+mk ::
   /-- Red-black map representation containing indices with known value. -/
   toRBMap : RBMap Idx Elm
-  /-- `Idx → Srt` conversion for user QoL. -/
-  IdxToSrt : ToSrt Idx
-  /-- `Elm → Srt` conversion for user QoL. -/
-  ElmToSrt : ToSrt Elm
 
-namespace TMap  variable [Ord Idx] [I : ToSrt Idx] [E : ToSrt Elm]
-
+namespace TMap variable [Ord Idx]
 /-- Constructor. -/
 def ofRBMap (toRBMap : RBMap Idx Elm) : Cvc.TMap Idx Elm :=
-  ⟨inferInstance, toRBMap, I, E⟩
+  ⟨inferInstance, toRBMap⟩
 
 /-- A total map with unknown values for all indices. -/
 abbrev unspecified : Cvc.TMap Idx Elm :=
   ofRBMap .empty
-
-instance : ToSrt (Cvc.TMap Idx Elm) := ⟨.array I.srt E.srt⟩
-
 end TMap
 
 namespace TMap variable (array : Cvc.TMap Idx Elm)
@@ -123,25 +74,20 @@ end TMap
 
 
 /-- Map between elements and their cardinality in the bag. -/
-protected
-structure Bag (Elm : Type) extends Ord Elm where
+protected structure Bag (Elm : Type) extends Ord Elm where
 mk ::
   /-- Black-tree map representation. -/
   toRBMap : RBMap Elm Nat
-  /-- `Elm → Srt` conversion for user QoL. -/
-  ElmToSrt : ToSrt Elm
 
-namespace Bag variable [Ord Elm] [E : ToSrt Elm]
+namespace Bag variable [Ord Elm]
 
 /-- Constructor. -/
 def ofRBMap (toRBMap : RBMap Elm Nat) : Cvc.Bag Elm :=
-  ⟨inferInstance, toRBMap, inferInstance⟩
+  ⟨inferInstance, toRBMap⟩
 
 /-- Empty bag constructor. -/
 def empty : Cvc.Bag Elm :=
-  ⟨inferInstance, RBMap.empty, inferInstance⟩
-
-instance : ToSrt (Cvc.Bag Elm) := ⟨.bag E.srt⟩
+  ⟨inferInstance, RBMap.empty⟩
 
 end Bag
 
@@ -202,8 +148,6 @@ structure FiniteField (n : Nat)
 
 namespace FiniteField
 
-instance : ToSrt (Cvc.FiniteField n) := ⟨.finiteField n⟩
-
 end FiniteField
 
 
@@ -212,46 +156,36 @@ structure RoundingMode
 
 namespace RoundingMode
 
-instance : ToSrt Cvc.RoundingMode := ⟨.roundingMode⟩
-
 end RoundingMode
 
 
 
 /-- Regular expression. -/
-protected
-structure Regex where
+protected structure Regex where
   /-- String representation. -/
   toString : String
 
 namespace Regex
-
-instance : ToSrt Cvc.Regex := ⟨.regex⟩
 
 end Regex
 
 
 
 /-- A set of elements. -/
-protected
-structure Set (Elm : Type) extends Ord Elm where
-mk' ::
+protected structure Set (Elm : Type) extends Ord Elm where
+mk ::
   /-- Red-black set representation. -/
   toRBSet : RBSet Elm
-  /-- `Elm → Srt` conversion for user QoL. -/
-  ElmToSrt : ToSrt Elm
 
-namespace Set variable [Ord Elm] [E : ToSrt Elm]
+namespace Set variable [Ord Elm]
 
 /-- Constructor. -/
 def ofRBSet (toRBSet : RBSet Elm) : Cvc.Set Elm :=
-  ⟨inferInstance, toRBSet, inferInstance⟩
+  ⟨inferInstance, toRBSet⟩
 
 /-- Empty set. -/
 def empty : Cvc.Set Elm :=
   ofRBSet .empty
-
-instance : ToSrt (Cvc.Set Elm) := ⟨.set E.srt⟩
 
 end Set
 
@@ -278,8 +212,6 @@ structure Uninterpreted (cons : Type)
 
 namespace Uninterpreted
 
-instance [A : ToSrt α] : ToSrt (Uninterpreted α) := ⟨.uninterpreted A.srt⟩
-
 end Uninterpreted
 
 
@@ -295,9 +227,7 @@ abbrev toType : Srt → Type
 | .bitVec n => BitVec n
 | .finiteField n => Cvc.FiniteField n
 | .float exp sig => Cvc.AnyFloat exp sig
-| .function dom [] cod => toType dom → toType cod
-| .function dom (domsHd :: domsTl) cod =>
-  toType dom → toType (.function domsHd domsTl cod)
+| .function dom cod => toType dom → toType cod
 | .int => Int
 | .prod lft rgt => lft.toType × rgt.toType
 | .real => Rat
@@ -312,22 +242,22 @@ abbrev toType : Srt → Type
 
 -- instance : CoeSort Srt Type := ⟨toType⟩
 
-class ToType (Driver : Type) where
-  srtToType : Srt → Type
+-- class ToType (Driver : Type) where
+--   srtToType : Srt → Type
 
-namespace ToType.Builtin
+-- namespace ToType.Builtin
 
-structure Driver
+-- structure Driver
 
-scoped
-instance instToType : ToType Driver where
-  srtToType := Srt.toType
+-- scoped
+-- instance instToType : ToType Driver where
+--   srtToType := Srt.toType
 
-end ToType.Builtin
+-- end ToType.Builtin
 
-end Srt
+-- end Srt
 
-abbrev srtToType [I : Srt.ToType Driver] := I.srtToType
+-- abbrev srtToType [I : Srt.ToType Driver] := I.srtToType
 
 
 -- namespace Srt
@@ -341,8 +271,7 @@ abbrev srtToType [I : Srt.ToType Driver] := I.srtToType
 
 -- namespace Driver.Builtin
 
--- protected
--- abbrev toType : Srt → Type
+-- protected -- abbrev toType : Srt → Type
 -- | .abstract kind => Cvc.Abstract kind
 -- | .array idx elm => Cvc.TMap (Builtin.toType idx) (Builtin.toType elm)
 -- | .bag elm => Cvc.Bag (Builtin.toType elm)
@@ -383,9 +312,9 @@ abbrev srtToType [I : Srt.ToType Driver] := I.srtToType
 
 
 
--- class AsSrt (α : Type) extends ToSrt α where
---   eq_srt : α = toToSrt.srt := by
---     simp only [ToSrt.srt]
+-- class AsSrt (α : Type) extends SrtBij α where
+--   eq_srt : α = toSrtBij.srt := by
+--     simp only [SrtBij.srt]
 --     <;> try (unfold Srt.toType)
 --     <;> try simp -- this is mostly just to trigger `rfl`/`AsSrt.type_eq_srt`
 
