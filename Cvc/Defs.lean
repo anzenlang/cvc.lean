@@ -389,6 +389,57 @@ def mul : Build (Term α) :=
 
 end nary2
 
+
+
+section apply
+
+/-- **[private]** Flattens higher-order applications. -/
+private partial def flattenHoApply
+  (revArgs : Array cvc5.Term) (functionTerm : cvc5.Term)
+: Term.Build cvc5.Term := do
+  match functionTerm.getKind with
+  -- if `functionTerm` is a higher-order apply, deconstruct it
+  | .HO_APPLY =>
+    let args := functionTerm.getChildren
+    if h : 0 < args.size then
+      let functionTerm := args[0]
+      let args := args.toSubarray (start := 1)
+      let revArgs := revArgs |> args.foldr fun arg acc => acc.push arg
+      flattenHoApply revArgs functionTerm
+    else Cvc.throwInternal s!"cannot deconstruct `HO_APPLY` with no arguments"
+  -- otherwise reconstruct a normal application
+  | _ =>
+    if revArgs.isEmpty
+    then Cvc.throwInternal s!"unreachable: `flattenHoApply` with empty list of arguments"
+    else
+      let revArgs := revArgs.push functionTerm
+      -- build the unsafe term
+      managerDoM fun tm => tm.mkTerm cvc5.Kind.APPLY_UF revArgs.reverse
+
+/-- Applies a function term to an argument.
+
+## Partial applications and higher-order
+
+This function supports partial applications: they are encoded as `cvc5.Kind.HO_APPLY` terms, which
+**would** trigger errors if used in a solver without support for higher-order. Since support for
+higher-order makes cvc5-level reasoning much more expensive, we want to avoid having `HO_APPLY`
+terms as much as possible.
+
+For this reason, this function detects when it is building an application that yields a non-function
+term; in this case, it will destruct the underlying higher-order terms (recursively, and if any) and
+rewrite them as a regular (first-order) function application.
+-/
+protected def apply (function : Term (α → β)) (arg : Term α) : Term.Build (Term β) := do
+  let hasSymbols := function.hasSymbols ∨ arg.hasSymbols
+  let term! := function.toUnsafe
+  let sort! := term!.getSort
+  let dom ← sort!.getFunctionDomainSorts
+  if 1 < dom.size
+  then Term.mk hasSymbols .HO_APPLY #[function.toUnsafe, arg.toUnsafe]
+  else ofUnsafe hasSymbols <$> flattenHoApply #[arg.toUnsafe] term!
+
+end apply
+
 end Term
 
 
