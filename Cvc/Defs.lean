@@ -212,7 +212,56 @@ private def logicDo (f : Logic.Builder → Logic.Builder) : Build Unit :=
     let logic := f state.logic
     return (.ok (), {state with logic})
 
+end Term
 
+
+
+namespace Srt
+
+
+def toSort (srt : Srt) : Term.Build cvc5.Sort :=
+  Term.managerDoM fun tm => aux tm srt 10_000
+where
+  aux (tm : cvc5.TermManager) (srt' : Srt) : (maxRec : Nat) → Term.Build cvc5.Sort
+    | 0 => Cvc.throwInternal s!"[Srt.toSort] maximum depth reached on `{srt}`"
+    | maxRec + 1 =>
+      match srt' with
+      | .bool => pure tm.getBooleanSort
+      | .int => pure tm.getIntegerSort
+      | .real => pure tm.getRealSort
+      | .regex => pure tm.getRegExpSort
+      | .string => pure tm.getStringSort
+      | .roundingMode => pure tm.getRoundingModeSort
+      | .finiteField size => tm.mkFiniteFieldSort size
+      | .bitVec size => tm.mkBitVectorSort size
+      | .float exp sig => tm.mkFloatingPointSort exp sig
+      | .uninterpreted cons => pure <| tm.mkUninterpretedSort cons.toString
+      | .bag elm => do tm.mkBagSort (← aux tm elm maxRec)
+      | .seq elm => do tm.mkSequenceSort (← aux tm elm maxRec)
+      | .set elm => do tm.mkSetSort (← aux tm elm maxRec)
+      | .array idx elm => do tm.mkArraySort (← aux tm idx maxRec) (← aux tm elm maxRec)
+      | .function dom cod => do
+        let (doms, cod) ← flattenFun tm maxRec #[← aux tm dom maxRec] cod
+        tm.mkFunctionSort doms cod
+      | .prod lft rgt => do tm.mkTupleSort #[← aux tm lft maxRec, ← aux tm rgt maxRec]
+      | .unit => tm.mkTupleSort #[]
+      | .abstract _k => Cvc.throwInternal s!"[Srt.toSort] todo `{srt'}`"
+  flattenFun (tm : cvc5.TermManager) (maxRec : Nat)
+    (doms : Array cvc5.Sort)
+  : (cod : Srt) → Term.Build (Array cvc5.Sort × cvc5.Sort)
+    | .function dom cod => do
+      let dom ← aux tm dom maxRec
+      flattenFun tm maxRec (doms.push dom) cod
+    | cod => return (doms, (← aux tm cod maxRec))
+
+private def toSignature! (srt : Srt) : Term.Build (Array cvc5.Sort × cvc5.Sort) :=
+  Term.managerDoM (toSort.flattenFun srt · 10_000 #[] srt)
+
+end Srt
+
+
+
+namespace Term
 
 /-- **[private]** Unsafe term creation. -/
 private def mk
@@ -481,10 +530,16 @@ private def lift5 [Monad m] (code : cvc5.SolverT m α) : SmtT m α := do
   set {state with solver}
   return ← res
 
+/-- Declares a function symbol. -/
+def declare (symbol : String) (α : Type) [Srt.Bij α] : Smt (Term α) := do
+  let srt := getSrt α
+  let (doms, cod) ← srt.toSignature!
+  let f ← lift5 <| cvc5.Solver.declareFun symbol doms cod
+  return Term.ofUnsafe true f
+
+/-- Asserts a formula. -/
 def assert (formula : Formula) : Smt Unit := do
   lift5 <| cvc5.Solver.assertFormula formula.toUnsafe
-
-
 
 section variable (assuming : Option (Array Formula) := none)
 

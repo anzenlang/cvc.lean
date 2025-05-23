@@ -382,7 +382,6 @@ where
     | k@.INTERNAL_SORT_KIND => failKind k
 
 
-
 abbrev isFunction : Srt → Bool
 | .function _ _ => true
 | _ => false

@@ -110,7 +110,7 @@ def elabTests : CommandElab
     | _ => throwUnsupportedSyntax
   let guardedEval ← `(
     $[ $outputComment:docComment ]?
-    #guard_msgs in Term.eval! do $[ $codeElms ]*
+    #guard_msgs in Smt.eval! do $[ $codeElms ]*
   )
   Lean.Elab.Command.elabCommand guardedEval
 | _ => Lean.Elab.throwUnsupportedSyntax
