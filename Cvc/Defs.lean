@@ -329,6 +329,9 @@ def mkAnd : Build Formula :=
 def and : Build Formula :=
   mkAnd #[lft, rgt]
 
+-- def iand (k : Nat) (i j : Term Int) : Build Formula := do
+--   sorry
+
 /-- Builds a disjunction term. -/
 def mkOr : Build Formula :=
   let _ := h_size
@@ -419,13 +422,7 @@ def mkAdd : Build (Term α) := do
 def add : Build (Term α) :=
   mkAdd #[lft, rgt]
 
-/-- Builds a multiplication term.
-
-- Forbids difference logic.
-- Forces non-linear logic if non-linear.
--/
-def mkMul : Build (Term α) := do
-  let _ := h_size ; let _ := h_arith
+private def nonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
   let mut hasSymbols := false
   let mut nonLinear := false
   for term in terms do
@@ -437,11 +434,58 @@ def mkMul : Build (Term α) := do
         hasSymbols := true
   if nonLinear then
     logicDo (.nonLinear ∘ .nonDiff)
+  return hasSymbols
+
+/-- Builds a multiplication term.
+
+- Forbids difference logic.
+- Forces non-linear logic if non-linear.
+-/
+def mkMul : Build (Term α) := do
+  let _ := h_size ; let _ := h_arith
+  let hasSymbols ← nonLinearOfArgs terms
   mk hasSymbols .MULT (terms.map toUnsafe)
 
 @[inherit_doc mkMul]
 def mul : Build (Term α) :=
   mkMul #[lft, rgt]
+
+
+section
+
+variable [A : Srt.Bij.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
+variable (h_size : 2 ≤ terms.size := by
+  (try (try simp <;> try omega) ; done)
+  <;> fail "expected an array of **at least** two terms"
+)
+
+/-- Arithmetic division with division by `0` undefined, left associative. -/
+def mkDiv! : Build (Term α) := do
+  let _ := h_size
+  let hasSymbols ← nonLinearOfArgs terms
+  let terms := terms.map toUnsafe
+  A.inspect
+    (fInt := fun _ => mk hasSymbols .INTS_DIVISION terms)
+    (fRat := fun _ => mk hasSymbols .DIVISION terms)
+
+@[inherit_doc mkDiv!]
+def div! : Build (Term α) := do
+  mkDiv! #[lft, rgt]
+
+/-- Arithmetic division with division by `0` defined to be `0`, left associative. -/
+def mkDivTotal : Build (Term α) := do
+  let _ := h_size
+  let hasSymbols ← nonLinearOfArgs terms
+  let terms := terms.map toUnsafe
+  A.inspect
+    (fInt := fun _ => mk hasSymbols .INTS_DIVISION_TOTAL terms)
+    (fRat := fun _ => mk hasSymbols .DIVISION_TOTAL terms)
+
+@[inherit_doc mkDivTotal]
+def divTotal : Build (Term α) := do
+  mkDivTotal #[lft, rgt]
+
+end
 
 end nary2
 

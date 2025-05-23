@@ -94,8 +94,22 @@ end Srt
 protected abbrev is_arith (α : Type) [Srt.Bij α] :=
   Srt.ofType α |>.is_arith
 
+example {α : Type} [Srt.Bij α] : Decidable (Cvc.is_arith α) := by
+  simp only [Cvc.is_arith, Srt.is_arith, Srt.isArith, Srt.ofType, getSrt]
+  cases Srt.Bij.srt α <;> (
+    simp
+    try exact instDecidableFalse
+    try exact instDecidableTrue
+  )
+
 @[simp]
 theorem is_arith_def (α : Type) [inst : Srt.Bij α] : Cvc.is_arith α → (α = Int ∨ α = Rat) := by
+  let {srt, h_bij} := inst
+  cases h_bij
+  cases srt <;> simp
+
+def is_arith_srt_def (α : Type) [inst : Srt.Bij α]
+: Cvc.is_arith α → (inst.srt = .int ∨ inst.srt = .real) := by
   let {srt, h_bij} := inst
   cases h_bij
   cases srt <;> simp
@@ -121,16 +135,23 @@ instance instRat : Bij.Arith Rat := {}
 theorem int_or_rat (α : Type) [inst : Srt.Bij.Arith α] : α = Int ∨ α = Rat :=
   Cvc.is_arith_def α inst.h_arith
 
-def inspect (α : Type) [inst : Srt.Bij.Arith α]
+def int_or_rat' (α : Type) [inst : Srt.Bij.Arith α] : inst.srt = .int ∨ inst.srt = .real :=
+  Cvc.is_arith_srt_def α inst.h_arith
+
+def inspect' (α : Type) [inst : Srt.Bij.Arith α]
   (fInt : (h : α = Int) → β) (fRat : (h : α = Rat) → β)
 : β :=
-  -- let srt := A.srt
   let { toBij, h_arith } := inst
   let { srt, h_bij } := toBij
   by
     cases inst.int_or_rat
     case inl => apply fInt ; assumption
     case inr => apply fRat ; assumption
+
+def inspect {α : Type} {β : Sort u} [inst : Srt.Bij.Arith α]
+  (fInt : (h : inst.srt = .int) → β) (fRat : (h : inst.srt = .real) → β)
+: β :=
+  inst.int_or_rat'.by_cases fInt fRat
 
 end Arith
 
