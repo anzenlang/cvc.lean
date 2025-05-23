@@ -17,10 +17,12 @@ namespace Cvc
 
 /-- Type-safe cvc5 terms, input type expected to be `Srt.Bij` for most uses.
 
-For the type-erased version, see `ETerm`.
+- For the type-erased version, see `ETerm`.
+- No direct constructor exposed publicly, users must go through the `Term.Build` monadic
+  constructors.
 -/
 structure Term (α : Type) where
-/-- **[private]** Constructor from an unsafe term. -/
+/-- Constructor from an unsafe term. -/
 private ofUnsafe ::
   /-- True if the term mentions symbols. -/
   hasSymbols : Bool
@@ -83,7 +85,7 @@ end
 
 
 
-/-- **[private]** Monadic constructor from an unsafe term. -/
+/-- Monadic constructor from an unsafe term. -/
 private def ofUnsafeM [Monad m] [Srt.Bij α] (hasSymbols : Bool) : m cvc5.Term → m (Term α) :=
   (Term.ofUnsafe hasSymbols <$> ·)
 
@@ -197,16 +199,16 @@ export Build (runWith' runWith run' run runIO' runIO)
 
 
 
-/-- **[private]** Applies a monadic function to the term manager part of the `Build.State`. -/
+/-- Applies a monadic function to the term manager part of the `Build.State`. -/
 private def managerDoM [Monad m] [MonadLiftT m Build] (f : Manager → m γ) : Build γ := do
   let state ← get
   f state.manager
 
-/-- **[private]** Applies a function to the term manager part of the `Build.State`. -/
+/-- Applies a function to the term manager part of the `Build.State`. -/
 private def managerDo (f : Manager → γ) : Build γ :=
   managerDoM (m := Id) f
 
-/-- **[private]** Applies a function to the `Logic.Builder` part of the `Build.State`. -/
+/-- Applies a function to the `Logic.Builder` part of the `Build.State`. -/
 private def logicDo (f : Logic.Builder → Logic.Builder) : Build Unit :=
   fun state =>
     let logic := f state.logic
@@ -219,6 +221,11 @@ end Term
 namespace Srt
 
 
+/-- Conversion to unsafe sorts.
+
+- function sorts are flattened:\
+  `srt → srt' → srt'' → nonFunSrt` becomes `#[srt, srt', srt''] → nonFunSrt`
+-/
 def toSort (srt : Srt) : Term.Build cvc5.Sort :=
   Term.managerDoM fun tm => aux tm srt 10_000
 where
@@ -235,7 +242,7 @@ where
       | .finiteField size => tm.mkFiniteFieldSort size
       | .bitVec size => tm.mkBitVectorSort size
       | .float exp sig => tm.mkFloatingPointSort exp sig
-      | .uninterpreted cons => pure <| tm.mkUninterpretedSort cons.toString
+      | .uninterpreted name => pure <| tm.mkUninterpretedSort name
       | .bag elm => do tm.mkBagSort (← aux tm elm maxRec)
       | .seq elm => do tm.mkSequenceSort (← aux tm elm maxRec)
       | .set elm => do tm.mkSetSort (← aux tm elm maxRec)
@@ -263,7 +270,7 @@ end Srt
 
 namespace Term
 
-/-- **[private]** Unsafe term creation. -/
+/-- Unsafe term creation. -/
 private def mk
   (hasSymbols : Bool) (k : cvc5.Kind) (args : Array cvc5.Term)
 : Build (Term α) :=
@@ -440,9 +447,10 @@ end nary2
 
 
 
+/-! ### Function application -/
 section apply
 
-/-- **[private]** Flattens higher-order applications. -/
+/-- Flattens higher-order applications. -/
 private partial def flattenHoApply
   (revArgs : Array cvc5.Term) (functionTerm : cvc5.Term)
 : Term.Build cvc5.Term := do
@@ -492,6 +500,8 @@ end apply
 end Term
 
 
+
+/-! ## `Smt` environment and functions -/
 
 structure Smt.State where
   solver : cvc5.Solver
@@ -568,17 +578,17 @@ end
 
 /-- Sat-mode state. -/
 structure Sat.State extends Smt.State where
-/-- **[private]** Constructor. -/
+/-- Constructor. -/
 private mk ::
 
 /-- Unsat-mode state. -/
 structure Unsat.State extends Smt.State where
-/-- **[private]** Constructor. -/
+/-- Constructor. -/
 private mk ::
 
 /-- Unknown-mode state. -/
 structure Unknown.State extends Smt.State where
-/-- **[private]** Constructor. -/
+/-- Constructor. -/
 private mk ::
 
 /-- Sat-mode monad, allows running commands such as get-value.
@@ -638,7 +648,7 @@ def checkSatAnd
 
 namespace Sat
 
-/-- **[private]** Unsafe solver monad lift. -/
+/-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : SatT m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, {state with solver})
@@ -662,7 +672,7 @@ end Sat
 
 namespace Unsat
 
-/-- **[private]** Unsafe solver monad lift. -/
+/-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : UnsatT m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, {state with solver})
@@ -677,7 +687,7 @@ end Unsat
 
 namespace Unknown
 
-/-- **[private]** Unsafe solver monad lift. -/
+/-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : UnknownT m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, {state with solver})

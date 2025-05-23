@@ -167,7 +167,7 @@ Cvc.mkSrt! Srt, Kind
   /-- Unit sort. -/
   | unit[TUPLE_SORT]
   /-- An uninterpreted sort. -/
-  | uninterpreted[UNINTERPRETED_SORT] : (cons : Srt) → Srt
+  | uninterpreted[UNINTERPRETED_SORT] : (name : String) → Srt
 
 namespace Srt
 
@@ -298,7 +298,7 @@ def toString (srt : Srt) (paren : Paren := .none) : String :=
   | .set elm => s!"Set {elm.toString .max}" |> paren.apply .ifArgs
   | .string => "String"
   | .unit => "Unit"
-  | uninterpreted cons => s!"Uninterpreted {cons.toString paren}" |> paren.apply .ifArgs
+  | uninterpreted name => s!"Uninterpreted {name}" |> paren.apply .ifArgs
 
 instance : ToString Srt := ⟨Srt.toString⟩
 
@@ -345,7 +345,8 @@ where
       return .float exp sig
 
     -- nodes
-    | .UNINTERPRETED_SORT => .uninterpreted <$> ofSort? sort.getUninterpretedSortConstructor
+    | .UNINTERPRETED_SORT =>
+      (.uninterpreted ∘ toString) <$> ofSort? sort.getUninterpretedSortConstructor
     | .BAG_SORT => .bag <$> ofSort? sort.getBagElementSort
     | .SEQUENCE_SORT => .seq <$> ofSort? sort.getSequenceElementSort
     | .SET_SORT => .set <$> ofSort? sort.getSetElementSort
@@ -398,6 +399,9 @@ abbrev isArith : Srt → Bool
 abbrev is_arith (srt : Srt) : Prop := srt.isArith
 
 example : DecidablePred is_arith := inferInstance
+
+theorem is_arith_def (srt : Srt) : srt.is_arith ↔ (srt = .int ∨ srt = .real) := by
+  cases srt <;> simp
 
 end Srt
 

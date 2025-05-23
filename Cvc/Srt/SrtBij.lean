@@ -36,8 +36,21 @@ abbrev getSrt (α : Type) [I : Srt.Bij α] : Srt :=
 
 namespace Srt
 
+instance toBijType (srt : Srt) : Srt.Bij srt.toType where
+  srt
+
 @[inherit_doc getSrt]
 abbrev ofType := Cvc.getSrt
+
+@[simp]
+theorem toType_ofType (α : Type) [I : Srt.Bij α] : (ofType α).toType = α := by
+  let {srt, h_bij} := I
+  cases h_bij
+  cases srt <;> rfl
+
+@[simp]
+theorem ofType_toType (srt : Srt) : ofType (srt.toType) = srt := by
+  cases srt <;> rfl
 
 namespace Bij
 
@@ -66,7 +79,7 @@ instance instProd : Srt.Bij (α × β) := mk <| .prod A.srt B.srt
 instance instTMap : Srt.Bij (Cvc.TMap α β) := mk <| .array A.srt B.srt
 instance instBag : Srt.Bij (Cvc.Bag α) := mk <| .bag A.srt
 instance instSet : Srt.Bij (Cvc.Set α) := mk <| .set A.srt
-instance instUninterpreted : Srt.Bij (Uninterpreted α) := mk <| .uninterpreted A.srt
+instance instUninterpreted : Srt.Bij (Uninterpreted name) := mk <| .uninterpreted name
 
 end
 
@@ -81,7 +94,16 @@ end Srt
 protected abbrev is_arith (α : Type) [Srt.Bij α] :=
   Srt.ofType α |>.is_arith
 
-namespace Srt.Bij
+@[simp]
+theorem is_arith_def (α : Type) [inst : Srt.Bij α] : Cvc.is_arith α → (α = Int ∨ α = Rat) := by
+  let {srt, h_bij} := inst
+  cases h_bij
+  cases srt <;> simp
+
+namespace Srt
+namespace Bij
+
+
 
 /-- Extends `Srt.Bij` with a proof that `α`'s `Srt` is arithmetic. -/
 protected class Arith (α : Type) extends Srt.Bij α where
@@ -96,6 +118,22 @@ example [Srt.Bij.Arith α] : Srt.Bij α := inferInstance
 instance instInt : Bij.Arith Int := {}
 instance instRat : Bij.Arith Rat := {}
 
+theorem int_or_rat (α : Type) [inst : Srt.Bij.Arith α] : α = Int ∨ α = Rat :=
+  Cvc.is_arith_def α inst.h_arith
+
+def inspect (α : Type) [inst : Srt.Bij.Arith α]
+  (fInt : (h : α = Int) → β) (fRat : (h : α = Rat) → β)
+: β :=
+  -- let srt := A.srt
+  let { toBij, h_arith } := inst
+  let { srt, h_bij } := toBij
+  by
+    cases inst.int_or_rat
+    case inl => apply fInt ; assumption
+    case inr => apply fRat ; assumption
+
 end Arith
 
-end Srt.Bij
+end Bij
+
+end Srt

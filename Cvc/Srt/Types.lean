@@ -208,7 +208,7 @@ end Set
 
 
 
-structure Uninterpreted (cons : Type)
+structure Uninterpreted (name : String)
 
 namespace Uninterpreted
 
@@ -237,8 +237,7 @@ abbrev toType : Srt → Type
 | .set elm => Cvc.Set (toType elm)
 | .string => String
 | .unit => Unit
-| .uninterpreted cons => Uninterpreted (toType cons)
-
+| .uninterpreted cons => Uninterpreted cons
 
 -- instance : CoeSort Srt Type := ⟨toType⟩
 
