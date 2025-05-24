@@ -11,6 +11,7 @@ import Cvc.Srt
 
 
 
+/-! # Functions and monads for term, term building, SMT *etc.* helpers and monads -/
 namespace Cvc
 
 
@@ -41,10 +42,15 @@ ofTerm ::
 /-- Abbreviation for a `Term Bool`. -/
 abbrev Formula := Term Bool
 
+
+
+
 namespace Term
 
 /-- Erases the type of a typed term. -/
 def erase : Term α → ETerm := .ofTerm
+
+
 
 /-- Boolean terms. -/
 protected abbrev Bool := Term Bool
@@ -97,6 +103,7 @@ instance : ToString (Term α) := ⟨Term.toSmtString⟩
 
 
 
+/-! ## Term building -/
 open cvc5 renaming TermManager → Manager
 
 /-- State of the term builder monad. -/
@@ -150,22 +157,26 @@ instance [Monad m] : MonadLift Build (BuildT m) :=
 instance [Monad m] [MonadLiftT IO m] : MonadLift BuildIO (BuildT m) :=
   ⟨fun code state => return ← code state⟩
 
+/-- Runs term-building code with a specific build state. -/
 def runWith' (build : BuildT m α) (state : Build.State) : m (Except Error α × Build.State) :=
   build state
 
 section variable [Monad m]
 
+@[inherit_doc runWith']
 def runWith (build : BuildT m α) (state : Build.State) : m (Except Error α) :=
   Prod.fst <$> build.runWith' state
 
 section variable [MonadLiftT BaseIO m]
 
+/-- Runs term-building code, creates an initial build state if none is provided. -/
 def run' [MonadLiftT BaseIO m]
   (build : BuildT m α) (state? : Option Build.State := none)
 : m (Except Error α × Build.State) := do
   let state ← if let some state := state? then pure state else Build.State.mk
   build state
 
+@[inherit_doc run']
 def run [MonadLiftT BaseIO m]
   (build : BuildT m α) (state? : Option Build.State := none)
 : m (Except Error α) :=
@@ -175,6 +186,7 @@ end
 
 end
 
+/-- Runs term-building code in `IO`, creates an initial build state if none is provided -/
 def runIO'
   (build : BuildIO α) (state? : Option Build.State := none)
 : IO (α × Build.State) := do
@@ -185,15 +197,18 @@ def runIO'
     IO.eprintln s!"{error}"
     throw <| IO.Error.userError error.toString
 
+@[inherit_doc runIO']
 def runIO (build : BuildIO α) (state? : Option Build.State := none) : IO α :=
   Prod.fst <$> build.runIO' state?
 
 end BuildT
 
+-- export `BuildT.<run>` runners to `Build.<run>`
 namespace Build
 export BuildT (runWith' runWith run' run runIO' runIO)
 end Build
 
+-- also export `Term.BuildT.<run>`/`Term.Build.<run>` runners to `Term.<run>`
 export Build (runWith' runWith run' run runIO' runIO)
 
 
@@ -261,6 +276,10 @@ where
       flattenFun tm maxRec (doms.push dom) cod
     | cod => return (doms, (← aux tm cod maxRec))
 
+/-- Retrieves the domain and codomain of `srt` for `declareFun`-like functions.
+
+This function uncurries `α → β → ... → γ` to `#[α, β, ...] → γ`.
+-/
 private def toSignature! (srt : Srt) : Term.Build (Array cvc5.Sort × cvc5.Sort) :=
   Term.managerDoM (toSort.flattenFun srt · 10_000 #[] srt)
 
@@ -268,10 +287,11 @@ end Srt
 
 
 
+/-! ## Term creation API -/
 namespace Term
 
 /-- Unsafe term creation. -/
-private def mk
+private def mk [Srt.Bij α]
   (hasSymbols : Bool) (k : cvc5.Kind) (args : Array cvc5.Term)
 : Build (Term α) :=
   managerDoM fun tm => ofUnsafe hasSymbols <$> tm.mkTerm k args
@@ -295,20 +315,18 @@ def mkNot (term : Term.Bool) : Build Term.Bool :=
 def not := mkNot
 
 /-- Builds an if-then-else term. -/
-def ite (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
+def ite [Srt.Bij α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
   mk (cnd.hasSymbols ∨ thn.hasSymbols ∨ els.hasSymbols)
     .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
 
+
+
+/-! ### `n`-ary operators (`2 ≤ n`) -/
 section nary2
 variable [A : Srt.Bij α] (terms : Array (Term α)) (lft rgt : Term α)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
-)
-variable (h_arith : Cvc.is_arith α := by
-  (try simp [Cvc.is_arith, Cvc.Srt.is_arith, *] ; done)
-  <;> fail
-    "expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`"
 )
 
 /-- Builds an equality term. -/
@@ -409,20 +427,24 @@ def mkGt : Build Formula :=
 def gt : Build Formula :=
   mkGt #[lft, rgt]
 
-/-- Builds an addition term.
+end nary2
 
-- Forbids difference logic.
--/
-def mkAdd : Build (Term α) := do
-  let _ := h_size ; let _ := h_arith
-  logicDo .nonDiff
-  mk (terms.any hasSymbols) .ADD (terms.map toUnsafe)
 
-@[inherit_doc mkAdd]
-def add : Build (Term α) :=
-  mkAdd #[lft, rgt]
 
-private def nonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
+/-! #### Arithmetic -/
+section arith
+
+variable [A : Srt.Bij.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
+variable (h_size : 2 ≤ terms.size := by
+  (try (try simp <;> try omega) ; done)
+  <;> fail "expected an array of **at least** two terms"
+)
+
+/-- Forbids difference logics. -/
+private def nonDiff : Build Unit := logicDo .nonDiff
+
+/-- Forces non-linear logic if non-linear, true if one of the terms has symbols. -/
+private def checkNonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
   let mut hasSymbols := false
   let mut nonLinear := false
   for term in terms do
@@ -436,33 +458,42 @@ private def nonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
     logicDo (.nonLinear ∘ .nonDiff)
   return hasSymbols
 
+/-- Builds an addition term.
+
+- Forbids difference logics.
+-/
+def mkAdd : Build (Term α) := do
+  nonDiff
+  let _ := h_size
+  mk (terms.any hasSymbols) .ADD (terms.map toUnsafe)
+
+@[inherit_doc mkAdd]
+def add : Build (Term α) :=
+  mkAdd #[lft, rgt]
+
 /-- Builds a multiplication term.
 
 - Forbids difference logic.
 - Forces non-linear logic if non-linear.
 -/
 def mkMul : Build (Term α) := do
-  let _ := h_size ; let _ := h_arith
-  let hasSymbols ← nonLinearOfArgs terms
+  let _ := h_size
+  nonDiff
+  let hasSymbols ← checkNonLinearOfArgs terms
   mk hasSymbols .MULT (terms.map toUnsafe)
 
 @[inherit_doc mkMul]
-def mul : Build (Term α) :=
-  mkMul #[lft, rgt]
+def mul : Build (Term α) := mkMul #[lft, rgt]
 
+/-- Arithmetic division with division by `0` undefined, left associative.
 
-section
-
-variable [A : Srt.Bij.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
-variable (h_size : 2 ≤ terms.size := by
-  (try (try simp <;> try omega) ; done)
-  <;> fail "expected an array of **at least** two terms"
-)
-
-/-- Arithmetic division with division by `0` undefined, left associative. -/
+- Forbids difference logic.
+- Forces non-linear logic if non-linear.
+-/
 def mkDiv! : Build (Term α) := do
   let _ := h_size
-  let hasSymbols ← nonLinearOfArgs terms
+  nonDiff
+  let hasSymbols ← checkNonLinearOfArgs terms
   let terms := terms.map toUnsafe
   A.inspect
     (fInt := fun _ => mk hasSymbols .INTS_DIVISION terms)
@@ -474,20 +505,17 @@ def div! : Build (Term α) := do
 
 /-- Arithmetic division with division by `0` defined to be `0`, left associative. -/
 def mkDivTotal : Build (Term α) := do
-  let _ := h_size
-  let hasSymbols ← nonLinearOfArgs terms
-  let terms := terms.map toUnsafe
+  nonDiff
+  let hasSymbols ← checkNonLinearOfArgs #[lft, rgt]
+  let args := #[lft.toUnsafe, rgt.toUnsafe]
   A.inspect
-    (fInt := fun _ => mk hasSymbols .INTS_DIVISION_TOTAL terms)
-    (fRat := fun _ => mk hasSymbols .DIVISION_TOTAL terms)
+    (fInt := fun _ => mk hasSymbols .INTS_DIVISION_TOTAL args)
+    (fRat := fun _ => mk hasSymbols .DIVISION_TOTAL args)
 
 @[inherit_doc mkDivTotal]
-def divTotal : Build (Term α) := do
-  mkDivTotal #[lft, rgt]
+def divTotal : Build (Term α) := mkDivTotal lft rgt
 
-end
-
-end nary2
+end arith
 
 
 
@@ -530,7 +558,9 @@ For this reason, this function detects when it is building an application that y
 term; in this case, it will destruct the underlying higher-order terms (recursively, and if any) and
 rewrite them as a regular (first-order) function application.
 -/
-protected def apply (function : Term (α → β)) (arg : Term α) : Term.Build (Term β) := do
+protected def apply [Srt.Bij β]
+  (function : Term (α → β)) (arg : Term α)
+: Term.Build (Term β) := do
   let hasSymbols := function.hasSymbols ∨ arg.hasSymbols
   let term! := function.toUnsafe
   let sort! := term!.getSort
