@@ -22,7 +22,8 @@
     "substs",
     "succ",
     "suff",
-    "Unsat"
+    "Unsat",
+    "uncurries"
   ],
   "cSpell.customDictionaries": {
     "custom-dictionary-workspace": {
