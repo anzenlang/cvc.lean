@@ -24,8 +24,13 @@ scoped syntax name : smtTerm
 scoped syntax num : smtTerm
 
 scoped syntax:25 smtTerm:26 " → " smtTerm:25 : smtTerm
+scoped syntax "→[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:35 smtTerm:36 " ∧ " smtTerm:35 : smtTerm
+scoped syntax "∧[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:30 smtTerm:31 " ∨ " smtTerm:30 : smtTerm
+scoped syntax "∨[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
+scoped syntax:30 smtTerm:31 " ∨! " smtTerm:30 : smtTerm
+scoped syntax "∨![" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:max "¬ " smtTerm:40 : smtTerm
 
 scoped syntax
@@ -47,12 +52,13 @@ scoped syntax:50 smtTerm:51 " > " smtTerm:50 : smtTerm
 scoped syntax ">[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 
 scoped syntax:70 smtTerm:70 " * " smtTerm:71 : smtTerm
+scoped syntax "*[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:70 smtTerm:70 " /! " smtTerm:71 : smtTerm
-scoped syntax:70 smtTerm:70 " /. " smtTerm:71 : smtTerm
-scoped syntax:70 smtTerm:70 " /.! " smtTerm:71 : smtTerm
+scoped syntax "/![" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:70 smtTerm:70 " / " smtTerm:71 : smtTerm
 scoped syntax:70 smtTerm:70 " % " smtTerm:71 : smtTerm
 scoped syntax:65 smtTerm:65 " + " smtTerm:66 : smtTerm
+scoped syntax "+[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:65 smtTerm:65 " - " smtTerm:66 : smtTerm
 scoped syntax:75 "- " smtTerm : smtTerm
 
@@ -120,10 +126,20 @@ macro_rules
 
 | `(smt! $lft → $rgt) =>
   `( (do (← smt! $lft).implies (← smt! $rgt)) )
+| `(smt! →[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkImplies #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ] ) )
 | `(smt! $lft ∧ $rgt) =>
   `( (do (← smt! $lft).and (← smt! $rgt)) )
+| `(smt! ∧[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkAnd #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ] ) )
 | `(smt! $lft ∨ $rgt) =>
   `( (do (← smt! $lft).or (← smt! $rgt)) )
+| `(smt! ∨[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkOr #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ] ) )
+| `(smt! $lft ∨! $rgt) =>
+  `( (do (← smt! $lft).xor (← smt! $rgt)) )
+| `(smt! ∨![ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkXor #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ] ) )
 | `(smt! ¬ $t) =>
   `( (do (← smt! $t).not) )
 
@@ -168,16 +184,18 @@ macro_rules
 
 | `(smt! $lft * $rgt) =>
   `( (do (← smt! $lft).mul (← smt! $rgt)) )
+| `(smt! *[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkMul #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ]) )
 | `(smt! $lft / $rgt) =>
-  `( (do (← smt! $lft).intDivTotal (← smt! $rgt)) )
+  `( (do (← smt! $lft).divTotal (← smt! $rgt)) )
 | `(smt! $lft /! $rgt) =>
-  `( (do (← smt! $lft).intDiv (← smt! $rgt)) )
-| `(smt! $lft /. $rgt) =>
-  `( (do (← smt! $lft).ratDiv (← smt! $rgt)) )
-| `(smt! $lft /.! $rgt) =>
-  `( (do (← smt! $lft).ratDivTotal (← smt! $rgt)) )
+  `( (do (← smt! $lft).div! (← smt! $rgt)) )
+| `(smt! /![ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkDiv! #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ]) )
 | `(smt! $lft + $rgt) =>
   `( (do (← smt! $lft).add (← smt! $rgt)) )
+| `(smt! +[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
+  `( (do Cvc.Term.mkAdd #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ]) )
 | `(smt! - $t) =>
   `( (do (← smt! $t).neg) )
 | `(smt! $lft - $rgt) =>
