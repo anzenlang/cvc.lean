@@ -58,6 +58,8 @@ protected abbrev Bool := Term Bool
 protected abbrev Int := Term Int
 /-- Real/`Rat` terms. -/
 protected abbrev Real := Term Rat
+/-- String terms. -/
+protected abbrev String := Term String
 /-- Array terms. -/
 protected abbrev Array (α β : Type) := Term (Cvc.TMap α β)
 /-- Sequence terms. -/
@@ -302,10 +304,56 @@ private def mk [Srt.Bij α]
 def bool (b : Bool) : Build Term.Bool :=
   managerDo fun tm => tm.mkBoolean b |> Term.ofUnsafe false
 
+/-- Retrieves the value of a constant Boolean term. -/
+def boolVal? (t : Term.Bool) : Option Bool :=
+  t.toUnsafe.getBooleanValue?
+
+@[inherit_doc boolVal?]
+def boolVal (t : Term.Bool) : Res Bool :=
+  if let some t := t.boolVal?
+  then return t
+  else
+    Res.failUser "cannot retrieve Boolean value of a non-constant term"
+    |>.context s!"on term `{t}`"
+
 /-- Builds a constant integer term. -/
 def int (i : Int) : Build Term.Int := do
   logicDo .int
   managerDo fun tm => tm.mkInteger i |> Term.ofUnsafe false
+
+/-- Retrieves the value of a constant integer term. -/
+def intVal? (t : Term.Int) : Option Int :=
+  t.toUnsafe.getIntegerValue?
+
+@[inherit_doc intVal?]
+def intVal (t : Term.Int) : Res Int :=
+  if let some t := t.intVal?
+  then return t
+  else
+    Res.failUser "cannot retrieve integer value of a non-constant term"
+    |>.context s!"on term `{t}`"
+
+/-- Retrieves the value of a constant rational/real term. -/
+def ratVal? (t : Term.Real) : Res (Option Rat) :=
+  t.toUnsafe.getRationalValue?.mapM fun r =>
+    if h : r.den ≠ 0 then return Rat.normalize r.num r.den h
+    else Res.failInternal s!"cvc5 produced an illegal ration value: `{r}`"
+
+@[inherit_doc ratVal?]
+def ratVal (t : Term.Real) : Res Rat := do
+  if let some r ← t.ratVal? then return r else
+    Res.failUser "cannot retrieve rational value of a non-constant term"
+    |>.context s!"on term `{t}`"
+
+-- /-- Retrieves the value of a constant rational/real term. -/
+-- def stringVal? (t : Term.String) : Option String :=
+--   t.toUnsafe.getStringValue?
+
+-- @[inherit_doc stringVal?]
+-- def stringVal (t : Term.String) : Res String := do
+--   if let some r ← t.stringVal? then return r else
+--     Res.failUser "cannot retrieve string value of a non-constant term"
+--     |>.context s!"on term `{t}`"
 
 /-- Builds the Boolean negation of a term. -/
 def mkNot (term : Term.Bool) : Build Term.Bool :=
@@ -434,10 +482,14 @@ end nary2
 /-! #### Arithmetic -/
 section arith
 
-variable [A : Srt.Bij.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
+variable [Srt.Bij α] (terms : Array (Term α)) (lft rgt : Term α)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
+)
+variable (Arith : Srt.Bij.Arith α := by
+  (try ( exact inferInstance ) ; done)
+  <;> fail "expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`"
 )
 
 /-- Forbids difference logics. -/
@@ -464,7 +516,7 @@ private def checkNonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
 -/
 def mkAdd : Build (Term α) := do
   nonDiff
-  let _ := h_size
+  let _ := h_size ; let _ := Arith
   mk (terms.any hasSymbols) .ADD (terms.map toUnsafe)
 
 @[inherit_doc mkAdd]
@@ -477,7 +529,7 @@ def add : Build (Term α) :=
 - Forces non-linear logic if non-linear.
 -/
 def mkMul : Build (Term α) := do
-  let _ := h_size
+  let _ := h_size ; let _ := Arith
   nonDiff
   let hasSymbols ← checkNonLinearOfArgs terms
   mk hasSymbols .MULT (terms.map toUnsafe)
@@ -495,7 +547,7 @@ def mkDiv! : Build (Term α) := do
   nonDiff
   let hasSymbols ← checkNonLinearOfArgs terms
   let terms := terms.map toUnsafe
-  A.inspect
+  Arith.inspect
     (fInt := fun _ => mk hasSymbols .INTS_DIVISION terms)
     (fRat := fun _ => mk hasSymbols .DIVISION terms)
 
@@ -508,7 +560,7 @@ def mkDivTotal : Build (Term α) := do
   nonDiff
   let hasSymbols ← checkNonLinearOfArgs #[lft, rgt]
   let args := #[lft.toUnsafe, rgt.toUnsafe]
-  A.inspect
+  Arith.inspect
     (fInt := fun _ => mk hasSymbols .INTS_DIVISION_TOTAL args)
     (fRat := fun _ => mk hasSymbols .DIVISION_TOTAL args)
 
@@ -571,7 +623,63 @@ protected def apply [Srt.Bij β]
 
 end apply
 
+
+
+/-- Conversion from `Term`-s of a certain sort to some *concrete value*.
+
+Used to extract values from constant terms, used by `Sat.getVal` and the `Symbols` API.
+-/
+class ToVal (α : Type) extends Srt.Bij α where
+mk' ::
+  /-- Concrete-value type for `Term α`-terms. -/
+  Val : Type := α
+  /-- Converts a `Term α` into a concrete value. -/
+  ofTerm : Term α → Term.Build Val
+
+namespace ToVal
+
+def mk [Srt.Bij α] (Val : Type := α)
+  (ofTerm : Term α → Term.Build Val := fun _ =>
+    Cvc.throwInternal s!"concrete value reconstruction is not yet implemented on sort `{getSrt α}`"
+  )
+: ToVal α :=
+  ⟨Val, ofTerm⟩
+
+instance : CoeSort (ToVal α) Type := ⟨fun inst => inst.Val⟩
+
+-- instance : ToVal Unit := mk
+instance : ToVal Bool := mk Bool fun t => t.boolVal
+instance : ToVal Int := mk Int fun t => t.intVal
+instance : ToVal Rat := mk Rat fun t => t.ratVal
+instance : ToVal String := mk
+instance : ToVal RoundingMode := mk
+instance : ToVal Cvc.Regex := mk
+
+instance : ToVal (Cvc.AnyFloat exp sig) := mk
+instance : ToVal (Cvc.Abstract k) := mk
+instance : ToVal (Cvc.FiniteField n) := mk
+instance : ToVal (BitVec size) := mk
+instance : ToVal (Uninterpreted name) := mk
+
+section variable [A : ToVal α] [B : ToVal β]
+
+instance : ToVal (Array α) := mk <| Array A
+instance : ToVal (α × β) := mk <| A × B
+instance : ToVal (α → β) := mk (Term (α → β)) (return ·)
+instance : ToVal (Cvc.TMap α β) := mk <| Cvc.TMap A B
+instance : ToVal (Cvc.Bag α) := mk <| Cvc.Bag A
+instance : ToVal (Cvc.Set α) := mk <| Cvc.Set A
+
+end
+
+end ToVal
+
+/-- The concrete-value type associated with `α`. -/
+abbrev getValType (α : Type) [inst : ToVal α] := inst.Val
+
 end Term
+
+export Term (getValType)
 
 
 
@@ -620,6 +728,10 @@ def declare (symbol : String) (α : Type) [Srt.Bij α] : Smt (Term α) := do
   let (doms, cod) ← srt.toSignature!
   let f ← lift5 <| cvc5.Solver.declareFun symbol doms cod
   return Term.ofUnsafe true f
+
+@[inherit_doc declare]
+def declare' {α : Type} [Srt.Bij α] (symbol : String) : Smt (Term α) :=
+  declare symbol α
 
 /-- Asserts a formula. -/
 def assert (formula : Formula) : Smt Unit := do
@@ -722,17 +834,32 @@ def checkSatAnd
 
 namespace Sat
 
+instance [Monad m] : MonadLift Smt.Sat (Smt.SatT m) :=
+  ⟨fun code state => return code state⟩
+instance [Monad m] : MonadLift Term.Build (Smt.SatT m) := ⟨fun build => do
+  let res ← modifyGet fun state =>
+    let (res, builder) := build state.builder
+    (res, {state with builder})
+  res
+⟩
+
 /-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : SatT m α := fun state => do
   let (res, solver) ← code state.solver
   return (Res.lift res, {state with solver})
 
-/-- Retrieves the value of a term in `Sat` mode. -/
+/-- Retrieves the value of a term in `Sat` mode.
+
+This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
+-/
 def getValue (term : Term α) : Sat (Term α) := do
   let term! ← lift5 <| cvc5.Solver.getValue (m := Id) term.toUnsafe
   return Term.ofUnsafe false term!
 
-/-- Retrieves the values of some terms of the same sort in `Sat` mode. -/
+/-- Retrieves the values of some terms of the same sort in `Sat` mode.
+
+This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
+-/
 def getValues (terms : Array (Term α)) : Sat (Array (Term α × Term α)) := do
   let mut values := Array.mkEmpty terms.size
   for term in terms do
@@ -740,11 +867,51 @@ def getValues (terms : Array (Term α)) : Sat (Array (Term α × Term α)) := do
     values := values.push (term, value)
   return values
 
+/-- Retrieves the *concrete value* of a term in `Sat` mode.
+
+This function is available the following namespaces: `Cvc.Term`, `Cvc.Term.ToVal`, `Cvc.Smt`, and
+`Cvc.Smt.Sat`.
+-/
+def getValUsing (Val : Term.ToVal α) (term : Term α) : Sat Val := do
+  let termVal ← getValue term
+  Val.ofTerm termVal
+
+@[inherit_doc getValUsing]
+def getVal [Val : Term.ToVal α] (term : Term α) : Sat Val :=
+  getValUsing Val term
+
+/-- Retrieves the *concrete values* of some terms of the same sort in `Sat` mode.
+
+This function is available the following namespaces: `Cvc.Term`, `Cvc.Term.ToVal`, `Cvc.Smt`, and
+`Cvc.Smt.Sat`.
+-/
+def getValsUsing (Val : Term.ToVal α) (terms : Array (Term α)) : Sat (Array (Term α × Val)) := do
+  let mut values := Array.mkEmpty terms.size
+  for term in terms do
+    let value ← getVal term
+    values := values.push (term, value)
+  return values
+
+@[inherit_doc getValsUsing]
+def getVals [Val : Term.ToVal α] (terms : Array (Term α)) : Sat (Array (Term α × Val)) :=
+  getValsUsing Val terms
+
 end Sat
+
+export Sat (getValue getValues getValUsing getValsUsing getVal getVals)
 
 
 
 namespace Unsat
+
+instance [Monad m] : MonadLift Smt.Unsat (Smt.UnsatT m) :=
+  ⟨fun code state => return code state⟩
+instance [Monad m] : MonadLift Term.Build (Smt.UnsatT m) := ⟨fun build => do
+  let res ← modifyGet fun state =>
+    let (res, builder) := build state.builder
+    (res, {state with builder})
+  res
+⟩
 
 /-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : UnsatT m α := fun state => do
@@ -757,9 +924,20 @@ def getProof : Unsat (Array cvc5.Proof) := do
 
 end Unsat
 
+export Unsat (getProof)
+
 
 
 namespace Unknown
+
+instance [Monad m] : MonadLift Smt.Unknown (Smt.UnknownT m) :=
+  ⟨fun code state => return code state⟩
+instance [Monad m] : MonadLift Term.Build (Smt.UnknownT m) := ⟨fun build => do
+  let res ← modifyGet fun state =>
+    let (res, builder) := build state.builder
+    (res, {state with builder})
+  res
+⟩
 
 /-- Unsafe solver monad lift. -/
 private def lift5 (code : cvc5.SolverT m α) : UnknownT m α := fun state => do
@@ -769,6 +947,18 @@ private def lift5 (code : cvc5.SolverT m α) : UnknownT m α := fun state => do
 end Unknown
 
 end Smt
+
+
+
+namespace Term
+
+export Smt (getValue getValues getVal getValUsing getVals getValsUsing)
+
+namespace ToVal
+export Term (getVal getValUsing getVals getValsUsing)
+end ToVal
+
+end Term
 
 
 

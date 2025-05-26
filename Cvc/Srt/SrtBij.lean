@@ -68,18 +68,18 @@ instance instRegex : Srt.Bij Cvc.Regex := mk <| .regex
 instance instAnyFloat : Srt.Bij (Cvc.AnyFloat exp sig) := mk <| .float exp sig
 instance instAbstract : Srt.Bij (Cvc.Abstract k) := mk <| .abstract k
 instance instFiniteField : Srt.Bij (Cvc.FiniteField n) := mk <| .finiteField n
+instance instBitVec : Srt.Bij (BitVec size) := mk <| .bitVec size
+instance instUninterpreted : Srt.Bij (Uninterpreted name) := mk <| .uninterpreted name
 
 /-! ## Instances composite types -/
 section variable [A : Srt.Bij α] [B : Srt.Bij β]
 
 instance instArray : Srt.Bij (Array α) := mk <| .seq A.srt
-instance instBitVec : Srt.Bij (BitVec size) := mk <| .bitVec size
 instance instFunction : Srt.Bij (α → β) := mk <| .function A.srt B.srt
 instance instProd : Srt.Bij (α × β) := mk <| .prod A.srt B.srt
 instance instTMap : Srt.Bij (Cvc.TMap α β) := mk <| .array A.srt B.srt
 instance instBag : Srt.Bij (Cvc.Bag α) := mk <| .bag A.srt
 instance instSet : Srt.Bij (Cvc.Set α) := mk <| .set A.srt
-instance instUninterpreted : Srt.Bij (Uninterpreted name) := mk <| .uninterpreted name
 
 end
 
@@ -94,7 +94,7 @@ end Srt
 protected abbrev is_arith (α : Type) [Srt.Bij α] :=
   Srt.ofType α |>.is_arith
 
-example {α : Type} [Srt.Bij α] : Decidable (Cvc.is_arith α) := by
+instance [Srt.Bij α] : Decidable (Cvc.is_arith α) := by
   simp only [Cvc.is_arith, Srt.is_arith, Srt.isArith, Srt.ofType, getSrt]
   cases Srt.Bij.srt α <;> (
     simp
