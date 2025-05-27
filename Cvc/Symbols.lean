@@ -7,3 +7,4 @@ Authors: Adrien Champion
 
 import Cvc.Symbols.Basic
 import Cvc.Symbols.Defs
+import Cvc.Symbols.Dsl

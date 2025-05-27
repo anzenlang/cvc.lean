@@ -71,6 +71,9 @@ def mkIdent (name : String) : Symbol α := mk name ()
 def mkTerm : String → Term α → Symbol.Term α := mk
 def mkVal [Val : Term.ToVal α] : String → Val → Symbol.Val α := mk
 
+def erase [Val : Term.ToVal α] {R : Symbol.Repr} (sym : Symbol α (R α)) : ESymbol R :=
+  ⟨α, Val, sym⟩
+
 section variable [Monad m] (sym : Symbol α β)
 
 def mapM (f : β → m γ) : m (Symbol α γ) := do
