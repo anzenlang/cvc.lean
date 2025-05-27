@@ -15,7 +15,7 @@ import Cvc.Symbols.Defs
 
 - support `extends Sub` as long as as a `Symbols Sub` instance can be found
 -/
-namespace Cvc.Symbols
+namespace Cvc.Symbols.Dsl
 
 
 
@@ -187,10 +187,10 @@ symbol structure MySymbols where
   myCounter : Int
   myReset : Bool
 
-/-- info: Cvc.Symbols.Test.MySymbols.Idents : Type -/
+/-- info: Cvc.Symbols.Dsl.Test.MySymbols.Idents : Type -/
 #guard_msgs in #check MySymbols.Idents
 
-/-- info: Cvc.Symbols.Test.MySymbols.idents : MySymbols.Idents -/
+/-- info: Cvc.Symbols.Dsl.Test.MySymbols.idents : MySymbols.Idents -/
 #guard_msgs in #check MySymbols.idents
 
 /-- info: MySymbols.idents.myCounter : Symbol Int (default Int) -/
@@ -213,4 +213,4 @@ symbol structure MySymbols where
 
 end Test
 
-end Symbols
+end Symbols.Dsl

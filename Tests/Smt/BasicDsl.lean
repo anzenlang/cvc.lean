@@ -12,7 +12,7 @@ namespace Cvc.Test
 
 
 
-open scoped Cvc.Symbols
+open scoped Cvc.Symbols.Dsl
 open scoped Cvc.Term.Dsl
 
 
