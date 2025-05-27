@@ -9,13 +9,13 @@ import Cvc.Symbols.Defs
 
 
 
-/-! # Syntax extension for `Cvc.Safe.Symbols` (`Cvc.Safe.Symbol` structures)
+/-! # Syntax extension for `Cvc.Symbols` (`Cvc.Symbol` structures)
 
 ## TODO
 
 - support `extends Sub` as long as as a `Symbols Sub` instance can be found
 -/
-namespace Cvc.Safe.Symbols
+namespace Cvc.Symbols
 
 
 
@@ -187,10 +187,10 @@ symbol structure MySymbols where
   myCounter : Int
   myReset : Bool
 
-/-- info: Cvc.Safe.Symbols.Test.MySymbols.Idents : Type -/
+/-- info: Cvc.Symbols.Test.MySymbols.Idents : Type -/
 #guard_msgs in #check MySymbols.Idents
 
-/-- info: Cvc.Safe.Symbols.Test.MySymbols.idents : MySymbols.Idents -/
+/-- info: Cvc.Symbols.Test.MySymbols.idents : MySymbols.Idents -/
 #guard_msgs in #check MySymbols.idents
 
 /-- info: MySymbols.idents.myCounter : Symbol Int (default Int) -/

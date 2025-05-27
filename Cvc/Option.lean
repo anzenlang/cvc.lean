@@ -315,41 +315,41 @@ end Option
 
 
 
-inductive Option
+protected inductive Option
 | common (c : Option.Common)
 | regular (r : Option.Regular)
 | expert (e : Option.Expert)
 
 namespace Option
-instance instCoeCommon : Coe Common Option := ⟨Option.common⟩
-instance instCoeRegular : Coe Regular Option := ⟨Option.regular⟩
-instance instCoeExpert : Coe Expert Option := ⟨Option.expert⟩
+instance instCoeCommon : Coe Common Cvc.Option := ⟨Option.common⟩
+instance instCoeRegular : Coe Regular Cvc.Option := ⟨Option.regular⟩
+instance instCoeExpert : Coe Expert Cvc.Option := ⟨Option.expert⟩
 
 @[inherit_doc Common.produceModels]
-def produceModels (active : Bool := true) : Option :=
+def produceModels (active : Bool := true) : Cvc.Option :=
   Common.produceModels active
 
 @[inherit_doc Regular.produceProofs]
-def produceProofs (active : Bool := true) : Option :=
+def produceProofs (active : Bool := true) : Cvc.Option :=
   Regular.produceProofs active
 
 @[inherit_doc Regular.produceUnsatCores]
-def produceUnsatCores (active : Bool := true) : Option :=
+def produceUnsatCores (active : Bool := true) : Cvc.Option :=
   Regular.produceUnsatCores active
 
 @[inherit_doc Regular.produceInterpolants]
-def produceInterpolants (active : Bool := true) : Option :=
+def produceInterpolants (active : Bool := true) : Cvc.Option :=
   Regular.produceInterpolants active
 
 @[inherit_doc Regular.produceAssignments]
-def produceAssignments (active : Bool := true) : Option :=
+def produceAssignments (active : Bool := true) : Cvc.Option :=
   Regular.produceAssignments active
 
 @[inherit_doc Regular.produceAssertions]
-def produceAssertions (active : Bool := true) : Option :=
+def produceAssertions (active : Bool := true) : Cvc.Option :=
   Regular.produceAssertions active
 
-def keyVal : Option → String × String
+def keyVal : Cvc.Option → String × String
 | common c => c.keyVal
 | regular r => r.keyVal
 | expert e => e.keyVal

@@ -8,6 +8,7 @@ Authors: Adrien Champion
 import Cvc.Logic
 import Cvc.Basic
 import Cvc.Srt
+import Cvc.Option
 
 
 
@@ -648,9 +649,12 @@ def mk [Srt.Bij α] (Val : Type := α)
 instance : CoeSort (ToVal α) Type := ⟨fun inst => inst.Val⟩
 
 -- instance : ToVal Unit := mk
-instance : ToVal Bool := mk Bool fun t => t.boolVal
-instance : ToVal Int := mk Int fun t => t.intVal
+instance instBool : ToVal Bool := mk Bool fun t => t.boolVal
+instance : ToString instBool.Val := inferInstanceAs (ToString Bool)
+instance instInt : ToVal Int := mk Int fun t => t.intVal
+instance : ToString instInt.Val := inferInstanceAs (ToString Int)
 instance : ToVal Rat := mk Rat fun t => t.ratVal
+instance : ToString instRat.Val := inferInstanceAs (ToString Rat)
 instance : ToVal String := mk
 instance : ToVal RoundingMode := mk
 instance : ToVal Cvc.Regex := mk
@@ -721,6 +725,15 @@ private def lift5 [Monad m] (code : cvc5.SolverT m α) : SmtT m α := do
   let (res, solver) ← code state.solver
   set {state with solver}
   return ← res
+
+/-- Sets an option in the solver. -/
+def setOption (opt : Cvc.Option) : Smt Unit := do
+  let (key, val) := opt.keyVal
+  let state ← getThe Smt.State
+  let (res, solver) ← cvc5.Solver.setOption key val state.solver
+  let () ← res
+  set {state with solver}
+
 
 /-- Declares a function symbol. -/
 def declare (symbol : String) (α : Type) [Srt.Bij α] : Smt (Term α) := do
