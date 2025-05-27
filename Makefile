@@ -15,7 +15,7 @@ docClean:
 	cd docbuild ; lake clean
 
 docUpdate:
-	cd docbuild ; lake update 
+	cd docbuild ; lake update ; lake run init
 
 doc:
 	lake build
