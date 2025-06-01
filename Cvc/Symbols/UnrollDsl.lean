@@ -15,13 +15,6 @@ namespace Cvc.Symbols.Dsl
 
 
 
-/-
-Illustration of what elaboration should generate on a concrete example, used for testing/debugging
-generation patterns.
--/
-
-
-
 open Lean.Parser
 open Command
 open Lean.Elab.Command (elabCommand)
