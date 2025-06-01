@@ -24,37 +24,37 @@ Illustration of what elaboration should generate on a concrete example, used for
 generation patterns.
 -/
 
--- structure MySymbols (F : Symbol.Repr) where
---   s1 : Symbol Int (F Int)
---   s2 : Symbol Bool (F Bool)
+structure Testing.MySymbols (F : Symbol.Repr) where
+  s1 : F Int
+  s2 : F Bool
 
--- namespace MySymbols
+namespace Testing.MySymbols
 
--- @[default_instance]
--- instance inst.{u, v} : Symbols.{u, v} MySymbols where
---   mapM self f := do
---     let s1 ← f self.s1
---     let s2 ← f self.s2
---     return mk s1 s2
---   forIn self acc f := do
---     let mut acc := acc
---     match ← f self.s1.erase acc with
---     | .done res => return res
---     | .yield acc' => acc := acc'
---     match ← f self.s2.erase acc with
---     | .done res => return res
---     | .yield acc' => acc := acc'
---     return acc
+@[default_instance]
+instance inst : Symbols (fun F => MySymbols F) where
+  mapM self f := do
+    let s1 ← f self.s1
+    let s2 ← f self.s2
+    return mk s1 s2
+  forIn self acc f := do
+    let mut acc := acc
+    match ← f self.s1 acc with
+    | .done res => return res
+    | .yield acc' => acc := acc'
+    match ← f self.s2 acc with
+    | .done res => return res
+    | .yield acc' => acc := acc'
+    return acc
 
---   idents' := mk (Symbol.mkIdent "s1") (Symbol.mkIdent "s2")
+  idents' := mk (Symbol.mkIdent "s1") (Symbol.mkIdent "s2")
 
--- abbrev Idents.{u, v} := inst.Idents.{u, v}
--- -- ...
+abbrev Idents := inst.Idents
+-- ...
 
--- def s1! (self : MySymbols F) := self.s1.get
--- def s2! (self : MySymbols F) := self.s2.get
+def s1! (self : MySymbols (Symbol R ·)) := self.s1
+def s2! (self : MySymbols (Symbol R ·)) := self.s2
 
--- end MySymbols
+end Testing.MySymbols
 
 
 
@@ -64,8 +64,8 @@ open Lean.Parser
 open Command
 open Lean.Elab.Command (elabCommand)
 
-def symbolTk := leading_parser
-  (symbol "symbol ")
+def symbolsTk := leading_parser
+  (symbol "symbols ")
 
 def stateStructure := leading_parser
   declId >>
@@ -73,8 +73,7 @@ def stateStructure := leading_parser
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
 scoped syntax (name := stateStructureSyntax)
-  declModifiers symbolTk
-    structureTk stateStructure
+  declModifiers symbolsTk stateStructure
     -- Lean.Parser.Command.«structure»
 : command
 
@@ -82,7 +81,7 @@ scoped syntax (name := stateStructureSyntax)
 def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 | `(
   $topMods:declModifiers
-  symbol structure $topDeclId:declId where $[ $ctor:structCtor ]?
+  symbols $topDeclId:declId where $[ $ctor:structCtor ]?
     $[ $fieldMods:declModifiers $fieldIdents:ident : $fieldTypes ]*
 ) => do
   let `( $identTop:ident ) := topDeclId.raw[0]
@@ -97,11 +96,18 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
   let ident_Spec := Lean.mkIdent `Spec
   let ident_toSymbols := Lean.mkIdent `toSymbols
   let ident_Idents := Lean.mkIdent `Idents
+  let ident_IdentsAt := Lean.mkIdent `IdentsAt
   let ident_idents := Lean.mkIdent `idents
+  let ident_unroll := Lean.mkIdent `unroll
   let ident_Values := Lean.mkIdent `Vals
+  let ident_ValuesAt := Lean.mkIdent `ValsAt
   let ident_Concrete := Lean.mkIdent `Concrete
   let ident_Model := Lean.mkIdent `Model
+  let ident_Concrete := Lean.mkIdent `Concrete
+  let ident_ConcreteAt := Lean.mkIdent `ConcreteAt
+  let ident_ModelAt := Lean.mkIdent `ModelAt
   let ident_Terms := Lean.mkIdent `Terms
+  let ident_TermsAt := Lean.mkIdent `TermsAt
   let ident_Fun := Lean.mkIdent `Fun
   let ident_Function := Lean.mkIdent `Function
   let ident_Pred := Lean.mkIdent `Pred
@@ -113,7 +119,8 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
   let mut ident'Elms := #[]
   let mut fieldIdentsBang := #[]
   for (fieldIdent, fieldType) in fieldIdents.zip fieldTypes do
-    let typStx ← `( $ident_Symbol ($fieldType) ($ident_F ($fieldType)))
+    -- let typStx ← `( $ident_Symbol ($fieldType) ($ident_F ($fieldType)) $ident_k)
+    let typStx ← `( $ident_F ($fieldType) )
     typs := typs.push typStx
     let identStr := fieldIdent.getId.toString
     let identStrLit := Lean.Syntax.mkStrLit identStr
@@ -124,21 +131,24 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
       |> Lean.Name.mkSimple
       |> Lean.mkIdent
       |> fieldIdentsBang.push
-  let stx ←  `(
+  let stx ← `(
     $topMods:declModifiers
-    structure $topDeclId ( $ident_F : $ident_Repr ) where $[ $ctor:structCtor ]?
+    structure $topDeclId ( $ident_F : $ident_Repr )
+    where $[ $ctor:structCtor ]?
       $[ $fieldMods:declModifiers $fieldIdents:ident : $typs ]*
 
     namespace $identTop
 
+    @[default_instance]
     instance $ident_inst:declId : $ident_Symbols $identTop where
-      mapM self f := do
+      mapM (self : $identTop _) f := do
         let ⟨ $[ $fieldIdents:ident ],*⟩ := self
-        return ⟨ $[ ← f self.$fieldIdents:ident ],* ⟩
-      forIn self acc f := do
+        return ⟨ $[ ← f $fieldIdents:ident ],* ⟩
+      forIn self acc f :=
+        do
         let mut acc := acc
         $[
-          match ← f (self.$fieldIdents).erase acc with
+          match ← f self.$fieldIdents acc with
           | .yield newAcc => acc := newAcc
           | .done res => return res
         ]*
@@ -149,27 +159,28 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
     abbrev $ident_Spec := $ident_inst
 
 
-    abbrev $ident_Idents := $ident_inst.{0, 0}.$ident_Idents
-    abbrev $ident_idents : $ident_Idents := $ident_inst.{0, 0}.$ident_idents
-    abbrev $ident_Values := $ident_inst.{0, 0}.$ident_Values
+    abbrev $ident_Idents := $ident_inst.$ident_Idents
+    abbrev $ident_idents : $ident_Idents := $ident_inst.$ident_idents
+    abbrev $ident_Values := $ident_inst.$ident_Values
     abbrev $ident_Concrete := $ident_Values
     abbrev $ident_Model := $ident_Values
-    abbrev $ident_Terms := $ident_inst.{0, 0}.$ident_Terms
-    protected abbrev $ident_Fun := $ident_inst.{0, 0}.$ident_Fun
-    protected abbrev $ident_Function := $ident_inst.{0, 0}.$ident_Function
-    abbrev $ident_Pred := $ident_inst.{0, 0}.$ident_Pred
+    abbrev $ident_Terms := $ident_inst.$ident_Terms
+    protected abbrev $ident_Fun := $ident_inst.$ident_Fun
+    protected abbrev $ident_Function := $ident_inst.$ident_Function
+    abbrev $ident_Pred := $ident_inst.$ident_Pred
     abbrev $ident_Predicate := $ident_Pred
-    abbrev $ident_Rel := $ident_inst.{0, 0}.$ident_Rel
+    abbrev $ident_Rel := $ident_inst.$ident_Rel
     abbrev $ident_Relation := $ident_Rel
 
     end $identTop
   )
   elabCommand stx
 
-  for (id!, id) in fieldIdentsBang.zip fieldIdents do
+  for (id!, id, typ) in fieldIdentsBang.zip <| fieldIdents.zip fieldTypes do
     let stx ← `(
       namespace $identTop
-      def $id! {F} (self : $identTop F) := self.$id.$ident_get
+      def $id! {R : $ident_Repr} {β} [Get : Symbol.Getter (R $typ) β] (self : $identTop R) : β :=
+        Get.getInner self.$id
       end $identTop
     )
     elabCommand stx
@@ -183,7 +194,7 @@ More commented testing stuff.
 namespace Test
 
 /-- Testing... -/
-symbol structure MySymbols where
+symbols MySymbols where
   myCounter : Int
   myReset : Bool
 
@@ -193,22 +204,22 @@ symbol structure MySymbols where
 /-- info: Cvc.Symbols.Dsl.Test.MySymbols.idents : MySymbols.Idents -/
 #guard_msgs in #check MySymbols.idents
 
-/-- info: MySymbols.idents.myCounter : Symbol Int (default Int) -/
+/-- info: MySymbols.idents.myCounter : Symbol.Ident Int -/
 #guard_msgs in #check MySymbols.idents.myCounter
 /-- info: myCounter -/
 #guard_msgs in #eval MySymbols.idents.myCounter
-/-- info: MySymbols.myCounter! MySymbols.idents : default Int -/
+/-- info: MySymbols.myCounter! MySymbols.idents : String -/
 #guard_msgs in #check MySymbols.idents.myCounter!
-/-- info: () -/
+/-- info: "myCounter" -/
 #guard_msgs in #eval MySymbols.idents.myCounter!
 
-/-- info: MySymbols.idents.myReset : Symbol Bool (default Bool) -/
+/-- info: MySymbols.idents.myReset : Symbol.Ident Bool -/
 #guard_msgs in #check MySymbols.idents.myReset
 /-- info: myReset -/
 #guard_msgs in #eval MySymbols.idents.myReset
-/-- info: MySymbols.myReset! MySymbols.idents : default Bool -/
+/-- info: MySymbols.myReset! MySymbols.idents : String -/
 #guard_msgs in #check MySymbols.idents.myReset!
-/-- info: () -/
+/-- info: "myReset" -/
 #guard_msgs in #eval MySymbols.idents.myReset!
 
 end Test

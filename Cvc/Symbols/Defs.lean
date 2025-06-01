@@ -26,43 +26,35 @@ can represent, for instance, the state of a transition systems. This class abstr
 structures so that `cvc.lean` can provide helpers for declaring function symbols, retrieving their
 (strongly-typed) value, *etc.*
 -/
-class Symbols.{u, v} (Struct : Symbols.Repr) where
+class Symbols (Struct : Symbols.Repr) where
   /-- Monadic *map* over a `Struct _`. -/
-  mapM {m : Type → Type} [Monad m]
-    (repr : Struct F) (f : {α : Type} → [Term.ToVal α] → Symbol α (F α) → m (Symbol α (G α)))
-  : m (Struct G)
-  /-- `ForIn`-like iteration function over `ESymbol _` elements. -/
-  forIn {m : Type u → Type v} [Monad m]
-    (symbols : Struct F) (init : β) (f : ESymbol F → β → m (ForInStep β))
+  mapM {m : Type → Type} [Monad m] (repr : Struct R)
+    (f : {α : Type} → [Term.ToVal α] → R α → m (R' α))
+  : m (Struct R')
+  /-- `ForIn`-like iteration/fold over `ESymbol _` elements. -/
+  forIn {m : Type → Type} [Monad m] (symbols : Struct R)
+    (init : β) (f : {α : Type} → [Term.ToVal α] → R α → β → m (ForInStep β))
   : m β
   /-- Symbol identifier initialization. Don't use this directly, use `idents` instead. -/
-  idents' : Struct Symbol.Repr.default
-
-/-- An array of `ESymbol R`-s. -/
-abbrev ESymbols (Repr : Symbol.Repr) : Type 1 :=
-  Array (ESymbol Repr)
+  idents' : Struct (Symbol.Ident ·)
 
 namespace Symbols variable [Syms : Symbols Struct]
 
-/-- Maps over the symbols in a `. -/
-def map (symbols : Struct F)
-  (f : {α : Type} → [Term.ToVal α] → Symbol α (F α) → Symbol α (G α))
+/-- Maps over the symbols in a `Struct F`. -/
+def map (symbols : Struct R)
+  (f : {α : Type} → [Term.ToVal α] → R α → G α)
 : Struct G :=
   Syms.mapM (m := Id) symbols f
 
 @[default_instance]
-instance instForIn : ForIn m (Struct F) (ESymbol F) :=
-  ⟨Syms.forIn⟩
+instance instForIn : ForIn m (Struct R) ((α : Type) × (_ : Term.ToVal α) × (R α)) where
+  forIn symbols init f :=
+    Syms.forIn symbols init
+      fun repr acc => f ⟨_, inferInstance, repr⟩ acc
 
-def erase (symbols : Struct F) : ESymbols F := Id.run do
-  let mut array := #[]
-  for symbol in symbols do
-    array := array.push symbol
-  return array
-
-abbrev Idents := let _ := Syms ; Struct default
-abbrev Terms := let _ := Syms ; Struct Symbol.Repr.Term
-abbrev Vals := let _ := Syms ; Struct Symbol.Repr.Val
+abbrev Idents := let _ := Syms ; Struct (Symbol.Ident ·)
+abbrev Terms := let _ := Syms ; Struct (Symbol.Term ·)
+abbrev Vals := let _ := Syms ; Struct (Symbol.Val ·)
 
 def idents : Syms.Idents := idents'
 
@@ -83,14 +75,14 @@ abbrev Relation := @Rel
 namespace Idents variable (idents : Syms.Idents)
 
 def mapM [Monad m]
-  (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → m (Symbol α (G α)))
-: m (Struct G) :=
-  Syms.mapM idents f
+  (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → m (R α))
+: m (Struct R) :=
+  Syms.mapM idents (fun sym => f sym)
 
-def map (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → Symbol α (G α)) : Struct G :=
-  idents.mapM (m := Id) f
+def map (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → R α) : Struct R :=
+  mapM (m := Id) idents f
 
-def declare : Smt Syms.Terms := idents.mapM (Symbol.declare ·)
+def declare : Smt Syms.Terms := mapM idents (fun ident => Symbol.declare ident)
 
 end Idents
 
@@ -102,16 +94,15 @@ export Idents (declare)
 namespace Terms variable (terms : Syms.Terms)
 
 def mapM [Monad m]
-  (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → m (Symbol α (G α)))
-: m (Struct G) :=
+  (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → m (R α))
+: m (Struct R) :=
   Syms.mapM terms f
 
-def map (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → Symbol α (G α)) : Struct G :=
-  terms.mapM (m := Id) f
+def map (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → R α) : Struct R :=
+  mapM (m := Id) terms f
 
 /-- Retrieves the values of all symbols in a *sat* context. -/
-def getVals : Smt.Sat Syms.Vals :=
-  terms.mapM Cvc.Symbol.getVal
+def getVals : Smt.Sat Syms.Vals := mapM terms Symbol.getVal
 
 @[inherit_doc getVals]
 def getVal := @getVals

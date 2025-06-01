@@ -17,40 +17,41 @@ namespace Cvc
 
 
 
-structure Symbol (α : Type) (β : Type := Unit) : Type
-where mk ::
+structure Symbol (β α : Type) : Type where
   name : String
   get : β
 
 namespace Symbol
 
-protected abbrev Ident (α : Type) := Symbol α
-protected abbrev Term (α : Type) := Symbol α (Term α)
+class Getter (α β : Type) : Type where
+  getInner : α → β
+
+@[default_instance]
+instance : Getter (Symbol β α) β := ⟨get⟩
+
+protected abbrev Ident (α : Type) := Symbol String α
+protected abbrev Term (α : Type) := Symbol (Term α) α
 instance : Coe (Symbol.Term α) (Term α) := ⟨get⟩
-protected abbrev Val (α : Type) [Term.ToVal α] :=
-  Symbol α (getValType α)
+protected abbrev Val (α : Type) [Term.ToVal α] := Symbol (getValType α) α
+
+protected abbrev Repr :=
+  (α : Type) → [Term.ToVal α] → Type
+
+namespace Repr
+protected abbrev Ident : Symbol.Repr := fun _ _ => String
+protected abbrev Term : Symbol.Repr := (Term ·)
+protected abbrev Val : Symbol.Repr := getValType
+end Repr
 
 end Symbol
 
 
 
-protected abbrev Symbol.Repr :=
-  (α : Type) → [Term.ToVal α] → Type
-
-namespace Symbol.Repr
-protected abbrev default : Symbol.Repr := fun _ => Unit
-instance : Inhabited Symbol.Repr := ⟨Symbol.Repr.default⟩
-
-protected abbrev Term : Symbol.Repr := fun α => Term α
-protected abbrev Val : Symbol.Repr := getValType
-end Symbol.Repr
-
-
-
-abbrev ESymbol (R : Symbol.Repr := default) :=
-  (α : Type) ×' (inst : Term.ToVal α) × Symbol α (@R α inst)
+abbrev ESymbol (R : Symbol.Repr := .Ident) :=
+  (α : Type) ×' (inst : Term.ToVal α) × Symbol (@R α inst) α
 
 namespace ESymbol
+
 protected abbrev Ident := ESymbol
 protected abbrev Term := ESymbol Symbol.Repr.Term
 protected abbrev Val := ESymbol Symbol.Repr.Val
@@ -60,22 +61,22 @@ end ESymbol
 
 namespace Symbol
 
-def erase [Val : Term.ToVal α] {R : Symbol.Repr} (sym : Symbol α (R α)) : ESymbol R :=
+def erase [Val : Term.ToVal α] {R : Symbol.Repr} (sym : Symbol (R α) α) : ESymbol R :=
   ⟨α, Val, sym⟩
 
-section variable [Monad m] (sym : Symbol α β)
+section variable [Monad m] (sym : Symbol β α)
 
-def mapM (f : β → m γ) : m (Symbol α γ) := do
+def mapM (f : β → m γ) : m (Symbol γ α) := do
   let val ← f sym.get
   return {sym with get := val}
 
-def map (f : β → γ) : Symbol α γ := sym.mapM (m := Id) f
+def map (f : β → γ) : Symbol γ α := sym.mapM (m := Id) f
 
 end
 
 
 
-def mkIdent (name : String) : Symbol α := mk name ()
+def mkIdent (name : String) : Symbol.Ident α := mk name name
 
 def mkTerm : String → Term α → Symbol.Term α := mk
 
@@ -101,7 +102,7 @@ end ident
 section term
 
 def assert (sTerm : Symbol.Term Bool) : Smt Unit :=
-  Smt.assert sTerm
+  Smt.assert sTerm.get
 
 /-- Retrieves the value of some symbol in a *sat* context. -/
 def getValUsing (Val : Term.ToVal α) (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Val α) := do
