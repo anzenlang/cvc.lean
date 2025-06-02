@@ -15,24 +15,23 @@ namespace Symbols
 
 
 
-structure Unroller (State : Symbols Struct) where
+structure Unroller (State : Symbols Struct) (depth : Nat) where
 private mk' ::
   idents : State.Idents
-  init : {k : Nat} → State.PredAt k
-  step : {k : Nat} → State.RelAt k
-  depth : Nat
+  init : State.StatePred
+  step : State.StateRel
   trace : State.TermTrace (depth + 1)
 
 namespace Unroller
 
 def mk [State : Symbols Struct] (idents: State.Idents)
-  (init : {k : Nat} → State.PredAt k) (step : {k : Nat} → State.RelAt k)
-: Smt State.Unroller :=
-  return ⟨idents, init, step, 0, Trace.mkOne (← idents.declareAt 0)⟩
+  (init : State.StatePred) (step : State.StateRel)
+: Smt (State.Unroller 0) :=
+  return ⟨idents, init, step, Trace.mkOne (← idents.declareAt 0)⟩
 
-section var_sys variable (sys : Unroller State)
+section var_sys variable (sys : Unroller State k)
 
-abbrev length := sys.depth + 1
+abbrev length := let _ := sys ; k + 1
 
 abbrev CexTrace := State.ValTrace sys.length
 
@@ -40,7 +39,7 @@ abbrev Idx := Fin sys.length
 
 abbrev idx0 : sys.Idx := ⟨0, by simp only [length, Nat.zero_lt_succ]⟩
 
-abbrev idxLast : sys.Idx := ⟨sys.depth, by simp only [length, Nat.lt_add_one]⟩
+abbrev idxLast : sys.Idx := ⟨k, by simp only [length, Nat.lt_add_one]⟩
 
 def getTermsAt (i : sys.Idx) : State.TermsAt i := sys.trace.get i
 
@@ -48,12 +47,12 @@ def getTerms0 := sys.getTermsAt sys.idx0
 
 def getTermsLast := sys.getTermsAt sys.idxLast
 
-def unroll : Smt (State.TermsAt sys.length × State.Unroller) := do
+def unroll : Smt (State.TermsAt sys.length × State.Unroller k.succ) := do
   let terms' := sys.getTermsLast
   let terms ← sys.idents.declareAt sys.length
   sys.step terms' terms >>= Smt.assert
   let trace := sys.trace.cons terms
-  return ⟨terms, {sys with trace, depth := sys.depth.succ}⟩
+  return ⟨terms, {sys with trace}⟩
 
 def checkSatAnd [Monad m] (init : Bool)
   (assuming : Array Formula := #[])

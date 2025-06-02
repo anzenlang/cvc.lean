@@ -132,12 +132,18 @@ abbrev FunctionAt := @FunAt
 
 abbrev PredAt (k : Nat) := Syms.FunAt k Bool
 abbrev PredicateAt := @PredAt
+abbrev StatePred := {k : Nat} → Syms.PredAt k
+abbrev StatePredicate := Syms.StatePred
 
 abbrev RelAt (k : Nat) := Syms.TermsAt k → Syms.PredAt k.succ
 abbrev RelationAt := @RelAt
+abbrev StateRel := {k : Nat} → Syms.RelAt k
+abbrev StateRelation := Syms.StateRel
 
 abbrev InvRelAt (k : Nat) := Syms.TermsAt k.succ → Syms.PredAt k
 abbrev InvRelationAt := @InvRelAt
+abbrev StateInvRel := {k : Nat} → Syms.InvRelAt k
+abbrev StateInvRelation := Syms.StateInvRel
 
 namespace IdentsAt
 
