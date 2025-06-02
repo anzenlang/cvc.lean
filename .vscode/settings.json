@@ -1,5 +1,6 @@
 {
   "cSpell.words": [
+    "Actlit",
     "Adrien",
     "bitvec",
     "BITVECTOR",
@@ -22,9 +23,10 @@
     "substs",
     "succ",
     "suff",
-    "Unsat",
+    "Syms",
     "uncurries",
-    "Syms"
+    "Unroller",
+    "Unsat"
   ],
   "cSpell.customDictionaries": {
     "custom-dictionary-workspace": {
