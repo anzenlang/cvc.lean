@@ -136,7 +136,7 @@ state structure MySystems where
 /-- info: "myCounter" -/
 #guard_msgs in #eval MySystems.idents.myCounter!
 
-/-- info: MySystems.unroll MySystems.idents 5 : MySystems.IdentsAt 5 -/
+/-- info: unroll MySystems.idents 5 : IdentsAt 5 -/
 #guard_msgs in #check MySystems.idents.unroll 5
 /-- info: myReset_unrolled_at_5 -/
 #guard_msgs in #eval MySystems.idents.unroll 5 |>.myReset

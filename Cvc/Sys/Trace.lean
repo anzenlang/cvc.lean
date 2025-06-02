@@ -19,7 +19,16 @@ inductive Trace (State : Symbols Struct) (Repr : Nat → Type) : (length : Nat) 
 | empty : Trace State Repr 0
 | cons (data : Repr n) (tail : Trace State Repr n) : Trace State Repr n.succ
 
+abbrev TermTrace (State : Symbols Struct) (length : Nat) :=
+  State.Trace State.TermsAt length
+
+abbrev ValTrace (State : Symbols Struct) (length : Nat) :=
+  State.Trace State.ValsAt length
+
 namespace Trace
+
+def mkOne [State : Symbols Struct] {Repr : Nat → Type} : (data : Repr 0) → State.Trace Repr 1 :=
+  empty.cons
 
 def get' : {k : Nat} → (idx : Nat) → (in_range : idx < k) → Trace S R k → R idx
   | 0, _, _, _ => by contradiction

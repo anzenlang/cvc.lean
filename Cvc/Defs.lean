@@ -692,6 +692,7 @@ export Term (getValType)
 structure Smt.State where
   solver : cvc5.Solver
   builder : Term.Build.State
+  private nextActlitIdx' : Nat
 
 abbrev SmtT (m : Type → Type) :=
   ExceptT Error (StateT Smt.State m)
@@ -719,6 +720,11 @@ instance [Monad m] : MonadLift Term.Build (SmtT m) where
       let (res, builder) := build state.builder
       (res, {state with builder})
     res
+
+def nextActlitIdx : Smt Nat :=
+  modifyGetThe Smt.State fun state =>
+    let idx := state.nextActlitIdx'
+    (idx, {state with nextActlitIdx' := idx.succ})
 
 private def lift5 [Monad m] (code : cvc5.SolverT m α) : SmtT m α := do
   let state ← getThe Smt.State
@@ -800,6 +806,9 @@ abbrev SatT (m : Type → Type u) :=
 
 abbrev Sat := SatT (m := Id)
 
+def Sat.unexpected : SatT m α :=
+  Error.throwUser "unexpected sat result"
+
 /-- Unsat-mode monad, allows running commands such as get-proof.
 
 `Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
@@ -809,6 +818,9 @@ abbrev UnsatT (m : Type → Type u) :=
   ExceptT Error (StateT Unsat.State m)
 
 abbrev Unsat := UnsatT (m := Id)
+
+def Unsat.unexpected : UnsatT m α :=
+  Error.throwUser "unexpected unsat result"
 
 /-- Unknown-mode monad, allows running unknown-mode-specific commands.
 
@@ -820,14 +832,17 @@ abbrev UnknownT (m : Type → Type u) :=
 
 abbrev Unknown := UnknownT (m := Id)
 
+def Unknown.unexpected : UnknownT m α :=
+  Error.throwUser "unexpected unknown result"
+
 
 
 /-- Performs a check-sat and runs sat/unsat/unknown-specific code. -/
 def checkSatAnd
   (assuming : Option (Array Formula) := none)
-  (ifSat : Smt.SatT m α := Error.throwUser "unexpected sat result")
-  (ifUnsat : Smt.UnsatT m α := Error.throwUser "unexpected unsat result")
-  (ifUnknown : Smt.UnknownT m α := Error.throwUser "unexpected unknown result")
+  (ifSat : Smt.SatT m α := Sat.unexpected)
+  (ifUnsat : Smt.UnsatT m α := Unsat.unexpected)
+  (ifUnknown : Smt.UnknownT m α := Unknown.unexpected)
 : SmtT m α := do
   if let some isSat ← checkSat? assuming then
     let state ← getThe Smt.State
@@ -971,6 +986,10 @@ namespace ToVal
 export Term (getVal getValUsing getVals getValsUsing)
 end ToVal
 
+/-- Returns the symbol of a symbol-term. -/
+def getSymbol? (term : Term α) : Option String :=
+  term.toUnsafe.getSymbol?
+
 end Term
 
 
@@ -993,7 +1012,7 @@ def run' [MonadLiftT BaseIO m]
     let tm ← cvc5.TermManager.new
     let builder := Term.Build.State.ofManager tm
     let res ← cvc5.Solver.run builder.manager fun solver => do
-      let (res, state) ← smt ⟨solver, builder⟩
+      let (res, state) ← smt ⟨solver, builder, 0⟩
       return (.ok (res, state), solver)
     match res with
     | .ok (.ok res, state) => return .ok (res, state)
@@ -1019,7 +1038,7 @@ def runWithBuilder'
   (smt : SmtT m α) (builder : Term.Build.State)
 : m (Except Error (α × Smt.State)) := do
   let res ← cvc5.Solver.run builder.manager fun solver => do
-    let (res, state) ← smt.runWith' ⟨solver, builder⟩
+    let (res, state) ← smt.runWith' ⟨solver, builder, 0⟩
     return (.ok (res.map (·, state)), state.solver)
   match res with
   | .ok (.ok (res, state)) => return .ok (res, state)

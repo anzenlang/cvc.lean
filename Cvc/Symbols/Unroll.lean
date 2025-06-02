@@ -97,6 +97,14 @@ end At
 
 
 
+namespace IdentsAt
+export At (declare unroll next)
+end IdentsAt
+
+namespace TermsAt
+export At (assert getValUsing getVal)
+end TermsAt
+
 /-- Declares a symbol at some depth, yielding the corresponding unrolled term. -/
 def declareAt [Srt.Bij α] (sym : Symbol.Ident α) (k : Nat) : Smt (Symbol.TermAt k α) :=
   sym.unroll k |>.declare
@@ -152,9 +160,16 @@ def next (syms : Syms.IdentsAt k) : Syms.IdentsAt k.succ :=
 def declare (syms : Syms.IdentsAt k) : Smt (Syms.TermsAt k) :=
   mapM syms Symbol.At.declare
 
+def declareAt (syms : Syms.Idents) (k : Nat) : Smt (Syms.TermsAt k) :=
+  unroll syms k |>.declare
+
 end IdentsAt
 
-export IdentsAt (unroll next)
+export IdentsAt (unroll next declareAt)
+
+namespace Idents
+export IdentsAt (unroll next declareAt)
+end Idents
 
 namespace TermsAt
 
