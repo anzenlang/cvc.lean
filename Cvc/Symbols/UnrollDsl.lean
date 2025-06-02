@@ -21,24 +21,24 @@ open Lean.Elab.Command (elabCommand)
 
 open scoped Cvc.Symbols.Dsl
 
-def systemTk := leading_parser
-  (symbol "system ")
+def stateTk := leading_parser
+  (nonReservedSymbol "state ")
 
-def systemStructure := leading_parser
+def stateStructure := leading_parser
   declId >>
   ppIndent (many (ppSpace >> Term.bracketedBinder) >> optional «extends» >> Term.optType) >>
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
-scoped syntax (name := systemStructureSyntax)
-  declModifiers systemTk systemStructure
+scoped syntax (name := stateStructureSyntax)
+  declModifiers stateTk structureTk stateStructure
     -- Lean.Parser.Command.«structure»
 : command
 
-@[command_elab systemStructureSyntax]
+@[command_elab stateStructureSyntax]
 def elabSystemStructureSyntax : Lean.Elab.Command.CommandElab
 | `(
   $topMods:declModifiers
-  system $topDeclId:declId where $[ $ctor:structCtor ]?
+  state structure $topDeclId:declId where $[ $ctor:structCtor ]?
     $[ $fieldMods:declModifiers $fieldIdents:ident : $fieldTypes ]*
 ) => do
   let `( $identTop:ident ) := topDeclId.raw[0]
@@ -74,7 +74,7 @@ def elabSystemStructureSyntax : Lean.Elab.Command.CommandElab
 
   let stx ← `(
     $topMods:declModifiers
-    symbols $topDeclId:declId where $[ $ctor:structCtor ]?
+    symbol structure $topDeclId:declId where $[ $ctor:structCtor ]?
       $[ $fieldMods:declModifiers $fieldIdents:ident : $fieldTypes ]*
   )
   elabCommand stx
@@ -117,7 +117,7 @@ More commented testing stuff.
 namespace Test
 
 /-- Testing... -/
-system MySystems where
+state structure MySystems where
   myCounter : Int
   myReset : Bool
 

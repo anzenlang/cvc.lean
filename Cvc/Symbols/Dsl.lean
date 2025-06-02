@@ -58,30 +58,28 @@ end Testing.MySymbols
 
 
 
-class abbrev C := Ord Int
-
 open Lean.Parser
 open Command
 open Lean.Elab.Command (elabCommand)
 
 def symbolsTk := leading_parser
-  (symbol "symbols ")
+  (nonReservedSymbol "symbol ")
 
-def stateStructure := leading_parser
+def symbolStructure := leading_parser
   declId >>
   ppIndent (many (ppSpace >> Term.bracketedBinder) >> optional «extends» >> Term.optType) >>
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
-scoped syntax (name := stateStructureSyntax)
-  declModifiers symbolsTk stateStructure
+scoped syntax (name := symbolStructureSyntax)
+  declModifiers symbolsTk structureTk symbolStructure
     -- Lean.Parser.Command.«structure»
 : command
 
-@[command_elab stateStructureSyntax]
+@[command_elab symbolStructureSyntax]
 def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 | `(
   $topMods:declModifiers
-  symbols $topDeclId:declId where $[ $ctor:structCtor ]?
+  symbol structure $topDeclId:declId where $[ $ctor:structCtor ]?
     $[ $fieldMods:declModifiers $fieldIdents:ident : $fieldTypes ]*
 ) => do
   let `( $identTop:ident ) := topDeclId.raw[0]
@@ -194,7 +192,7 @@ More commented testing stuff.
 namespace Test
 
 /-- Testing... -/
-symbols MySymbols where
+symbol structure MySymbols where
   myCounter : Int
   myReset : Bool
 
