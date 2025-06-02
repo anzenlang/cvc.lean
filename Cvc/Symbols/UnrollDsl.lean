@@ -22,7 +22,7 @@ open Lean.Elab.Command (elabCommand)
 open scoped Cvc.Symbols.Dsl
 
 def stateTk := leading_parser
-  (nonReservedSymbol "state ")
+  (nonReservedSymbol "state " true)
 
 def stateStructure := leading_parser
   declId >>

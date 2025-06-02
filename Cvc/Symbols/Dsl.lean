@@ -24,37 +24,37 @@ Illustration of what elaboration should generate on a concrete example, used for
 generation patterns.
 -/
 
-structure Testing.MySymbols (F : Symbol.Repr) where
-  s1 : F Int
-  s2 : F Bool
+-- structure Testing.MySymbols (F : Symbol.Repr) where
+--   s1 : F Int
+--   s2 : F Bool
 
-namespace Testing.MySymbols
+-- namespace Testing.MySymbols
 
-@[default_instance]
-instance inst : Symbols (fun F => MySymbols F) where
-  mapM self f := do
-    let s1 ← f self.s1
-    let s2 ← f self.s2
-    return mk s1 s2
-  forIn self acc f := do
-    let mut acc := acc
-    match ← f self.s1 acc with
-    | .done res => return res
-    | .yield acc' => acc := acc'
-    match ← f self.s2 acc with
-    | .done res => return res
-    | .yield acc' => acc := acc'
-    return acc
+-- @[default_instance]
+-- instance inst : Symbols (fun F => MySymbols F) where
+--   mapM self f := do
+--     let s1 ← f self.s1
+--     let s2 ← f self.s2
+--     return mk s1 s2
+--   forIn self acc f := do
+--     let mut acc := acc
+--     match ← f self.s1 acc with
+--     | .done res => return res
+--     | .yield acc' => acc := acc'
+--     match ← f self.s2 acc with
+--     | .done res => return res
+--     | .yield acc' => acc := acc'
+--     return acc
 
-  idents' := mk (Symbol.mkIdent "s1") (Symbol.mkIdent "s2")
+--   idents' := mk (Symbol.mkIdent "s1") (Symbol.mkIdent "s2")
 
-abbrev Idents := inst.Idents
--- ...
+-- abbrev Idents := inst.Idents
+-- -- ...
 
-def s1! (self : MySymbols (Symbol R ·)) := self.s1
-def s2! (self : MySymbols (Symbol R ·)) := self.s2
+-- def s1! (self : MySymbols (Symbol R ·)) := self.s1
+-- def s2! (self : MySymbols (Symbol R ·)) := self.s2
 
-end Testing.MySymbols
+-- end Testing.MySymbols
 
 
 
@@ -62,8 +62,8 @@ open Lean.Parser
 open Command
 open Lean.Elab.Command (elabCommand)
 
-def symbolsTk := leading_parser
-  (nonReservedSymbol "symbol ")
+def symbolTk := leading_parser
+  (nonReservedSymbol "symbol " true)
 
 def symbolStructure := leading_parser
   declId >>
@@ -71,7 +71,7 @@ def symbolStructure := leading_parser
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
 scoped syntax (name := symbolStructureSyntax)
-  declModifiers symbolsTk structureTk symbolStructure
+  declModifiers symbolTk structureTk symbolStructure
     -- Lean.Parser.Command.«structure»
 : command
 
