@@ -5,6 +5,5 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Symbols.Basic
-import Cvc.Symbols.Defs
-import Cvc.Symbols.Dsl
+import Cvc.State.Defs
+import Cvc.State.Dsl
