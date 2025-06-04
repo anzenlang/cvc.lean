@@ -117,7 +117,7 @@ end Symbols
 
 structure Sys (State : Symbols Struct) (k : Nat) extends toUnroller : State.Unroller k where
 private mk' ::
-  candidates : State.Candidates
+  candidates : State.Candidates := #[]
 
 namespace Symbols
 export Cvc (Sys)
@@ -125,11 +125,11 @@ end Symbols
 
 namespace Sys variable [State : Symbols S]
 
-def mk (symbols : State.Idents)
+def mk
   (init : State.StatePred) (step : State.StateRel)
   (namedCandidates : Array (String × State.StatePred))
 : Smt (State.Sys 0) := do
-  let unroller ← Symbols.Unroller.mk symbols init step
+  let unroller ← Symbols.Unroller.mk init step
   let state0 := unroller.getTermsLast
   let mut candidates := Array.mkEmpty namedCandidates.size
   for (name, pred) in namedCandidates do

@@ -27,14 +27,16 @@ protected structure At (k : Nat) (β α : Type) : Type where
 /-- Private constructor so that users don't mess up. -/
 private mk ::
   /-- Private conversion to syms, not reason to use this directly currently. -/
-  private getSymbol : Symbol β α
+  getSymbol : Symbol β α
 
 /-- Type alias for a `Symbol.Ident` at some depth. -/
 abbrev IdentAt k α := Symbol.At k String α
 /-- Type alias for a `Symbol.Term` at some depth. -/
-abbrev TermAt k α := Symbol.At k (Term α) α
+abbrev TermAt (k : semiOutParam Nat) α := Symbol.At k (Term α) α
 /-- Type alias for a `Symbol.Val` at some depth. -/
 abbrev ValAt k α [Val : Term.ToVal α] := Symbol.At k Val α
+
+instance : CoeDep (TermAt k α) term (Term α) := ⟨term.getSymbol.get⟩
 
 
 

@@ -21,16 +21,19 @@ open Lean.Elab.Command (elabCommand)
 
 open scoped Cvc.Symbols.Dsl
 
-def stateTk := leading_parser (nonReservedSymbol "state " true)
+def stateTk := leading_parser (nonReservedSymbol "state ")
 
 def stateStructure := leading_parser
   ppIndent (many (ppSpace >> Term.bracketedBinder) >> optional «extends» >> Term.optType) >>
   optional ((symbol " := " <|> " where ") >> optional structCtor >> structFields)
 
+-- def stateStructureParser := leading_parser
+--   declModifiersF >> (nonReservedSymbol "state ") >> structureTk >> declId >> stateStructure
+
 scoped syntax (name := stateStructureSyntax)
-  declModifiers stateTk structureTk declId stateStructure
-    -- Lean.Parser.Command.«structure»
+  declModifiersF stateTk structureTk declId stateStructure
 : command
+  -- stateStructureParser : command
 
 namespace Idents
 def id_IdentsAt := Lean.mkIdent `IdentsAt
@@ -98,34 +101,32 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 
 
 
-/-
-More commented testing stuff.
--/
+/-! ## Testing -/
 namespace Test
 
 /-- Testing... -/
-state structure MySystems where
+state structure MySystem where
   myCounter : Int
   myReset : Bool
 
-/-- info: Cvc.State.Dsl.Test.MySystems.Idents : Type -/
-#guard_msgs in #check MySystems.Idents
+/-- info: Cvc.State.Dsl.Test.MySystem.Idents : Type -/
+#guard_msgs in #check MySystem.Idents
 
-/-- info: Cvc.State.Dsl.Test.MySystems.idents : MySystems.Idents -/
-#guard_msgs in #check MySystems.idents
+/-- info: Cvc.State.Dsl.Test.MySystem.idents : MySystem.Idents -/
+#guard_msgs in #check MySystem.idents
 
-/-- info: MySystems.idents.myCounter : Symbol.Ident Int -/
-#guard_msgs in #check MySystems.idents.myCounter
+/-- info: MySystem.idents.myCounter : Symbol.Ident Int -/
+#guard_msgs in #check MySystem.idents.myCounter
 /-- info: myCounter -/
-#guard_msgs in #eval MySystems.idents.myCounter
-/-- info: MySystems.myCounter! MySystems.idents : String -/
-#guard_msgs in #check MySystems.idents.myCounter!
+#guard_msgs in #eval MySystem.idents.myCounter
+/-- info: MySystem.myCounter! MySystem.idents : String -/
+#guard_msgs in #check MySystem.idents.myCounter!
 /-- info: "myCounter" -/
-#guard_msgs in #eval MySystems.idents.myCounter!
+#guard_msgs in #eval MySystem.idents.myCounter!
 
-/-- info: Symbols.unroll MySystems.idents 5 : Symbols.IdentsAt 5 -/
-#guard_msgs in #check MySystems.idents.unroll 5
+/-- info: Symbols.unroll MySystem.idents 5 : Symbols.IdentsAt 5 -/
+#guard_msgs in #check MySystem.idents.unroll 5
 /-- info: myReset_unrolled_at_5 -/
-#guard_msgs in #eval MySystems.idents.unroll 5 |>.myReset
+#guard_msgs in #eval MySystem.idents.unroll 5 |>.myReset
 /-- info: "myReset_unrolled_at_5" -/
-#guard_msgs in #eval MySystems.idents.unroll 5 |>.myReset!
+#guard_msgs in #eval MySystem.idents.unroll 5 |>.myReset!

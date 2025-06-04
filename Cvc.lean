@@ -10,7 +10,7 @@ import Cvc.Logic
 import Cvc.Option
 import Cvc.Srt
 import Cvc.Defs
-import Cvc.Dsl
+import Cvc.TermDsl
 import Cvc.Actlit
 import Cvc.Symbols
 import Cvc.Sys

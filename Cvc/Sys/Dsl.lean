@@ -5,6 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
+import Cvc.TermDsl
 import Cvc.State.Dsl
 import Cvc.Sys.Defs
 
@@ -20,19 +21,21 @@ open Term (whereDecls)
 open Lean.Elab.Command (elabCommand)
 
 open scoped Cvc.State.Dsl
+open scoped Cvc.Term.Dsl
 
 
 /- Drafting the syntax...
 
 /-- doc -/
 system MySys
-with -- `with`-clause optional
+-- `for`-clause **or** `with`-clause
+for MyState
+with
   /-- doc -/
   state structure MyState where
     s1 : Int
     s2 : Bool
 where
-  State := MyState -- optional if `with`-clause present
   init state := smt! state.s1 = 0
   step prev curr := smt!
     curr.s1 = if curr.s2 then prev.s1 + 1 else prev.s1
@@ -42,42 +45,131 @@ where
 -/
 
 def systemTk := leading_parser (nonReservedSymbol "system " true)
-def StateTk := leading_parser (nonReservedSymbol "State " true)
-def initTk := leading_parser (nonReservedSymbol "init " true)
-def stepTk := leading_parser (nonReservedSymbol "step " true)
-def candidatesTk := leading_parser (nonReservedSymbol "candidates " true)
 
 open State.Dsl (stateStructureSyntax stateStructure)
 
 namespace Idents
+def id_State := Lean.mkIdent `State
+def id_mk := Lean.mkIdent `mk
+def id_init := Lean.mkIdent `init
+def id_step := Lean.mkIdent `step
+def id_candidates := Lean.mkIdent `namedCandidates
+
 def idRef_Sys := Lean.mkIdent ``Cvc.Sys
+def idRef_Sys_mk := Lean.mkIdent ``Cvc.Sys.mk
+def idRef_Smt := Lean.mkIdent ``Cvc.Smt
 end Idents
 
-scoped syntax (name := systemDefSyntax)
-  declModifiers systemTk ident
-  ( (" with " ppIndent( stateStructureSyntax )) <|> (" for " term) )
-  whereDecls
-  -- " where " structFields
+scoped syntax (name := systemForDefSyntax)
+  declModifiers systemTk structureTk ident group(" for " term) ppLine whereDecls
 : command
 
+open Symbols.Dsl.Idents in
 open Idents in
-@[command_elab systemDefSyntax]
-def elabSystemDefSyntax : Lean.Elab.Command.CommandElab
+@[command_elab systemForDefSyntax]
+def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
 | `(
   $mods:declModifiers
-  system $System:ident for $State:term
-  where $tail
-) => do
-  sorry
-| `(
-  $mods:declModifiers system $System:ident
-  with $stateMods:declModifiers state structure $State:ident $stateStruct:stateStructure
+  system structure $SystemIdent:ident for $StateTerm:term
   $tail:whereDecls
 ) => do
-  let stx ← `($stateMods:declModifiers state structure $State $stateStruct)
+  let System_State := SystemIdent.getId.append id_State.getId |> Lean.mkIdent
+  -- set `$System_State` to be `Symbols` instance, fail if none found
+  let stx ← `(
+    def $System_State : $idRef_Symbols $StateTerm := by
+      exact inferInstance <;> fail "could not find `{$idRef_Symbols}` instance for state type"
+  )
   elabCommand stx
   let stx ← `(
-    $mods:declModifiers system $System for $State $tail:whereDecls
+    $mods:declModifiers
+    abbrev $SystemIdent : (k : Nat) → Type := $idRef_Sys $System_State
+
+    namespace $SystemIdent
+    /-- Constructor. -/
+    def $id_mk : $idRef_Smt ($SystemIdent 0) :=
+      $idRef_Sys_mk $id_init $id_step $id_candidates
+    $tail:whereDecls
+    end $SystemIdent
   )
   elabCommand stx
 | _ => Lean.Elab.throwUnsupportedSyntax
+
+scoped syntax (name := systemWithDefSyntax)
+  declModifiers systemTk structureTk ident
+  group(" with " ppLine ppIndent(stateStructureSyntax))
+  ppLine whereDecls
+: command
+
+open Symbols.Dsl.Idents in
+open Idents in
+@[command_elab systemWithDefSyntax]
+def elabSystemWithDefSyntax : Lean.Elab.Command.CommandElab
+| `(
+  $mods:declModifiers system structure $System:ident
+  with $stateMods:declModifiers state structure $StateIdent:ident $stateStruct:stateStructure
+  $tail:whereDecls
+) => do
+  let stx ← `($stateMods:declModifiers state structure $StateIdent $stateStruct)
+  elabCommand stx
+  let stx ← `(
+    $mods:declModifiers system structure $System for $StateIdent $tail:whereDecls
+  )
+  elabCommand stx
+| _ => Lean.Elab.throwUnsupportedSyntax
+
+
+
+/-! ## Testing -/
+namespace Test
+
+namespace For
+
+/-- State structure. -/
+state structure MyState where
+  bVar : Bool
+  intVar : Int
+
+/-- `MyState`- System. -/
+system structure MySys for MyState where
+  init {k} (state : MyState.TermsAt k) := smt! 0 ≤ state.intVar
+  step {k} (prev : MyState.TermsAt k) (curr : MyState.TermsAt k.succ) := smt!
+    (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
+    ∧ curr.bVar = ¬ prev.bVar
+  namedCandidates := #[]
+
+/-- info: Cvc.Sys.Dsl.Test.For.MySys.State : Symbols MyState -/
+#guard_msgs in #check MySys.State
+
+/-- info: Cvc.Sys.Dsl.Test.For.MySys : Nat → Type -/
+#guard_msgs in #check MySys
+
+end For
+
+
+
+namespace With
+
+/-- `MyState`-system. -/
+system structure MySys
+with
+  /-- State structure. -/
+  state structure MyState where
+    bVar : Bool
+    intVar : Int
+where
+  init := fun {k} state => smt! 0 ≤ state.intVar
+  step := fun {k} prev curr => smt!
+    (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
+    ∧ curr.bVar = ¬ prev.bVar
+  namedCandidates := #[]
+
+/-- info: Cvc.Sys.Dsl.Test.With.MyState (R : Symbol.Repr) : Type -/
+#guard_msgs in #check MyState
+
+/-- info: Cvc.Sys.Dsl.Test.With.MySys.State : Symbols MyState -/
+#guard_msgs in #check MySys.State
+
+/-- info: Cvc.Sys.Dsl.Test.With.MySys : Nat → Type -/
+#guard_msgs in #check MySys
+
+end With
