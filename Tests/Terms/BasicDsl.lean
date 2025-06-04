@@ -76,8 +76,8 @@ or_2 ↦ (or (= 5 10) (= 7 5))
   let equal_7_5_10 ← smt! =[seven, five, ten]
   let equal_5_10 ← smt! five = ten
   let seven_equal_five ← smt! seven = five
-  let xor_3 ← smt! ∨![equal_7_5_10, equal_5_10, seven_equal_five]
-  let xor_2 ← smt! equal_5_10 ∨! seven_equal_five
+  let xor_3 ← smt! ⊻[equal_7_5_10, equal_5_10, seven_equal_five]
+  let xor_2 ← smt! equal_5_10 ⊻ seven_equal_five
   show[xor_3, xor_2]
 /-- info: boo ↦ false, not_boo ↦ (not false), seven ↦ 7, five ↦ 5, ten ↦ 10
 
