@@ -78,41 +78,45 @@ def elabTests : CommandElab
     $[ with $pref?:doSeqIndent ]?
     $[ [ $testId:ident ] $code:doSeqIndent $[ $outputComment:docComment ]? ]*
 ) => for (testId, code, outputComment) in testId.zip <| code.zip outputComment do
-  let codeElms ←
-    match code with
-    | `(Lean.Parser.Term.doSeqIndent| $[$codeItems:doSeqItem]*) =>
-      if let some pref := pref? then
-        match pref with
-        | `(Lean.Parser.Term.doSeqIndent| $[$prefItems:doSeqItem]*) =>
-          pure <| prefItems ++ codeItems
-        | _ => throwUnsupportedSyntax
-      else pure codeItems
-    | _ => throwUnsupportedSyntax
-  let guardedEval ← `(
-    $[ $outputComment:docComment ]?
-    #guard_msgs in Term.eval! do $[ $codeElms ]*
-  )
-  Lean.Elab.Command.elabCommand guardedEval
+  try
+    let codeElms ←
+      match code with
+      | `(Lean.Parser.Term.doSeqIndent| $[$codeItems:doSeqItem]*) =>
+        if let some pref := pref? then
+          match pref with
+          | `(Lean.Parser.Term.doSeqIndent| $[$prefItems:doSeqItem]*) =>
+            pure <| prefItems ++ codeItems
+          | _ => throwUnsupportedSyntax
+        else pure codeItems
+      | _ => throwUnsupportedSyntax
+    let guardedEval ← `(
+      $[ $outputComment:docComment ]?
+      #guard_msgs%$testId in Term.eval! do $[ $codeElms ]*
+    )
+    Lean.Elab.Command.elabCommand guardedEval
+  catch exc => Lean.logErrorAt testId exc.toMessageData
 | `(
   Smt.test!
     $[ with $pref?:doSeqIndent ]?
     $[ [ $testId:ident ] $code:doSeqIndent $[ $outputComment:docComment ]? ]*
 ) => for (testId, code, outputComment) in testId.zip <| code.zip outputComment do
-  let codeElms ←
-    match code with
-    | `(Lean.Parser.Term.doSeqIndent| $[$codeItems:doSeqItem]*) =>
-      if let some pref := pref? then
-        match pref with
-        | `(Lean.Parser.Term.doSeqIndent| $[$prefItems:doSeqItem]*) =>
-          pure <| prefItems ++ codeItems
-        | _ => throwUnsupportedSyntax
-      else pure codeItems
-    | _ => throwUnsupportedSyntax
-  let guardedEval ← `(
-    $[ $outputComment:docComment ]?
-    #guard_msgs in Smt.eval! do $[ $codeElms ]*
-  )
-  Lean.Elab.Command.elabCommand guardedEval
+  try
+    let codeElms ←
+      match code with
+      | `(Lean.Parser.Term.doSeqIndent| $[$codeItems:doSeqItem]*) =>
+        if let some pref := pref? then
+          match pref with
+          | `(Lean.Parser.Term.doSeqIndent| $[$prefItems:doSeqItem]*) =>
+            pure <| prefItems ++ codeItems
+          | _ => throwUnsupportedSyntax
+        else pure codeItems
+      | _ => throwUnsupportedSyntax
+    let guardedEval ← `(
+      $[ $outputComment:docComment ]?
+      #guard_msgs%$testId in Smt.eval! do $[ $codeElms ]*
+    )
+    Lean.Elab.Command.elabCommand guardedEval
+  catch exc => Lean.logErrorAt testId exc.toMessageData
 | _ => Lean.Elab.throwUnsupportedSyntax
 
 
