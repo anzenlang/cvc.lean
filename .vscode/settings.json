@@ -18,6 +18,7 @@
     "MULT",
     "nequal",
     "println",
+    "preds",
     "REGLAN",
     "ROUNDINGMODE",
     "satisfiability",
