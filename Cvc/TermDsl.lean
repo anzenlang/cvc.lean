@@ -75,11 +75,11 @@ scoped syntax
     (ppSpace funBinder)+ optType " => " ppLine group(colGt smtTerm)
 : term
 scoped syntax
-  "smtPred! "
+  ("smtPred! " <|> "smtPredicate! ")
     (ppSpace funBinder) optType " => " ppLine group(colGt smtTerm)
 : term
 scoped syntax
-  "smtRel! "
+  ("smtRel! " <|> "smtRelation! ")
     (ppSpace funBinder) (ppSpace funBinder) optType " => " ppLine group(colGt smtTerm)
 : term
 
@@ -98,19 +98,21 @@ macro_rules
 | `(smtFun! $[$binders]* => $t:smtTerm ) => `(
   fun $[$binders]* => smt! $t
 )
-| `(smtPred! $binder:funBinder $[ : $ty:term ]? => $t:smtTerm ) => `(
+| `(smtPredicate! $binder:funBinder $[ : $ty:term ]? => $t:smtTerm ) => `(
   fun $binder:funBinder $[ : $ty:term ]? => smt! $t
 )
-| `(smtPred! $binder:funBinder => $t:smtTerm ) => `(
-  fun $binder:funBinder => smt! $t
+| `(smtPred! $binder:funBinder $[ : $ty:term ]? => $t:smtTerm ) => `(
+  fun $binder:funBinder $[ : $ty:term ]? => smt! $t
 )
 | `(smtRel!
   $currBinder:funBinder $nextBinder:funBinder $[ : $ty:term ]? => $t:smtTerm
 ) => `(
   fun $currBinder:funBinder $nextBinder:funBinder $[ : $ty:term ]? => smt! $t
 )
-| `(smtRel! $currBinder:funBinder $nextBinder:funBinder => $t:smtTerm ) => `(
-  fun $currBinder:funBinder $nextBinder:funBinder => smt! $t
+| `(smtRelation!
+  $currBinder:funBinder $nextBinder:funBinder $[ : $ty:term ]? => $t:smtTerm
+) => `(
+  fun $currBinder:funBinder $nextBinder:funBinder $[ : $ty:term ]? => smt! $t
 )
 
 -- | `(smt! [| $t:term |]) => `((pure $t))

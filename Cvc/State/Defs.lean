@@ -147,6 +147,9 @@ abbrev InvRelationAt := @InvRelAt
 abbrev StateInvRel := {k : Nat} → Syms.InvRelAt k
 abbrev StateInvRelation := Syms.StateInvRel
 
+abbrev NamedPreds := RBMap String Syms.StatePred
+abbrev NamedPredicates := Syms.NamedPreds
+
 namespace IdentsAt
 
 def mapM [Monad m] (syms : Syms.IdentsAt k)

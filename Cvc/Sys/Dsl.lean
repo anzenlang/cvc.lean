@@ -55,7 +55,7 @@ def id_init := Lean.mkIdent `init
 def id_step := Lean.mkIdent `step
 def id_candidates := Lean.mkIdent `namedCandidates
 
-def idRef_Sys := Lean.mkIdent ``Cvc.Sys
+def idRef_Sys := Lean.mkIdent ``_root_.Cvc.Sys
 def idRef_Sys_mk := Lean.mkIdent ``Cvc.Sys.mk
 def idRef_Smt := Lean.mkIdent ``Cvc.Smt
 end Idents
@@ -82,11 +82,12 @@ def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
   elabCommand stx
   let stx ← `(
     $mods:declModifiers
-    abbrev $SystemIdent : (k : Nat) → Type := $idRef_Sys $System_State
+    -- abbrev $SystemIdent : (depth : Nat := 0) → Type := $idRef_Sys $System_State
+    abbrev $SystemIdent (depth : Nat := 0) : Type := $idRef_Sys $System_State depth
 
     namespace $SystemIdent
     /-- Constructor. -/
-    def $id_mk : $idRef_Smt ($SystemIdent 0) :=
+    def $id_mk : $SystemIdent 0 :=
       $idRef_Sys_mk $id_init $id_step $id_candidates
     $tail:whereDecls
     end $SystemIdent
@@ -130,18 +131,23 @@ state structure MyState where
   intVar : Int
 
 /-- `MyState`- System. -/
-system structure MySys for MyState where
-  init {k} (state : MyState.TermsAt k) := smt! 0 ≤ state.intVar
-  step {k} (prev : MyState.TermsAt k) (curr : MyState.TermsAt k.succ) := smt!
+system structure MySys for MyState
+where
+  init : MyState.StatePred := smtPred! state => 0 ≤ state.intVar
+  step : MyState.StateRel := smtRel! prev curr =>
     (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
     ∧ curr.bVar = ¬ prev.bVar
-  namedCandidates := #[]
+  namedCandidates := .empty
 
 /-- info: Cvc.Sys.Dsl.Test.For.MySys.State : Symbols MyState -/
 #guard_msgs in #check MySys.State
 
-/-- info: Cvc.Sys.Dsl.Test.For.MySys : Nat → Type -/
+/-- info: Cvc.Sys.Dsl.Test.For.MySys : optParam Nat 0 → Type -/
 #guard_msgs in #check MySys
+/-- info: MySys : Type -/
+#guard_msgs in #check MySys 0
+/-- info: MySys 5 : Type -/
+#guard_msgs in #check MySys 5
 
 end For
 
@@ -157,11 +163,11 @@ with
     bVar : Bool
     intVar : Int
 where
-  init := fun {k} state => smt! 0 ≤ state.intVar
-  step := fun {k} prev curr => smt!
+  init : MyState.StatePred := smtPred! state => 0 ≤ state.intVar
+  step : MyState.StateRel := smtRel! prev curr =>
     (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
     ∧ curr.bVar = ¬ prev.bVar
-  namedCandidates := #[]
+  namedCandidates := .empty
 
 /-- info: Cvc.Sys.Dsl.Test.With.MyState (R : Symbol.Repr) : Type -/
 #guard_msgs in #check MyState
@@ -169,7 +175,7 @@ where
 /-- info: Cvc.Sys.Dsl.Test.With.MySys.State : Symbols MyState -/
 #guard_msgs in #check MySys.State
 
-/-- info: Cvc.Sys.Dsl.Test.With.MySys : Nat → Type -/
+/-- info: Cvc.Sys.Dsl.Test.With.MySys : optParam Nat 0 → Type -/
 #guard_msgs in #check MySys
 
 end With

@@ -48,6 +48,10 @@ def id_RelAt := Lean.mkIdent `RelAt
 def id_RelationAt := Lean.mkIdent `RelationAt
 def id_InvRelAt := Lean.mkIdent `InvRelAt
 def id_InvRelationAt := Lean.mkIdent `InvRelationAt
+def id_StatePred := Lean.mkIdent `StatePred
+def id_StatePredicate := Lean.mkIdent `StatePredicate
+def id_StateRel := Lean.mkIdent `StateRel
+def id_StateRelation := Lean.mkIdent `StateRelation
 def id_unroll := Lean.mkIdent `unroll
 def id_next := Lean.mkIdent `next
 def id_declareAt := Lean.mkIdent `declareAt
@@ -94,6 +98,11 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
     abbrev $id_RelationAt (k : Nat) := $(id_inst).$id_RelationAt k
     abbrev $id_InvRelAt (k : Nat) := $(id_inst).$id_InvRelAt k
     abbrev $id_InvRelationAt (k : Nat) := $(id_inst).$id_InvRelationAt k
+
+    abbrev $id_StatePred := $(id_inst).$id_StatePred
+    abbrev $id_StatePredicate := $(id_inst).$id_StatePredicate
+    abbrev $id_StateRel := $(id_inst).$id_StateRel
+    abbrev $id_StateRelation := $(id_inst).$id_StateRelation
     end $State
   )
   elabCommand stx

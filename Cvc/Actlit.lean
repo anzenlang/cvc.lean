@@ -23,23 +23,43 @@ namespace Actlit
 
 instance : Coe Actlit Formula := ⟨getTerm⟩
 
-protected def reservedIdentPref := "__cvc_reserved_actlit__"
+protected structure Ident where
+private mk' ::
+  getIdent : String
 
-protected def mkSymbol (n : Nat) := s!"{Actlit.reservedIdentPref}{n}__"
+namespace Ident
 
-def isActlitIdent (s : String) := s.startsWith Actlit.reservedIdentPref
+protected def reservedPref := "__cvc_reserved_actlit__"
+
+protected def identOfIdx (idx : Nat) := s!"{Actlit.Ident.reservedPref}{idx}"
+
+def ofIdx (idx : Nat) : Actlit.Ident := ⟨Ident.identOfIdx idx⟩
+
+instance : Coe Actlit.Ident String := ⟨getIdent⟩
+instance : ToString Actlit.Ident := ⟨getIdent⟩
+
+def declare (ident : Actlit.Ident) : Smt Actlit :=
+  return ⟨← Smt.declare ident Bool⟩
+
+end Ident
+
+def ofIdx (idx : Nat) : Smt Actlit :=
+  Actlit.Ident.ofIdx idx |>.declare
+
+def isActlitIdent (s : String) := s.startsWith Actlit.Ident.reservedPref
 
 def isActlitTerm (term : Formula) : Bool :=
   term.getSymbol?.map isActlitIdent |>.getD false
 
-def fresh : Smt Actlit := do
-  let symbol ← Actlit.mkSymbol <$> Smt.nextActlitIdx
-  Actlit.mk' <$> Smt.declare symbol Bool
+def fresh : Smt Actlit := Smt.nextActlitIdx >>= Actlit.ofIdx
 
 section variable (a : Actlit)
 
 def activate (a : Actlit) (term : Formula) : Smt Unit := do
   Smt.assert (← a.getTerm.implies term)
+
+def equate (a : Actlit) (term : Formula) : Smt Unit := do
+  Smt.assert (← a.getTerm.equal term)
 
 def deactivate (a : Actlit) : Smt Unit := do
   Smt.assert (← a.getTerm.not)
@@ -52,7 +72,7 @@ namespace Smt
 
 def freshActlit : Smt Actlit := Actlit.fresh
 
-export Actlit (activate deactivate)
+export Actlit (activate equate deactivate)
 
 end Smt
 
@@ -62,7 +82,7 @@ namespace Term
 
 def isActlit : Formula → Bool := Actlit.isActlitTerm
 
-export Actlit (activate deactivate)
+export Actlit (activate equate deactivate)
 
 end Term
 
@@ -70,6 +90,6 @@ namespace Formula
 
 def isActlit : Formula → Bool := Actlit.isActlitTerm
 
-export Actlit (activate deactivate)
+export Actlit (activate equate deactivate)
 
 end Formula

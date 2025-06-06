@@ -15,66 +15,90 @@ namespace Symbols
 
 
 
-structure Unroller (State : Symbols Struct) (depth : Nat) where
+structure Unroller (State : Symbols Struct) (length : Nat) where
 private mk' ::
   init : State.StatePred
   step : State.StateRel
-  trace : State.TermTrace (depth + 1)
+  trace : State.TermTrace length
 
 namespace Unroller
 
 def mk [State : Symbols Struct]
   (init : State.StatePred) (step : State.StateRel)
-: Smt (State.Unroller 0) :=
-  return ⟨init, step, Trace.mkOne (← State.idents.declareAt 0)⟩
+: State.Unroller 0 :=
+  ⟨init, step, .empty⟩
 
 def idents [State : Symbols Struct] : (unroller : Unroller State k) → State.Idents :=
   fun _ => State.idents
 
-section var_sys variable (sys : Unroller State k)
+section var_sys variable (sys : Unroller State length)
 
-abbrev length := let _ := sys ; k + 1
+protected abbrev length : Nat := let _ := sys ; length
 
 abbrev CexTrace := State.ValTrace sys.length
 
-abbrev Idx := Fin sys.length
-
-abbrev idx0 : sys.Idx := ⟨0, by simp only [length, Nat.zero_lt_succ]⟩
-
-abbrev idxLast : sys.Idx := ⟨k, by simp only [length, Nat.lt_add_one]⟩
+abbrev Idx := let _ := sys ; Fin length
 
 def getTermsAt (i : sys.Idx) : State.TermsAt i := sys.trace.get i
 
-def getTerms0 := sys.getTermsAt sys.idx0
+def extractCexTrace : Smt.Sat sys.CexTrace := do
+  sys.trace.mapM fun _ terms => terms.getVals
 
-def getTermsLast := sys.getTermsAt sys.idxLast
 
-def unroll : Smt (State.TermsAt sys.length × State.Unroller k.succ) := do
-  let terms' := sys.getTermsLast
-  let terms ← State.idents.declareAt sys.length
-  sys.step terms' terms >>= Smt.assert
-  let trace := sys.trace.cons terms
-  return ⟨terms, {sys with trace}⟩
 
-def checkSatAnd [Monad m] (init : Bool)
+section var_k_succ variable {k : Nat} (sys : Unroller State k.succ)
+
+abbrev idx0: sys.Idx := ⟨0, by simp only [Nat.zero_lt_succ]⟩
+
+abbrev idxLast : sys.Idx := ⟨k, by simp only [Nat.lt_add_one]⟩
+
+abbrev getTerms0 : State.TermsAt 0 := sys.getTermsAt sys.idx0
+
+abbrev getTermsLast : State.TermsAt k := sys.getTermsAt sys.idxLast
+
+private def assertNextStep (next : State.TermsAt k.succ) : Smt Unit :=
+  sys.step sys.getTermsLast next >>= Smt.assert
+
+section variable [Monad m] (init : Bool)
   (assuming : Array Formula := #[])
   (ifSat : Smt.SatT m α := Smt.Sat.unexpected)
   (ifUnsat : Smt.UnsatT m α := Smt.Unsat.unexpected)
   (ifUnknown : Smt.UnknownT m α := Smt.Unknown.unexpected)
-: SmtT m α := do
+
+def checkSatAnd : SmtT m α := do
   let mut assuming := assuming
   if init then
     let init ← sys.init sys.getTermsLast
     assuming := assuming.push init
   Smt.checkSatAnd assuming ifSat ifUnsat ifUnknown
 
-def extractCexTrace : Smt.Sat sys.CexTrace := do
-  sys.trace.mapM fun _ terms => terms.getVals
+def checkSatBaseAnd : SmtT m α := sys.checkSatAnd true assuming ifSat ifUnsat ifUnknown
+def checkSatStepAnd : SmtT m α := sys.checkSatAnd false assuming ifSat ifUnsat ifUnknown
+
+end
 
 def findCexTrace? (init : Bool) (assuming : Array Formula := #[]) : Smt (Option sys.CexTrace) :=
   sys.checkSatAnd init assuming
     (ifSat := some <$> sys.extractCexTrace)
     (ifUnsat := pure none)
+
+end var_k_succ
+
+
+
+private def declareNext : Smt (State.TermsAt length) :=
+  let _ := sys ; State.idents.declareAt length
+
+def unroll : Smt (State.TermsAt length × State.Unroller length.succ) := do
+  let next ← sys.declareNext
+  let trace := sys.trace.cons next
+  let res := Prod.mk next {sys with trace}
+  by cases length with
+  | succ _ => exact do sys.assertNextStep next ; return res
+  | zero => exact return res
+
+def unroll' : Smt (State.Unroller length.succ) :=
+  Prod.snd <$> sys.unroll
 
 end var_sys
 

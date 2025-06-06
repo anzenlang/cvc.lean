@@ -99,7 +99,7 @@ def distinctSize : Nat := bag.toRBMap.size
 
 /-- Number of elements in the map, see also `distinctSize`. -/
 def size : Nat :=
-  0 |> bag.toRBMap.fold fun sum _ n => sum + n
+  0 |> bag.toRBMap.foldl fun sum _ n => sum + n
 
 @[inherit_doc size]
 def card := @size
@@ -116,13 +116,15 @@ def contains : Bool :=
 
 /-- Removes an element from the bag. -/
 def erase : Cvc.Bag Elm :=
-  { bag with toRBMap := Lean.RBMap.erase bag.toRBMap elm }
+  let _ := bag.toOrd
+  { bag with toRBMap := bag.toRBMap.erase elm }
 
 /-- Forces the multiplicity of an element. -/
 def setCard : (count : Nat) → Cvc.Bag Elm
 | 0 => bag.erase elm
 | count =>
-  { bag with toRBMap := Lean.RBMap.insert bag.toRBMap elm count}
+  let _ := bag.toOrd
+  { bag with toRBMap := bag.toRBMap.insert elm count}
 
 /-- Passes the multiplicity of an element to a function. -/
 def countDo (f : Nat → α) : α :=
@@ -202,7 +204,8 @@ def contains : Bool := set.toRBSet.contains elm
 
 /-- Inserts an element in the set. -/
 def insert : Cvc.Set Elm :=
-  {set with toRBSet := Lean.RBMap.insert set.toRBSet elm ()}
+  let _ := set.toOrd
+  {set with toRBSet := set.toRBSet.insert elm}
 
 end Set
 
