@@ -142,26 +142,34 @@ namespace Unknown.Data
 
 private def init (info : Info State) (nextState : State.TermsAt 0)
 : Smt (Unknown.Data State 0) := do
-  let posActlit ← Actlit.fresh
-  let currNegActlit ← Actlit.fresh
+  let posActlit ← Actlit.fresh s!"POSITIVE_{info.name}"
+  let currNegActlit ← Actlit.fresh s!"NEGATIVE_{info.name}_init"
   let currPred ← info.pred nextState
   currNegActlit.activate (← currPred.not)
-  return ⟨posActlit, currNegActlit, currPred, none, none, none⟩
+  return ⟨posActlit, currNegActlit, currPred, none, some 0, none⟩
+
+def isBaseValid (data : Unknown.Data State k) : Bool :=
+  data.baseValidUpTo = k
+
+def isPrevBaseValid (data : Unknown.Data State k) : Bool :=
+  k = 0 ∨ data.baseValidUpTo = k.pred
+
+def isStepInvalid (data : Unknown.Data State k) : Bool :=
+  k = 0 ∨ data.stepInvalidUpTo = k
+
+def isPrevStepInvalid (data : Unknown.Data State k) : Bool :=
+  k = 0 ∨ data.stepInvalidUpTo = k.pred
 
 protected def toString (data : Data State k) : String :=
   s!"\
     baseValidUpTo: {data.baseValidUpTo}, \
     stepInvalidUpTo: {data.stepInvalidUpTo}, \
-    stepValidAt: {data.stepValidAt}\
+    stepValidAt: {data.stepValidAt}, \
+    [isPrevBaseValid/isBaseValid]: {data.isPrevBaseValid}/{data.isBaseValid}, \
+    [isPrevStepInvalid/isStepInvalid]: {data.isPrevStepInvalid}/{data.isStepInvalid}\
   "
 
 instance : ToString (Data State k) := ⟨Data.toString⟩
-
-def isBaseValid (data : Unknown.Data State k) : Bool :=
-  data.baseValidUpTo = some k
-
-def isStepInvalid (data : Unknown.Data State k) : Bool :=
-  data.stepInvalidUpTo = some k
 
 def isInvariant? (data : Unknown.Data State k) : Option Nat := do
   let baseK ← data.baseValidUpTo
@@ -185,16 +193,25 @@ private def confirmBase (data : Unknown.Data State k) : Res (Unknown.Data State 
         currently unconfirmed for any `k` and `{k} ≠ 0`"
 
 private def confirmStep {k : Nat} (data : Unknown.Data State k.succ)
-: Res (Unknown.Data State k.succ) :=
-  if let some prev_k := data.stepValidAt then
-    Error.throwUser s!"will not confirm step at `{k}`: already confirmed at `{prev_k}`"
-  else return {data with stepValidAt := k}
+: Res (Unknown.Data State k.succ) := do
+  if let some prevK := data.stepValidAt then
+    Error.throwUser s!"will not confirm step at `{k}`: already confirmed at `{prevK}`"
+  else if let some invalidStepK := data.stepInvalidUpTo then
+    if k.succ ≤ invalidStepK then
+      Error.throwUser s!"will not confirm step at `{k}`: marked invalid at `{invalidStepK} > {k}`"
+  return {data with stepValidAt := k.succ}
 
 private def invalidStep {k : Nat} (data : Unknown.Data State k.succ)
 : Res (Unknown.Data State k.succ) :=
-  if let some prev_k := data.stepValidAt then
-    Error.throwUser s!"will not register invalid step at `{k}`: already confirmed at `{prev_k}`"
-  else return {data with stepInvalidUpTo := k}
+  match (k, data.stepInvalidUpTo) with
+  | (0, none) | (1, none) =>
+    return {data with stepInvalidUpTo := k.succ}
+  | (_, some prevK) =>
+    if prevK = k then return {data with stepInvalidUpTo := k.succ} else
+      Error.throwUser
+        s!"will not register invalid step at `{k.succ}`: `data.stepInvalidUpTo = {prevK}`"
+  | (_, none) =>
+    Error.throwUser s!"will not register invalid step at `{k.succ} > 1`: no `data.stepInvalidUpTo`"
 
 private def next (info : Info State) (nextState : State.TermsAt k.succ)
 : Unknown.Data State k → Smt (Unknown.Data State k.succ)
@@ -208,7 +225,7 @@ private def next (info : Info State) (nextState : State.TermsAt k.succ)
   posActlit.activate currPred
   -- activate predicate negation at `k + 1`
   let nextPred ← info.pred nextState
-  let nextNegActlit ← Actlit.fresh
+  let nextNegActlit ← Actlit.fresh s!"NEGATIVE_{info.name}_@{k.succ}"
   nextNegActlit.activate (← nextPred.not)
   -- done
   return ⟨posActlit, nextNegActlit, nextPred, baseValid, stepInvalid, stepValid⟩
@@ -231,8 +248,14 @@ def next (nextState : State.TermsAt k)
 def isBaseValid {k : Nat} (unk : Unknown State k.succ) : Bool :=
   unk.data.isBaseValid
 
+def isPrevBaseValid {k : Nat} (unk : Unknown State k.succ) : Bool :=
+  unk.data.isPrevBaseValid
+
 def isStepInvalid {k : Nat} (unk : Unknown State k.succ) : Bool :=
   unk.data.isStepInvalid
+
+def isPrevStepInvalid {k : Nat} (unk : Unknown State k.succ) : Bool :=
+  unk.data.isPrevStepInvalid
 
 def isInvariant? {k : Nat} (unk : Unknown State k.succ) : Option Nat :=
   unk.data.isInvariant?
@@ -319,36 +342,42 @@ def toLines (unk : UnknownMap State depth) (pref := "") : Array String :=
 
 def addBaseActivators {k : Nat} (unk : UnknownMap State k.succ) (activators : Array Formula)
 : Term.Build (Array Formula) := do
-  let mut currNegActlits := #[]
+  let mut currNegActlits : Array Formula := #[]
   let mut activators := activators
   for (_, unk) in unk do
-    if ¬ unk.isBaseValid then
+    if unk.isPrevBaseValid then
       currNegActlits := currNegActlits.push unk.data.currNegActlit
-  if h : 2 ≤ activators.size then
-    return activators.push (← Term.mkOr activators h)
-  else if h : 0 < activators.size then
-    return activators.push activators[0]
-  else Error.throwUser "expected at least one unknown candidate, got none"
+  let currNegActlitsDisj ←
+    if h : 2 ≤ currNegActlits.size then
+      Term.mkOr currNegActlits h
+    else if h : 0 < currNegActlits.size then
+      pure currNegActlits[0]
+    else Error.throwUser "expected at least one unknown candidate for base activators, got none"
+  return activators.push currNegActlitsDisj
 
 def addStepActivators {k : Nat} (unk : UnknownMap State k.succ) (activators : Array Formula)
 : Term.Build (Array Formula) := do
-  let mut currNegActlits := #[]
+  let mut currNegActlits : Array Formula := #[]
   let mut activators := activators
   for (_, unk) in unk do
-    if unk.isStepInvalid then
+    if unk.isPrevStepInvalid then
       activators := activators.push unk.data.posActlit
       currNegActlits := currNegActlits.push unk.data.currNegActlit
-  if h : 2 ≤ activators.size then
-    return activators.push (← Term.mkOr activators h)
-  else if h : 0 < activators.size then
-    return activators.push activators[0]
-  else Error.throwUser "expected at least one unknown candidate, got none"
+    else
+      Error.throwInternal s!"`{unk.info.name}` is not prev-step-invalid | {unk.data}"
+  let currNegActlitsDisj ←
+    if h : 2 ≤ currNegActlits.size then
+      Term.mkOr currNegActlits h
+    else if h : 0 < currNegActlits.size then
+      pure currNegActlits[0]
+    else Error.throwUser "expected at least one unknown candidate for step activators, got none"
+  return activators.push currNegActlitsDisj
 
 def isNextBaseReady {k : Nat} (unk : UnknownMap State k.succ) : Bool :=
-  ¬ unk.isEmpty ∧ unk.all fun _ unk => unk.isBaseValid
+  unk.all fun _ unk => unk.isBaseValid
 
 def isNextStepReady {k : Nat} (unk : UnknownMap State k.succ) : Bool :=
-  k = 0 ∨ (¬ unk.isEmpty ∧ unk.all fun _ unk => unk.isStepInvalid)
+  unk.all fun _ unk => unk.isStepInvalid
 
 end UnknownMap
 
@@ -398,10 +427,10 @@ def empty : Candidates State 0 := .init .empty
 
 def toLines (pref := "") : Candidates State depth → Array String
 | .init unk =>
-  let array := #[pref ++ "candidates at 0 {"] ++ unk.toLines (pref ++ "  ")
+  let array := #[pref ++ "candidates in init {"] ++ unk.toLines (pref ++ "  ")
   array.push <| pref ++ "}"
 | .mk unk inv fls  =>
-  let array := #[pref ++ "candidates at 0 {"]
+  let array := #[pref ++ "candidates at " ++ toString depth.pred ++ " {"]
     ++ unk.toLines (pref ++ "  ")
     ++ inv.toLines (pref ++ "  ")
     ++ fls.toLines (pref ++ "  ")
@@ -421,7 +450,7 @@ def isNextBaseReady : (self : Candidates State depth) → Bool
 
 def isNextStepReady : (self : Candidates State depth) → Bool
 | .init unk => true
-| .mk unk .. => unk.isNextBaseReady
+| .mk unk .. => unk.isNextStepReady
 
 def invariant {depth : Nat} : Candidates State depth.succ → InvariantMap State depth.succ
 | .mk _ inv _ => inv
@@ -572,7 +601,7 @@ def registerStepUnsat {k : Nat} (self : Candidates State k.succ.succ)
 : Smt.Unsat (Candidates State k.succ.succ) := do
   let (self, unk) ← self.unknown.filterMapFoldM self fun self _ unk => do
     if ¬ unk.isStepInvalid then
-      let unk ← unk.invalidStep
+      let unk ← unk.confirmStep
       if let some inv := unk.toInvariant? then
         let self ← self.insertInvariant inv
         pure (self, none)

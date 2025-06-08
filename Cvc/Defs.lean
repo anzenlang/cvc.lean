@@ -52,7 +52,6 @@ namespace Term
 def erase : Term α → ETerm := .ofTerm
 
 
-
 /-- Boolean terms. -/
 protected abbrev Bool := Term Bool
 /-- Integer terms. -/

@@ -29,11 +29,12 @@ private mk' ::
 
 namespace Ident
 
-protected def reservedPref := "__cvc_reserved_actlit__"
+protected def reservedPref := "__cvc_reserved_actlit_"
 
-protected def identOfIdx (idx : Nat) := s!"{Actlit.Ident.reservedPref}{idx}"
+protected def identOfIdx (idx : Nat) (desc : String := "") :=
+  s!"{Actlit.Ident.reservedPref}{desc}_{idx}"
 
-def ofIdx (idx : Nat) : Actlit.Ident := ⟨Ident.identOfIdx idx⟩
+def ofIdx (idx : Nat) (desc := "") : Actlit.Ident := ⟨Ident.identOfIdx idx desc⟩
 
 instance : Coe Actlit.Ident String := ⟨getIdent⟩
 instance : ToString Actlit.Ident := ⟨getIdent⟩
@@ -43,15 +44,15 @@ def declare (ident : Actlit.Ident) : Smt Actlit :=
 
 end Ident
 
-def ofIdx (idx : Nat) : Smt Actlit :=
-  Actlit.Ident.ofIdx idx |>.declare
+def ofIdx (idx : Nat) (desc := "") : Smt Actlit :=
+  Actlit.Ident.ofIdx idx desc |>.declare
 
 def isActlitIdent (s : String) := s.startsWith Actlit.Ident.reservedPref
 
 def isActlitTerm (term : Formula) : Bool :=
   term.getSymbol?.map isActlitIdent |>.getD false
 
-def fresh : Smt Actlit := Smt.nextActlitIdx >>= Actlit.ofIdx
+def fresh (desc := "") : Smt Actlit := Smt.nextActlitIdx >>= (Actlit.ofIdx · desc)
 
 section variable (a : Actlit)
 

@@ -114,28 +114,38 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 namespace Test
 
 /-- Testing... -/
-state structure MySystem where
+state structure MyState where
   myCounter : Int
   myReset : Bool
 
-/-- info: Cvc.State.Dsl.Test.MySystem.Idents : Type -/
-#guard_msgs in #check MySystem.Idents
+/-- info: Cvc.State.Dsl.Test.MyState.Idents : Type -/
+#guard_msgs in #check MyState.Idents
 
-/-- info: Cvc.State.Dsl.Test.MySystem.idents : MySystem.Idents -/
-#guard_msgs in #check MySystem.idents
+/-- info: Cvc.State.Dsl.Test.MyState.idents : MyState.Idents -/
+#guard_msgs in #check MyState.idents
 
-/-- info: MySystem.idents.myCounter : Symbol.Ident Int -/
-#guard_msgs in #check MySystem.idents.myCounter
+/-- info: MyState.idents.myCounter : Symbol.Ident Int -/
+#guard_msgs in #check MyState.idents.myCounter
 /-- info: myCounter -/
-#guard_msgs in #eval MySystem.idents.myCounter
-/-- info: MySystem.myCounter! MySystem.idents : String -/
-#guard_msgs in #check MySystem.idents.myCounter!
+#guard_msgs in #eval MyState.idents.myCounter
+/-- info: MyState.myCounter! MyState.idents : String -/
+#guard_msgs in #check MyState.idents.myCounter!
 /-- info: "myCounter" -/
-#guard_msgs in #eval MySystem.idents.myCounter!
+#guard_msgs in #eval MyState.idents.myCounter!
 
-/-- info: Symbols.unroll MySystem.idents 5 : Symbols.IdentsAt 5 -/
-#guard_msgs in #check MySystem.idents.unroll 5
+/-- info: Symbols.unroll MyState.idents 5 : Symbols.IdentsAt 5 -/
+#guard_msgs in #check MyState.idents.unroll 5
 /-- info: myReset_unrolled_at_5 -/
-#guard_msgs in #eval MySystem.idents.unroll 5 |>.myReset
+#guard_msgs in #eval MyState.idents.unroll 5 |>.myReset
 /-- info: "myReset_unrolled_at_5" -/
-#guard_msgs in #eval MySystem.idents.unroll 5 |>.myReset!
+#guard_msgs in #eval MyState.idents.unroll 5 |>.myReset!
+
+
+
+/-- Testing names featuring `.`-separators. -/
+state structure My.State where
+  myCounter : Int
+  myReset : Bool
+
+/-- info: Cvc.State.Dsl.Test.My.State.instSymbols : Symbols My.State -/
+#guard_msgs in #check My.State.instSymbols

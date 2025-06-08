@@ -66,14 +66,12 @@ section variable [Monad m] (init : Bool)
   (ifUnknown : Smt.UnknownT m α := Smt.Unknown.unexpected)
 
 def checkSatAnd : SmtT m α := do
-  let mut assuming := assuming
-  if init then
-    let init ← sys.init sys.getTermsLast
-    assuming := assuming.push init
+  let assuming ←
+    if init then assuming.push <$> sys.init sys.getTerms0 else pure assuming
   Smt.checkSatAnd assuming ifSat ifUnsat ifUnknown
 
-def checkSatBaseAnd : SmtT m α := sys.checkSatAnd true assuming ifSat ifUnsat ifUnknown
-def checkSatStepAnd : SmtT m α := sys.checkSatAnd false assuming ifSat ifUnsat ifUnknown
+def checkSatBaseAnd : SmtT m α := sys.checkSatAnd (init := true) assuming ifSat ifUnsat ifUnknown
+def checkSatStepAnd : SmtT m α := sys.checkSatAnd (init := false) assuming ifSat ifUnsat ifUnknown
 
 end
 

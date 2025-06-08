@@ -31,6 +31,10 @@ open Batteries renaming RBMap → Map
 /-- The empty map. -/
 def empty : RBMap α β := Map.empty
 
+/-- Builds a map from a list. -/
+def ofList : List (α × β) → RBMap α β :=
+  (Map.ofList · compare)
+
 /-- Removes from `map` the bindings `key`/`val` such that `¬ f key val`. -/
 def filter : (map : RBMap α β) → (f : α → β → Bool) → RBMap α β :=
   Map.filter

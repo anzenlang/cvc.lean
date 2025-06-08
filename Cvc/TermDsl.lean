@@ -159,7 +159,7 @@ macro_rules
 | `(smt! =[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
   `( (do Cvc.Term.mkEqual #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ] ) )
 | `(smt! $lft ≠ $rgt) =>
-  `( (do (← smt! $lft).distinct (← smt! $rgt)) )
+  `( (do Term.distinct (← smt! $lft) (← smt! $rgt)) )
 | `(smt! ≠[ $fst:smtTerm, $snd:smtTerm $[ , $tail:smtTerm ]* $[,]? ]) =>
   `( (do Cvc.Term.mkDistinct #[(← smt! ($fst)), (← smt! ($snd)), $[(← smt! ($tail)) ],* ]) )
 | `(smt! $lft ≤ $rgt) =>
@@ -181,7 +181,7 @@ macro_rules
 
 | `(smt! $f:smtTerm $arg:smtTerm) =>
   `( (do
-    (← smt! $f).apply (← smt! $arg)
+    Term.apply (← smt! $f) (← smt! $arg)
   ) )
 
 | `(smt! $lft * $rgt) =>

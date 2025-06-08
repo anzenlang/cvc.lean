@@ -179,6 +179,11 @@ More commented testing stuff.
 namespace Test
 
 /-- Testing... -/
+symbol structure My.Symbols where
+  myCounter : Int
+  myReset : Bool
+
+/-- Testing... -/
 symbol structure MySymbols where
   myCounter : Int
   myReset : Bool

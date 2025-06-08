@@ -59,12 +59,14 @@ def mk (init : State.StatePred) (step : State.StateRel)
   let candidates := candidates.mapVal Candidate.mkUnknown
   ⟨unroller, .init candidates⟩
 
-def toLines (pref := "") (sys : Sys depth) : Array String :=
+protected def depth : (sys : Sys State depth) → Nat := 𝕂 depth
+
+def toLines (sys : Sys State depth) (pref := "") : Array String :=
   sys.candidates.toLines pref
 
 def addCandidate (sys : State.Sys) (name : String) (pred : State.StatePred) : Res State.Sys := do
   let candidate := Candidate.mkUnknown name pred
-  let candidates : Candidates State 0 ← sys.candidates.insertUnknown candidate
+  let candidates ← sys.candidates.insertUnknown candidate
   return {sys with candidates}
 
 def addCandidates [ForIn Res α (String × State.StatePred)]
@@ -84,6 +86,7 @@ abbrev isDone : Bool := sys.candidates.isDone
 
 def isNextBaseReady : Bool := sys.candidates.isNextBaseReady
 def isNextStepReady : Bool := sys.candidates.isNextStepReady
+def isNextReady : Bool := sys.isNextBaseReady ∧ sys.isNextStepReady
 def isBaseOver : Bool := sys.isNextBaseReady
 def isStepOver : Bool := sys.isNextStepReady
 
@@ -121,19 +124,30 @@ def checkBase {k : Nat} (sys : State.Sys k.succ)
 
 def checkStep {k : Nat} (sys : State.Sys k.succ.succ)
 : (h : ¬ sys.isStepOver := by assumption)
-→ (maxIter : Nat := sys.candidates.unknown.size.succ.succ)
+→ (maxIter : Nat := sys.candidates.unknown.size)
+→ (maxIterRef : Nat := sys.candidates.unknown.size)
 → Smt (State.Sys k.succ.succ)
-| _, maxIter + 1 => do
+| _, maxIter + 1, maxIterRef => do
   let activators ←
     #[] |> sys.candidates.addStepActivators
-  let candidates ← sys.toUnroller.checkSatStepAnd activators
-    (ifSat := sys.candidates.registerStepCex)
-    (ifUnsat := sys.candidates.registerStepUnsat)
+  let (wasSat, candidates) ← sys.toUnroller.checkSatStepAnd activators
+    (ifSat := (true, ·) <$> sys.candidates.registerStepCex)
+    (ifUnsat := (false, ·) <$> sys.candidates.registerStepUnsat)
   let sys := {sys with candidates}
-  if h : sys.isStepOver then return sys else sys.checkStep h maxIter
-| _, 0 => Error.throwInternal s!"\
-  step-checking at {k} not done after number-of-candidates-plus-one iterations\
-"
+  if sys.isDone then
+    return sys
+  if h : sys.isStepOver then
+    return sys
+  else if ¬ wasSat then
+    Error.throwInternal s!"step not over but step-check returned `unsat`"
+  else
+    sys.checkStep h maxIter
+| _, 0, _maxIterRef =>
+  -- return sys
+  let info : String := sys.candidates.unknown.foldl (fun acc _ unk => s!" {acc}{unk},") "unknows:"
+  Error.throwInternal s!"\
+    step-checking at {k.succ} not done after number-of-candidates (`{_maxIterRef}`) iteration(s) | {info}\
+  "
 
 def unrollCheckBaseStep {k : Nat} (sys : State.Sys k)
 : (h_base : sys.isBaseOver := by assumption)
@@ -149,13 +163,11 @@ def unrollCheckBaseStep {k : Nat} (sys : State.Sys k)
   by
     cases k ; exact return sys
     exact
-      if h : ¬ sys.isStepOver then
-        sys.checkStep
-      else if ¬ sys.isDone then Error.throwInternal s!"\
-        [unreachable] system `sys` is `¬ sys.isDone`, \
-        but it is `¬ sys.isStepOver` before step-check\
+      if sys.isDone then pure sys
+      else if h : ¬ sys.isStepOver then sys.checkStep
+      else Error.throwInternal s!"\
+        [unreachable] system `sys` is `¬ sys.isDone`, but it is `sys.isStepOver` before step-check\
       "
-      else pure sys
 
 def kInduction {k} (sys : State.Sys k)
 : (maxSteps : Nat) → Smt ((k' : Nat) × State.Sys k')
@@ -164,7 +176,15 @@ def kInduction {k} (sys : State.Sys k)
     if h : sys.isBaseOver ∧ sys.isStepOver then
       let ⟨_, _⟩ := h
       let sys ← sys.unrollCheckBaseStep
-      sys.kInduction maxSteps
+      if sys.isDone then return ⟨k.succ, sys⟩ else
+        let desc := match (sys.isBaseOver, sys.isStepOver) with
+          | (false, false) => some "neither base nor step are"
+          | (true, false) => "step is"
+          | (false, true) => "base is"
+          | (true, true) => none
+        if let some desc := desc then
+          Error.throwInternal s!"after `unrollCheckBaseStep` {k} → {k.succ}, {desc} not over"
+        sys.kInduction maxSteps
     else
       let desc := match h' : (sys.isBaseOver, sys.isStepOver) with
         | (false, false) => "neither base nor step are"

@@ -49,7 +49,7 @@ def systemTk := leading_parser (nonReservedSymbol "system " true)
 open State.Dsl (stateStructureSyntax stateStructure)
 
 namespace Idents
-def id_State := Lean.mkIdent `State
+def id_instState := Lean.mkIdent `instState
 def id_mk := Lean.mkIdent `mk
 def id_init := Lean.mkIdent `init
 def id_step := Lean.mkIdent `step
@@ -65,6 +65,7 @@ scoped syntax (name := systemForDefSyntax)
 : command
 
 open Symbols.Dsl.Idents in
+open State.Dsl.Idents in
 open Idents in
 @[command_elab systemForDefSyntax]
 def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
@@ -73,7 +74,7 @@ def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
   system structure $SystemIdent:ident for $StateTerm:term
   $tail:whereDecls
 ) => do
-  let System_State := SystemIdent.getId.append id_State.getId |> Lean.mkIdent
+  let System_State := SystemIdent.getId.append id_instState.getId |> Lean.mkIdent
   -- set `$System_State` to be `Symbols` instance, fail if none found
   let stx ← `(
     def $System_State : $idRef_Symbols $StateTerm := by
@@ -82,10 +83,14 @@ def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
   elabCommand stx
   let stx ← `(
     $mods:declModifiers
-    -- abbrev $SystemIdent : (depth : Nat := 0) → Type := $idRef_Sys $System_State
     abbrev $SystemIdent (depth : Nat := 0) : Type := $idRef_Sys $System_State depth
 
     namespace $SystemIdent
+    abbrev $id_StatePred := $(id_instState).$id_StatePred
+    abbrev $id_StatePredicate := $(id_instState).$id_StatePredicate
+    abbrev $id_StateRel := $(id_instState).$id_StateRel
+    abbrev $id_StateRelation := $(id_instState).$id_StateRelation
+
     /-- Constructor. -/
     def $id_mk : $SystemIdent 0 :=
       $idRef_Sys_mk $id_init $id_step $id_candidates
@@ -119,7 +124,6 @@ def elabSystemWithDefSyntax : Lean.Elab.Command.CommandElab
 | _ => Lean.Elab.throwUnsupportedSyntax
 
 
-
 /-! ## Testing -/
 namespace Test
 
@@ -133,14 +137,14 @@ state structure MyState where
 /-- `MyState`- System. -/
 system structure MySys for MyState
 where
-  init : MyState.StatePred := smtPred! state => 0 ≤ state.intVar
-  step : MyState.StateRel := smtRel! prev curr =>
+  init : MySys.StatePred := smtPred! state => 0 ≤ state.intVar
+  step : MySys.StateRel := smtRel! prev curr =>
     (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
     ∧ curr.bVar = ¬ prev.bVar
   namedCandidates := .empty
 
-/-- info: Cvc.Sys.Dsl.Test.For.MySys.State : Symbols MyState -/
-#guard_msgs in #check MySys.State
+/-- info: Cvc.Sys.Dsl.Test.For.MySys.instState : Symbols MyState -/
+#guard_msgs in #check MySys.instState
 
 /-- info: Cvc.Sys.Dsl.Test.For.MySys : optParam Nat 0 → Type -/
 #guard_msgs in #check MySys
@@ -148,6 +152,22 @@ where
 #guard_msgs in #check MySys 0
 /-- info: MySys 5 : Type -/
 #guard_msgs in #check MySys 5
+
+/-- State structure. -/
+state structure MyState' where
+  bVar : Bool
+  intVar : Int
+
+/-- `MyState`- System. -/
+system structure MySys' for MyState
+where
+  init : MySys.StatePred := smtPred! state => 0 ≤ state.intVar
+  step : MySys.StateRel := smtRel! prev curr =>
+    (curr.intVar = if curr.bVar then prev.intVar + 1 else prev.intVar)
+    ∧ curr.bVar = ¬ prev.bVar
+  namedCandidates := RBMap.ofList [
+    ("intVar positive", (smtPred! state => 0 ≤ state.intVar : MyState.StatePred))
+  ]
 
 end For
 
@@ -172,8 +192,8 @@ where
 /-- info: Cvc.Sys.Dsl.Test.With.MyState (R : Symbol.Repr) : Type -/
 #guard_msgs in #check MyState
 
-/-- info: Cvc.Sys.Dsl.Test.With.MySys.State : Symbols MyState -/
-#guard_msgs in #check MySys.State
+/-- info: Cvc.Sys.Dsl.Test.With.MySys.instState : Symbols MyState -/
+#guard_msgs in #check MySys.instState
 
 /-- info: Cvc.Sys.Dsl.Test.With.MySys : optParam Nat 0 → Type -/
 #guard_msgs in #check MySys
