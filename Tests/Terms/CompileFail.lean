@@ -13,9 +13,7 @@ namespace Cvc.Test
 
 
 
-Term.test!
-
-[Term.mkEqual.noArg]
+Term.test! [Term.mkEqual.noArg]
   Term.mkEqual #[]
 /-- error: could not synthesize default value for parameter 'h_size' using tactics
 ---
@@ -23,7 +21,7 @@ error: expected an array of **at least** two terms
 ⊢ 2 ≤ #[].size
 -/
 
-[Term.mkDistinct.oneArg]
+Term.test! [Term.mkDistinct.oneArg]
   let seven ← Term.int 7
   Term.mkEqual #[seven]
 /--

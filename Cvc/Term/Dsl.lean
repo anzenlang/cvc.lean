@@ -23,6 +23,8 @@ scoped syntax ident : smtTerm
 scoped syntax name : smtTerm
 scoped syntax num : smtTerm
 
+scoped syntax "?[" term " : " term "]" : smtTerm
+
 scoped syntax:25 smtTerm:26 " → " smtTerm:25 : smtTerm
 scoped syntax "→[" smtTerm ", " smtTerm (", " smtTerm)* ","? "]" : smtTerm
 scoped syntax:35 smtTerm:36 " ∧ " smtTerm:35 : smtTerm
@@ -118,6 +120,7 @@ macro_rules
 -- | `(smt! [| $t:term |]) => `((pure $t))
 | `(smt! ![ $t:term ]) => `($t)
 | `(smt! ($t:smtTerm)) => `(smt! $t)
+| `(smt! ?[ $t:term : $ty:term ]) => `($t >>= fun eTerm => eTerm.as $ty)
 
 | `(smt! false) => `(Cvc.Term.bool false)
 | `(smt! true) => `(Cvc.Term.bool true)

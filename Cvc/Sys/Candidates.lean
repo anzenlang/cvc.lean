@@ -6,7 +6,7 @@ Authors: Adrien Champion
 -/
 
 import Cvc.Actlit
-import Cvc.Symbols
+import Cvc.Symbols.Defs
 import Cvc.Sys.Trace
 
 

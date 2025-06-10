@@ -19,7 +19,6 @@ namespace Cvc
 
 /-- Type-safe cvc5 terms, input type expected to be `Srt.Bij` for most uses.
 
-- For the type-erased version, see `ETerm`.
 - No direct constructor exposed publicly, users must go through the `Term.Build` monadic
   constructors.
 -/
@@ -33,17 +32,6 @@ private ofUnsafe ::
 
 /-- Abbreviation for a `Term Bool`. -/
 abbrev Formula := Term Bool
-
-
-
-/-- Type-erased version `Term`. -/
-structure ETerm where
-/-- Constructor from a typed-term. -/
-ofTerm ::
-  /-- Sort of the underlying typed-term. -/
-  srt : Srt
-  /-- Typed version of a type-erased term. -/
-  typed : Term srt.toType
 
 
 
@@ -643,6 +631,8 @@ def mk [Srt.Bij α] (Val : Type := α)
 : ToVal α :=
   ⟨Val, ofTerm⟩
 
+protected def Terms [Srt.Bij α] : ToVal α := ⟨Term α, pure⟩
+
 instance : CoeSort (ToVal α) Type := ⟨fun inst => inst.Val⟩
 
 -- instance : ToVal Unit := mk
@@ -681,47 +671,6 @@ abbrev getValType (α : Type) [inst : ToVal α] := inst.Val
 end Term
 
 export Term (getValType)
-
-
-
-/-! ## Erased term API -/
-
-namespace ETerm
-
-/-- Constructor from a typed term. -/
-def mk {α : Type} [A : Srt.Bij α] (term : Term α) : ETerm :=
-  ofTerm A.srt (A.h_bij ▸ term)
-
-section variable (erased : ETerm)
-
-/-- String representation. -/
-protected def toString : String := toString erased.typed
-
-instance : ToString ETerm := ⟨ETerm.toString⟩
-
-/-- Attempts to `Srt`-type an erased term. -/
-def as? (srt : Srt) : Res (Term srt.toType) :=
-  let ⟨termSrt, term⟩ := erased
-  if h_srt : termSrt = srt
-  then .ok (h_srt ▸ term)
-  else Error.throwUser s!"erased term of type `{termSrt}` cannot be typed as `{srt}`"
-
-/-- Attempts to retype an erased term. -/
-def typeAs? (α : Type) [A : Srt.Bij α] : Res (Term α) := by
-  cases A ; case mk srt h_bij =>
-  cases h_bij
-  exact erased.as? srt
-
-end
-
-end ETerm
-
-namespace Term
-
-/-- Erases the type of a typed term. -/
-def erase [Srt.Bij α] : Term α → ETerm := .mk
-
-end Term
 
 
 

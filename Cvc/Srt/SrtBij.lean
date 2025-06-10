@@ -23,7 +23,7 @@ namespace Cvc
 
 *"Bijection"* here means that when `A : SrtBij α`, then `A.srt.toType = α` as guaranteed by `valid`.
 -/
-protected class Srt.Bij (α : Type) where private mk ::
+protected class Srt.Bij (α : Type) where mk ::
   /-- `Srt` version of `α`. -/
   srt : Srt
   /-- Turning `srt` into a `Type` results in `α`. -/

@@ -25,6 +25,9 @@ abbrev TermTrace (State : Symbols Struct) (length : Nat) :=
 abbrev ValTrace (State : Symbols Struct) (length : Nat) :=
   State.Trace State.ValsAt length
 
+abbrev ValueTrace (State : Symbols Struct) (length : Nat) :=
+  State.Trace State.ValuesAt length
+
 namespace Trace
 
 def mkOne [State : Symbols Struct] {Repr : Nat → Type} : (data : Repr 0) → State.Trace Repr 1 :=

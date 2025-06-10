@@ -17,6 +17,7 @@ namespace Symbols
 
 structure Unroller (State : Symbols Struct) (length : Nat) where
 private mk' ::
+  idents : State.Idents
   init : State.StatePred
   step : State.StateRel
   trace : State.TermTrace length
@@ -24,12 +25,9 @@ private mk' ::
 namespace Unroller
 
 def mk [State : Symbols Struct]
-  (init : State.StatePred) (step : State.StateRel)
+  (idents : State.Idents) (init : State.StatePred) (step : State.StateRel)
 : State.Unroller 0 :=
-  ⟨init, step, .empty⟩
-
-def idents [State : Symbols Struct] : (unroller : Unroller State k) → State.Idents :=
-  fun _ => State.idents
+  ⟨idents, init, step, .empty⟩
 
 section var_sys variable (sys : Unroller State length)
 
@@ -85,7 +83,7 @@ end var_k_succ
 
 
 private def declareNext : Smt (State.TermsAt length) :=
-  let _ := sys ; State.idents.declareAt length
+  let _ := sys ; sys.idents.declareAt length
 
 def unroll : Smt (State.TermsAt length × State.Unroller length.succ) := do
   let next ← sys.declareNext

@@ -52,10 +52,12 @@ end Symbols
 
 namespace Sys variable [State : Symbols S]
 
-def mk (init : State.StatePred) (step : State.StateRel)
+def mk
+  (idents : State.Idents)
+  (init : State.StatePred) (step : State.StateRel)
   (candidates : State.NamedPredicates := .empty)
 : State.Sys :=
-  let unroller := Symbols.Unroller.mk init step
+  let unroller := Symbols.Unroller.mk idents init step
   let candidates := candidates.mapVal Candidate.mkUnknown
   ⟨unroller, .init candidates⟩
 

@@ -139,14 +139,13 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
           | .done res => return res
         ]*
         return acc
-      idents' := ⟨ $[ $ident'Elms ],* ⟩
 
     abbrev $id_toSymbols := $id_inst
     abbrev $id_Spec := $id_inst
 
 
     abbrev $id_Idents := $id_inst.$id_Idents
-    abbrev $id_idents : $id_Idents := $id_inst.$id_idents
+    abbrev $id_idents : $id_Idents := ⟨ $[ $ident'Elms ],* ⟩
     abbrev $id_Vals := $id_inst.$id_Vals
     abbrev $id_Model := $id_Vals
     abbrev $id_Terms := $id_inst.$id_Terms

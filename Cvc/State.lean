@@ -7,3 +7,4 @@ Authors: Adrien Champion
 
 import Cvc.State.Defs
 import Cvc.State.Dsl
+import Cvc.State.Erased

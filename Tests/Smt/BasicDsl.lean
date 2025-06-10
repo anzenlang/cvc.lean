@@ -48,7 +48,7 @@ Smt.test!
   Smt.checkSatAnd
     (ifSat := do
       println! "sat"
-      let val ← state.getVal
+      let val ← state.getModel
       println! "- reset     ↦ {val.reset!}"
       println! "- startStop ↦ {val.startStop!}"
       println! "- counter   ↦ {val.counter!}"

@@ -33,6 +33,7 @@ protected abbrev Ident (α : Type) := Symbol String α
 protected abbrev Term (α : Type) := Symbol (Term α) α
 instance : Coe (Symbol.Term α) (Term α) := ⟨get⟩
 protected abbrev Val (α : Type) [Term.ToVal α] := Symbol (getValType α) α
+protected abbrev Value (α : Type) := Symbol (Term α) α
 
 protected abbrev Repr :=
   (α : Type) → [Term.ToVal α] → Type
@@ -43,26 +44,7 @@ protected abbrev Term : Symbol.Repr := (Term ·)
 protected abbrev Val : Symbol.Repr := getValType
 end Repr
 
-end Symbol
 
-
-
-abbrev ESymbol (R : Symbol.Repr := .Ident) :=
-  (α : Type) ×' (inst : Term.ToVal α) × Symbol (@R α inst) α
-
-namespace ESymbol
-
-protected abbrev Ident := ESymbol
-protected abbrev Term := ESymbol Symbol.Repr.Term
-protected abbrev Val := ESymbol Symbol.Repr.Val
-end ESymbol
-
-
-
-namespace Symbol
-
-def erase [Val : Term.ToVal α] {R : Symbol.Repr} (sym : Symbol (R α) α) : ESymbol R :=
-  ⟨α, Val, sym⟩
 
 section variable [Monad m] (sym : Symbol β α)
 
@@ -112,6 +94,10 @@ def getValUsing (Val : Term.ToVal α) (sTerm : Symbol.Term α) : Smt.Sat (Symbol
 @[inherit_doc getValUsing]
 def getVal [Val : Term.ToVal α] (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Val α) :=
   getValUsing Val sTerm
+
+@[inherit_doc getVal]
+def getValue [Srt.Bij α] (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Value α) :=
+  getValUsing Term.ToVal.Terms sTerm
 
 end term
 

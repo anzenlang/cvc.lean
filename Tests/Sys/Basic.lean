@@ -97,6 +97,10 @@ system structure Sw for Sw.State where
 
 namespace Sw
 
+def idents := Sw.State.idents
+
+def mk := ofIdents idents
+
 def mkWith (candidates : List (String × Sw.StatePred)) : Res Sw :=
   mk.addCandidates candidates
 

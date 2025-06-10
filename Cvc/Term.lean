@@ -5,8 +5,5 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Sys.Trace
-import Cvc.Sys.Unroller
-import Cvc.Sys.Defs
-import Cvc.Sys.Dsl
-import Cvc.Sys.Erased
+import Cvc.Term.Erased
+import Cvc.Term.Dsl

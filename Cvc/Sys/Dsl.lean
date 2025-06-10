@@ -5,7 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.TermDsl
+import Cvc.Term.Dsl
 import Cvc.State.Dsl
 import Cvc.Sys.Defs
 
@@ -50,6 +50,7 @@ open State.Dsl (stateStructureSyntax stateStructure)
 
 namespace Idents
 def id_instState := Lean.mkIdent `instState
+def id_ofIdents := Lean.mkIdent `ofIdents
 def id_mk := Lean.mkIdent `mk
 def id_init := Lean.mkIdent `init
 def id_step := Lean.mkIdent `step
@@ -92,8 +93,8 @@ def elabSystemForDefSyntax : Lean.Elab.Command.CommandElab
     abbrev $id_StateRelation := $(id_instState).$id_StateRelation
 
     /-- Constructor. -/
-    def $id_mk : $SystemIdent 0 :=
-      $idRef_Sys_mk $id_init $id_step $id_candidates
+    def $id_ofIdents (idents : $(id_instState).$id_Idents) : $SystemIdent 0 :=
+      $idRef_Sys_mk idents $id_init $id_step $id_candidates
     $tail:whereDecls
     end $SystemIdent
   )
@@ -117,8 +118,16 @@ def elabSystemWithDefSyntax : Lean.Elab.Command.CommandElab
 ) => do
   let stx ← `($stateMods:declModifiers state structure $StateIdent $stateStruct)
   elabCommand stx
+  let id_State_idents :=
+    StateIdent.getId.append id_idents.getId |> Lean.mkIdent
   let stx ← `(
     $mods:declModifiers system structure $System for $StateIdent $tail:whereDecls
+
+    namespace $System
+    def $id_idents := $id_State_idents
+
+    def $id_mk := $id_ofIdents $id_idents
+    end $System
   )
   elabCommand stx
 | _ => Lean.Elab.throwUnsupportedSyntax
@@ -197,5 +206,8 @@ where
 
 /-- info: Cvc.Sys.Dsl.Test.With.MySys : optParam Nat 0 → Type -/
 #guard_msgs in #check MySys
+
+/-- info: Cvc.Sys.Dsl.Test.With.MySys.ofIdents : Symbols.Idents → MySys -/
+#guard_msgs in #check MySys.ofIdents
 
 end With
