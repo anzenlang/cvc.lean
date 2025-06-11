@@ -109,22 +109,24 @@ def printLines (sw : Sw k) (desc : String := "sw") : IO Unit := do
   for line in sw.toLines "  " do
     println! line
 
-def printState (state : Sw.instState.ValsAt k) (pref := "") : IO Unit := do
+def printState (state : Sw.instState.ValuesAt k) (pref := "") : IO Unit := do
   println! "{pref}inputs    | \
     startStop: {state.startStop}, reset: {state.reset}\
   "
   println! "{pref}internals | \
-    risingReset: {state.risingReset}, risingStartStop: {state.risingStartStop}, \
+    risingStartStop: {state.risingStartStop}, risingReset: {state.risingReset}, \
     isCounting: {state.isCounting}\
   "
   println! "{pref}output    | counter: {state.counter}"
 
-def printTrace (trace : Sw.instState.ValTrace k) (pref := "") : IO Unit := do
+def printTrace (trace : Sw.instState.ValueTrace k) (pref := "") : IO Unit := do
   for ⟨k, state⟩ in trace do
     println! "{pref}- at {k}"
     printState state (pref ++ "  ")
 
-def printCexs {k : Nat} (sw : Sw k.succ) (pref := "") : IO Unit := do
+def printCexs : {k : Nat} → (sw : Sw k) → (pref : String := "") → IO Unit
+| 0, _, _ => println! "error: cannot print cex-s on a system at `k = 0`"
+| _ + 1, sw, pref => do
   let fls := sw.candidates.falsified
   println! "{fls.size} falsified candidate(s)"
   for (name, fls) in fls do
@@ -163,7 +165,7 @@ base-checked sw, depth is 1:
 - `counter ≠ 0`
   - at 0
     inputs    | startStop: false, reset: false
-    internals | risingReset: false, risingStartStop: false, isCounting: false
+    internals | risingStartStop: false, risingReset: false, isCounting: false
     output    | counter: 0
 -/
 
@@ -174,9 +176,7 @@ Smt.test! [Sys.basics.kInductionCex0]
   let ⟨k, sw⟩ ← sw.kInduction 1
   println! "k-induction stopped at `{k}`"
   Sw.printLines sw
-  match k with
-  | 0 => println! "cannot be stopped at 0"
-  | _+1 => Sw.printCexs sw
+  Sw.printCexs sw
 /-- info:
 k-induction stopped at `1`
 
@@ -192,7 +192,7 @@ sw, depth is 1:
 - `counter ≠ 0`
   - at 0
     inputs    | startStop: false, reset: false
-    internals | risingReset: false, risingStartStop: false, isCounting: false
+    internals | risingStartStop: false, risingReset: false, isCounting: false
     output    | counter: 0
 -/
 
@@ -203,9 +203,7 @@ Smt.test! [Sys.basics.kInductionCex5]
   let ⟨k, sw⟩ ← sw.kInduction 10
   println! "k-induction stopped at `{k}`"
   Sw.printLines sw "base-checked sw"
-  match k with
-  | 0 => println! "cannot be stopped at 0"
-  | _+1 => Sw.printCexs sw
+  Sw.printCexs sw
 /-- info:
 initial sw, depth is 0:
   candidates in init {
@@ -227,27 +225,27 @@ base-checked sw, depth is 6:
 - `counter ≠ 5`
   - at 5
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: true
+    internals | risingStartStop: false, risingReset: false, isCounting: true
     output    | counter: 5
   - at 4
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: true
+    internals | risingStartStop: false, risingReset: false, isCounting: true
     output    | counter: 4
   - at 3
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: true
+    internals | risingStartStop: false, risingReset: false, isCounting: true
     output    | counter: 3
   - at 2
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: true
+    internals | risingStartStop: false, risingReset: false, isCounting: true
     output    | counter: 2
   - at 1
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: true, isCounting: true
+    internals | risingStartStop: true, risingReset: false, isCounting: true
     output    | counter: 1
   - at 0
     inputs    | startStop: false, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: false
+    internals | risingStartStop: false, risingReset: false, isCounting: false
     output    | counter: 0
 -/
 
@@ -261,9 +259,7 @@ Smt.test! [Sys.basics.kInduction1]
   println! "sw@{sw.depth}:"
   for line in sw.toLines "  " do
     println! line
-  match k with
-  | 0 => println! "cannot be stopped at 0"
-  | _+1 => Sw.printCexs sw
+  Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 2
 k-induction stopped at 2
@@ -281,11 +277,11 @@ sw@2:
 - `reset → counter = 0`
   - at 1
     inputs    | startStop: true, reset: true
-    internals | risingReset: false, risingStartStop: true, isCounting: true
+    internals | risingStartStop: true, risingReset: false, isCounting: true
     output    | counter: 1
   - at 0
     inputs    | startStop: false, reset: true
-    internals | risingReset: false, risingStartStop: false, isCounting: false
+    internals | risingStartStop: false, risingReset: false, isCounting: false
     output    | counter: 0
 -/
 
@@ -299,9 +295,7 @@ Smt.test! [Sys.basics.kInduction2]
   println! "sw@{sw.depth}:"
   for line in sw.toLines "  " do
     println! line
-  match k with
-  | 0 => println! "cannot be stopped at 0"
-  | _+1 => Sw.printCexs sw
+  Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 5
 k-induction stopped at 5
@@ -330,9 +324,7 @@ Smt.test! [Sys.basics.kInduction3]
   println! "sw@{sw.depth}:"
   for line in sw.toLines "  " do
     println! line
-  match k with
-  | 0 => println! "cannot be stopped at 0"
-  | _+1 => Sw.printCexs sw
+  Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 5
 k-induction stopped at 2

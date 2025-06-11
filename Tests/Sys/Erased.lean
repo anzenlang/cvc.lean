@@ -33,6 +33,31 @@ def idents : ESymbols.ByName.Idents :=
   |>.insertIdent! Bool "isCounting"
   |>.insertIdent! Int "counter"
 
+variable (state : State R)
+
+def unwrap [ToString α] : Res α → String
+| .ok a => toString a
+| .error e => s!"{e}"
+
+def startStop [S : ToString (R.srt .bool)] (state : State R) :=
+  let val := state.findAs Bool "startStop"
+  @unwrap (R.srt .bool) S val
+def reset [S : ToString (R.srt .bool)] (state : State R) :=
+  let val := state.findAs Bool "reset"
+  @unwrap (R.srt .bool) S val
+def risingStartStop [S : ToString (R.srt .bool)] (state : State R) :=
+  let val := state.findAs Bool "risingStartStop"
+  @unwrap (R.srt .bool) S val
+def risingReset [S : ToString (R.srt .bool)] (state : State R) :=
+  let val := state.findAs Bool "risingReset"
+  @unwrap (R.srt .bool) S val
+def isCounting [S : ToString (R.srt .bool)] (state : State R) :=
+  let val := state.findAs Bool "isCounting"
+  @unwrap (R.srt .bool) S val
+def counter [S : ToString (R.srt .int)] (state : State R) :=
+  let val := state.findAs Int "counter"
+  @unwrap (R.srt .int) S val
+
 end Sw.State
 
 
@@ -64,6 +89,7 @@ system structure Sw for Sw.State where
     )
   namedCandidates := .ofList [
     ("counter ≠ 0", smtPred! state => ![state.findAs Int "counter"] ≠ 0),
+    ("counter ≠ 5", smtPred! state => ![state.findAs Int "counter"] ≠ 5),
     ("always counting", smtPred! state => ![state.findAs Bool "isCounting"]),
     ("0 ≤ counter", smtPred! state => 0 ≤ ![state.findAs Int "counter"]),
     ("¬ reset", smtPred! state => ¬ ![state.findAs Bool "reset"]),
@@ -85,24 +111,49 @@ def printLines (sw : Sw k) (desc : String := "sw") : IO Unit := do
   for line in sw.toLines "  " do
     println! line
 
+def printState (state : Sw.instState.ValuesAt k) (pref := "") : IO Unit := do
+  println! "{pref}inputs    | \
+    startStop: {state.startStop}, reset: {state.reset}\
+  "
+  println! "{pref}internals | \
+    risingReset: {state.risingReset}, risingStartStop: {state.risingStartStop}, \
+    isCounting: {state.isCounting}\
+  "
+  println! "{pref}output    | counter: {state.counter}"
+
+def printTrace (trace : Sw.instState.ValueTrace k) (pref := "") : IO Unit := do
+  for ⟨k, state⟩ in trace do
+    println! "{pref}- at {k}"
+    printState state (pref ++ "  ")
+
+def printCexs : {k : Nat} → (sw : Sw k) → (pref : String := "") → IO Unit
+| 0, _, _ => println! "error: cannot print cex-s on a system at `k = 0`"
+| _ + 1, sw, pref => do
+  let fls := sw.candidates.falsified
+  println! "{fls.size} falsified candidate(s)"
+  for (name, fls) in fls do
+    println! "- `{name}`"
+    printTrace fls.data.cex (pref ++ "  ")
+
 end Sw
 
 
 Smt.test! [ESys.sw.all]
   Smt.setOption Cvc.Option.produceModels
   let sw := Sw.mk
-  let steps := 5
+  let steps := 10
   println! "\nrunning k-induction, step(s) := {steps}"
   let ⟨k, sw⟩ ← sw.kInduction steps
   println! "k-induction stopped at {k}"
   println! "sw@{sw.depth}:"
   for line in sw.toLines "  " do
     println! line
+  Sw.printCexs sw
 /-- info:
-running k-induction, step(s) := 5
-k-induction stopped at 2
-sw@2:
-  candidates at 1 {
+running k-induction, step(s) := 10
+k-induction stopped at 6
+sw@6:
+  candidates at 5 {
     no unknown
     invariant: {}
       `0 ≤ counter`: 1-inductive
@@ -112,8 +163,64 @@ sw@2:
       `always counting`: falsified at 0
       `counter ≠ -7`: falsified at 0
       `counter ≠ 0`: falsified at 0
+      `counter ≠ 5`: falsified at 5
       `reset → counter = 0`: falsified at 1
       `¬ reset`: falsified at 0
     }
   }
+6 falsified candidate(s)
+- `always counting`
+  - at 0
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
+- `counter ≠ -7`
+  - at 0
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
+- `counter ≠ 0`
+  - at 0
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
+- `counter ≠ 5`
+  - at 5
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: true
+    output    | counter: 5
+  - at 4
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: true
+    output    | counter: 4
+  - at 3
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: true
+    output    | counter: 3
+  - at 2
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: true
+    output    | counter: 2
+  - at 1
+    inputs    | startStop: true, reset: false
+    internals | risingReset: false, risingStartStop: true, isCounting: true
+    output    | counter: 1
+  - at 0
+    inputs    | startStop: false, reset: false
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
+- `reset → counter = 0`
+  - at 1
+    inputs    | startStop: true, reset: true
+    internals | risingReset: false, risingStartStop: true, isCounting: true
+    output    | counter: 1
+  - at 0
+    inputs    | startStop: false, reset: true
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
+- `¬ reset`
+  - at 0
+    inputs    | startStop: false, reset: true
+    internals | risingReset: false, risingStartStop: false, isCounting: false
+    output    | counter: 0
 -/
