@@ -35,12 +35,17 @@ protected abbrev length : Nat := let _ := sys ; length
 
 abbrev CexTrace := State.ValTrace sys.length
 
+abbrev TermCexTrace := State.ValueTrace sys.length
+
 abbrev Idx := let _ := sys ; Fin length
 
 def getTermsAt (i : sys.Idx) : State.TermsAt i := sys.trace.get i
 
 def extractCexTrace : Smt.Sat sys.CexTrace := do
   sys.trace.mapM fun _ terms => terms.getVals
+
+def extractTermCexTrace : Smt.Sat sys.TermCexTrace := do
+  sys.trace.mapM fun _ terms => terms.getValues
 
 
 
@@ -76,6 +81,13 @@ end
 def findCexTrace? (init : Bool) (assuming : Array Formula := #[]) : Smt (Option sys.CexTrace) :=
   sys.checkSatAnd init assuming
     (ifSat := some <$> sys.extractCexTrace)
+    (ifUnsat := pure none)
+
+def findTermCexTrace? (init : Bool)
+  (assuming : Array Formula := #[])
+: Smt (Option sys.TermCexTrace) :=
+  sys.checkSatAnd init assuming
+    (ifSat := some <$> sys.extractTermCexTrace)
     (ifUnsat := pure none)
 
 end var_k_succ

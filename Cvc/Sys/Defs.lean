@@ -116,7 +116,7 @@ def checkBase {k : Nat} (sys : State.Sys k.succ)
   let activators ←
     #[] |> sys.candidates.addBaseActivators
   let candidates ← sys.toUnroller.checkSatBaseAnd activators
-    (ifSat := sys.toUnroller.extractCexTrace >>= sys.candidates.registerBaseCex)
+    (ifSat := sys.toUnroller.extractTermCexTrace >>= sys.candidates.registerBaseCex)
     (ifUnsat := sys.candidates.registerBaseUnsat)
   let sys := {sys with candidates}
   if h : sys.isBaseOver then return sys else sys.checkBase h maxIter

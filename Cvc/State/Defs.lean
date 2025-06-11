@@ -198,6 +198,9 @@ def map (terms : Syms.TermsAt k)
 def getVals (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValsAt k) :=
   mapM terms Symbol.At.getVal
 
+def getValues (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValuesAt k) :=
+  mapM terms (Symbol.At.getValUsing Term.ToVal.Terms)
+
 end TermsAt
 
 def declareAt (syms : Syms.Idents) (k : Nat) : Smt (Syms.TermsAt k) :=

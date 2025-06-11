@@ -39,6 +39,9 @@ protected abbrev Repr :=
   (α : Type) → [Term.ToVal α] → Type
 
 namespace Repr
+protected abbrev srt (R : Symbol.Repr) (srt : Srt) : Type :=
+  @R srt.toType Term.ToVal.Terms
+
 protected abbrev Ident : Symbol.Repr := fun _ _ => String
 protected abbrev Term : Symbol.Repr := (Term ·)
 protected abbrev Val : Symbol.Repr := getValType

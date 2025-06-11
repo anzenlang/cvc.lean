@@ -99,7 +99,7 @@ end Invariant
 structure Falsified.Data (State : Symbols S) (k : Nat) where
   negActlit : Actlit
   falsifiedAt : Nat
-  cex : State.ValTrace falsifiedAt.succ
+  cex : State.ValueTrace falsifiedAt.succ
 
 namespace Falsified.Data
 
@@ -363,8 +363,8 @@ def addStepActivators {k : Nat} (unk : UnknownMap State k.succ) (activators : Ar
     if unk.isPrevStepInvalid then
       activators := activators.push unk.data.posActlit
       currNegActlits := currNegActlits.push unk.data.currNegActlit
-    else
-      Error.throwInternal s!"`{unk.info.name}` is not prev-step-invalid | {unk.data}"
+    else if ¬ unk.isStepInvalid then
+      Error.throwInternal s!"[at {k}] `{unk.info.name}` is not (prev-)step-invalid | {unk.data}"
   let currNegActlitsDisj ←
     if h : 2 ≤ currNegActlits.size then
       Term.mkOr currNegActlits h
@@ -570,7 +570,7 @@ def next (state : State.TermsAt k)
 
 section variable {k : Nat} (self : Candidates State k.succ)
 
-def registerBaseCex (cex : State.ValTrace k.succ) : Smt.Sat (Candidates State k.succ) := do
+def registerBaseCex (cex : State.ValueTrace k.succ) : Smt.Sat (Candidates State k.succ) := do
   let (self, unk) ← self.unknown.filterMapFoldM self
     fun self _ (unk : Unknown State _) => do
       if ¬ unk.isBaseValid ∧ (← unk.checkFalsified) then
