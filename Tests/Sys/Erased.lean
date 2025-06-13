@@ -22,16 +22,16 @@ abbrev Sw.State Data := ESymbols.ByName Data
 
 namespace Sw.State
 
-export ESymbols.ByName (StatePred StateRel getAs)
+export ESymbols.ByName (StatePred StateRel)
 
 def idents : ESymbols.ByName.Idents :=
   ESymbols.ByName.emptyIdents
-  |>.insertIdent! Bool "startStop"
-  |>.insertIdent! Bool "reset"
-  |>.insertIdent! Bool "risingStartStop"
-  |>.insertIdent! Bool "risingReset"
-  |>.insertIdent! Bool "isCounting"
-  |>.insertIdent! Int "counter"
+  |>.insert! "startStop" Bool
+  |>.insert! "reset" Bool
+  |>.insert! "risingStartStop" Bool
+  |>.insert! "risingReset" Bool
+  |>.insert! "isCounting" Bool
+  |>.insert! "counter" Int
 
 variable (state : State R)
 
@@ -39,24 +39,18 @@ def unwrap [ToString α] : Res α → String
 | .ok a => toString a
 | .error e => s!"{e}"
 
-def startStop [S : ToString (R.srt .bool)] (state : State R) :=
-  let val := state.findAs Bool "startStop"
-  @unwrap (R.srt .bool) S val
-def reset [S : ToString (R.srt .bool)] (state : State R) :=
-  let val := state.findAs Bool "reset"
-  @unwrap (R.srt .bool) S val
-def risingStartStop [S : ToString (R.srt .bool)] (state : State R) :=
-  let val := state.findAs Bool "risingStartStop"
-  @unwrap (R.srt .bool) S val
-def risingReset [S : ToString (R.srt .bool)] (state : State R) :=
-  let val := state.findAs Bool "risingReset"
-  @unwrap (R.srt .bool) S val
-def isCounting [S : ToString (R.srt .bool)] (state : State R) :=
-  let val := state.findAs Bool "isCounting"
-  @unwrap (R.srt .bool) S val
-def counter [S : ToString (R.srt .int)] (state : State R) :=
-  let val := state.findAs Int "counter"
-  @unwrap (R.srt .int) S val
+def startStop [S : ToString (R Bool)] (state : State R) :=
+  state.findAs Bool "startStop" |> @unwrap (R Bool) S
+def reset [S : ToString (R Bool)] (state : State R) :=
+  state.findAs Bool "reset" |> @unwrap (R Bool) S
+def risingStartStop [S : ToString (R Bool)] (state : State R) :=
+  state.findAs Bool "risingStartStop" |> @unwrap (R Bool) S
+def risingReset [S : ToString (R Bool)] (state : State R) :=
+  state.findAs Bool "risingReset" |> @unwrap (R Bool) S
+def isCounting [S : ToString (R Bool)] (state : State R) :=
+  state.findAs Bool "isCounting" |> @unwrap (R Bool) S
+def counter [S : ToString (R Int)] (state : State R) :=
+  state.findAs Int "counter" |> @unwrap (R Int) S
 
 end Sw.State
 

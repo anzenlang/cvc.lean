@@ -47,16 +47,16 @@ with
 /--
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 ---
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
 _bad1 : Term Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 -/
 
 [Term.mkAdd.nonArith]
@@ -65,16 +65,16 @@ _bad1 : Term Bool
 /--
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 ---
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
 _bad1 : Term Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 -/
 
 [Term.mkDiv!.nonArith]
@@ -83,16 +83,16 @@ _bad1 : Term Bool
 /--
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 ---
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
 _bad1 : Term Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 -/
 
 [Term.mkDivTotal.nonArith]
@@ -101,14 +101,14 @@ _bad1 : Term Bool
 /--
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 ---
 error: could not synthesize default value for parameter 'Arith' using tactics
 ---
-error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 b1 b2 b3 b4 : Term.Bool
 _bad1 : Term Bool
-⊢ Srt.Bij.Arith Bool
+⊢ IsSrt.Arith Bool
 -/

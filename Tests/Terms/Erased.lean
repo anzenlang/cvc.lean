@@ -19,8 +19,8 @@ open scoped Cvc.Term.Dsl
 
 def declareTerms : Smt ESymbols.ByName.Terms := do
   let mut syms := ESymbols.ByName.emptyIdents
-  syms ← syms.insertIdent Bool "isCounting"
-  syms ← syms.insertIdent Int "counter"
+  syms ← syms.insert "isCounting" Bool
+  syms ← syms.insert "counter" Int
   syms.declare
 
 
@@ -28,14 +28,14 @@ def declareTerms : Smt ESymbols.ByName.Terms := do
 Smt.test! [ETerm.basic1]
   let terms ← declareTerms
 
-  let counter ← terms.get "counter" >>= (ETerm.as · Int)
+  let counter ← terms.findETerm "counter" >>= (ETerm.as · Int)
   println! s!"counter term: {counter}"
-  let counter ← terms.getAs Int "counter"
+  let counter ← terms.findAs Int "counter"
   println! s!"counter term again: {counter}"
 
   let iteTerm ← smt!
-    if ?[ terms.get "isCounting" : Bool ]
-    then ?[ terms.get "counter" : Int ] + 1 else 0
+    if ?[ terms.find "isCounting" : Bool ]
+    then ?[ terms.find "counter" : Int ] + 1 else 0
   println! "ite term: {iteTerm}"
 /-- info:
 counter term: counter
@@ -48,14 +48,14 @@ ite term: (ite isCounting (+ counter 1) 0)
 Smt.test! [ETerm.basic2]
   let terms ← declareTerms
 
-  let counter ← terms.get "counter" >>= (ETerm.as · Int)
+  let counter ← terms.findETerm "counter" >>= (ETerm.as · Int)
   println! s!"counter term: {counter}"
-  let counter ← terms.getAs Int "counter"
+  let counter ← terms.findAs Int "counter"
   println! s!"counter term again: {counter}"
 
   let iteTerm ← smt!
-    if ![ terms.getAs Bool "isCounting" ]
-    then ![ terms.getAs Int "counter" ] + 1 else 0
+    if ![ terms.findAs Bool "isCounting" ]
+    then ![ terms.findAs Int "counter" ] + 1 else 0
   println! "ite term: {iteTerm}"
 /-- info:
 counter term: counter
@@ -68,8 +68,8 @@ ite term: (ite isCounting (+ counter 1) 0)
 Smt.test! [ETerm.bad1]
   let terms ← declareTerms
   let iteTerm ← smt!
-    if ?[ terms.get "isCounting" : Bool ]
-    then ?[ terms.get "isCounting" : Int ] + 1 else 0
+    if ?[ terms.findETerm "isCounting" : Bool ]
+    then ?[ terms.findETerm "isCounting" : Int ] + 1 else 0
   println! "ite term: {iteTerm}"
 /-- info:
 user error: erased term of type `Bool` cannot be typed as `Int`
@@ -82,8 +82,8 @@ user error: erased term of type `Bool` cannot be typed as `Int`
 Smt.test! [ETerm.bad2]
   let terms ← declareTerms
   let iteTerm ← smt!
-    if ![ terms.getAs Bool "isCounting" ]
-    then ![ terms.getAs Int "isCounting" ] + 1 else 0
+    if ![ terms.findAs Bool "isCounting" ]
+    then ![ terms.findAs Int "isCounting" ] + 1 else 0
   println! "ite term: {iteTerm}"
 /-- info:
 user error: symbol `isCounting : Bool` cannot be typed as `Int`

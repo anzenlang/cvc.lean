@@ -140,7 +140,7 @@ def elabTests : CommandElab
 -- /--
 -- error: could not synthesize default value for parameter 'h_arith' using tactics
 -- ---
--- error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+-- error: expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 -- b1 b2 : Term.Bool
 -- ⊢ Cvc.is_arith Bool
 -- -/
@@ -152,7 +152,7 @@ def elabTests : CommandElab
 -- /--
 -- error: could not synthesize default value for parameter 'h_arith' using tactics
 -- ---
--- error: arithmetic type `Int` or `Rat` required, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`
+-- error: arithmetic type `Int` or `Rat` required, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`
 -- b1 b2 : Term.Bool
 -- ⊢ Cvc.is_arith Bool
 -- -/
