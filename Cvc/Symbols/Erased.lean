@@ -16,7 +16,7 @@ namespace Cvc
 
 structure ESymbol (R : Symbol.Repr := (Symbol.Ident ·)) where
   srt : Srt
-  getData : @R srt.toType Term.ToVal.Terms
+  getData : R srt
 
 namespace ESymbol
 
@@ -24,10 +24,10 @@ section variable (erased : ESymbol R)
 
 abbrev type := erased.srt.toType
 
-def mapM [Monad m] (f : R.srt erased.srt → m (R'.srt erased.srt)) : m (ESymbol R') :=
+def mapM [Monad m] (f : R erased.srt → m (R' erased.srt)) : m (ESymbol R') :=
   return ⟨erased.srt, ← f erased.getData⟩
 
-def map (f : R.srt erased.srt → R'.srt erased.srt) : ESymbol R' :=
+def map (f : R erased.srt → R' erased.srt) : ESymbol R' :=
   erased.mapM (m := Id) f
 
 end
@@ -36,44 +36,47 @@ protected abbrev Ident := ESymbol (Symbol.Ident ·)
 protected abbrev Term := ESymbol (Symbol.Term ·)
 protected abbrev Value := ESymbol (Symbol.Value ·)
 
-def mkIdent (name : String) (srt : Srt) : ESymbol.Ident :=
-  ⟨srt, .mk name⟩
+protected def toString (symbol : ESymbol R) [ToString (R symbol.srt)] : String :=
+  toString symbol.getData
 
+instance : ToString ESymbol.Ident := ⟨(ESymbol.toString ·)⟩
+instance : ToString ESymbol.Term := ⟨(ESymbol.toString ·)⟩
+instance : ToString ESymbol.Value := ⟨(ESymbol.toString ·)⟩
 
-protected def toString (eSymbol : ESymbol.Ident) : String :=
-  toString eSymbol.getData
+def mkIdent (name : String) (α : Type) [IsSrt α] : ESymbol.Ident :=
+  ⟨getSrt α, .mk name⟩
 
-instance : ToString ESymbol.Ident := ⟨ESymbol.toString⟩
+namespace Ident variable (ident : ESymbol.Ident)
 
-def declare (ident : ESymbol.Ident) : Smt ESymbol.Term := do
-  let ⟨srt, symbol⟩ := ident
-  let term ← symbol.declare
-  return ⟨srt, term⟩
+def mk := @ESymbol.mkIdent
 
-def getSymbolETerm (term : ESymbol.Term) : ETerm :=
-  ⟨term.srt, term.getData⟩
+def declare : Smt ESymbol.Term :=
+  return ⟨ident.srt, ← ident.getData.declare⟩
 
-def getETerm (term : ESymbol.Term) : ETerm := term.getSymbolETerm
+end Ident
 
-def getSymbolTerm (term : ESymbol.Term) : Term term.srt.toType :=
-  term.getData
+namespace Term variable (term : ESymbol.Term)
 
-def getValue (term : ESymbol.Term) : Smt.Sat ESymbol.Value := do
-  let ⟨srt, term⟩ := term
-  let value ← term.getValUsing Term.ToVal.Terms
-  return ⟨srt, value⟩
+def toTerm : Term term.srt := term.getData
 
-def getValueETerm (value : ESymbol.Value) : ETerm :=
-  ⟨value.srt, value.getData⟩
+def toETerm : ETerm := ⟨term.srt, term.toTerm⟩
 
-def getValueTerm (value : ESymbol.Value) : Term value.srt.toType :=
-  value.getData
+instance : Coe ESymbol.Term ETerm := ⟨toETerm⟩
 
-def getValUsing (value : ESymbol.Value) (Val : Term.ToVal value.srt.toType) : Term.Build Val :=
-  Val.ofTerm value.getValueTerm
+def getValue : Smt.Sat ESymbol.Value :=
+  return ⟨term.srt, ← term.getData.getValue⟩
 
-def getVal (value : ESymbol.Value) [Val : Term.ToVal value.srt.toType] : Term.Build Val :=
-  value.getValUsing Val
+end Term
+
+namespace Value variable (value : ESymbol.Value)
+
+def toValue : Value value.srt := value.getData
+
+def toEValue : EValue := ⟨value.srt, value.toValue⟩
+
+instance : Coe ESymbol.Value EValue := ⟨toEValue⟩
+
+end Value
 
 end ESymbol
 
@@ -89,21 +92,21 @@ ofRBMap ::
 namespace ByName
 
 def mapM [Monad m] (symbols : ByName R)
-  (f : (srt : Srt) → R.srt srt → m (R'.srt srt))
+  (f : (srt : Srt) → R srt → m (R' srt))
 : m (ByName R') :=
   ofRBMap <$> symbols.rbMap.mapValM fun _name symbol => symbol.mapM (f symbol.srt)
 
-def map (symbols : ByName R) (f : (srt : Srt) → R.srt srt → R'.srt srt) : ByName R' :=
+def map (symbols : ByName R) (f : (srt : Srt) → R srt → R' srt) : ByName R' :=
   symbols.mapM (m := Id) f
 
 protected def forIn [Monad m] (symbols : ByName R)
-  (init : β) (f : (srt : Srt) → R.srt srt → β → m (ForInStep β))
+  (init : β) (f : (srt : Srt) → R srt → β → m (ForInStep β))
 : m β :=
   ForIn.forIn symbols.rbMap init fun (_name, symbol) => f symbol.srt symbol.getData
 
 instance instSymbols : Symbols ByName where
-  mapM symbols f := symbols.mapM fun srt => @f srt.toType Term.ToVal.Terms
-  forIn symbols init f := symbols.forIn init fun srt => @f srt.toType Term.ToVal.Terms
+  mapM symbols f := symbols.mapM fun _srt => f
+  forIn symbols init f := symbols.forIn init fun _srt => f
 
 protected abbrev Idents := instSymbols.Idents
 protected abbrev Terms := instSymbols.Terms
@@ -119,15 +122,15 @@ def emptyIdents : ByName.Idents := empty
 
 section variable (symbols : ByName R)
 
-def insert! (name : String) (data : ESymbol R) : ByName R :=
+private def genericInsert! (name : String) (data : ESymbol R) : ByName R :=
   symbols.rbMap.insert name data |> ofRBMap
 
-def insert? (name : String) (data : ESymbol R) : Option (ESymbol R) × ByName R :=
+private def genericInsert? (name : String) (data : ESymbol R) : Option (ESymbol R) × ByName R :=
   let (prev?, map) := symbols.rbMap.insert' name data
   (prev?, ofRBMap map)
 
-def insert (name : String) (data : ESymbol R) : Res (ByName R) :=
-  let (prev?, symbols) := symbols.insert? name data
+private def genericInsert (name : String) (data : ESymbol R) : Res (ByName R) :=
+  let (prev?, symbols) := symbols.genericInsert? name data
   if prev?.isSome then Error.throwUser
     s!"cannot insert symbol with name `{name}`: a symbol with this name already exists"
   else return symbols
@@ -145,23 +148,23 @@ def findSrt? (name : String) : Option Srt :=
 def findSrt (name : String) : Res Srt :=
   symbols.find name |>.map ESymbol.srt
 
-def findAsSrt? (srt : Srt) (name : String) : Option (R.srt srt) := do
+def findAsSrt? (srt : Srt) (name : String) : Option (R srt) := do
   let ⟨srt', repr⟩ ← symbols.find? name
   if h : srt' = srt then return h ▸ repr else none
 
-def findAsSrt (srt : Srt) (name : String) : Res (R.srt srt) := do
+def findAsSrt (srt : Srt) (name : String) : Res (R srt) := do
   let ⟨srt', repr⟩ ← symbols.find name
   if h : srt' = srt then return h ▸ repr
   else Error.throwUser s!"symbol `{name} : {srt'}` cannot be typed as `{srt}`"
 
-def findAs? (α : Type) [A : Srt.Bij α] (name : String) : Option (@R α Term.ToVal.Terms) := do
+def findAs? (α : Type) [A : IsSrt α] (name : String) : Option (R α) := do
   let ⟨srt, h_bij⟩ := A
   let asSrt ← symbols.findAsSrt? srt name
   return by
     cases h_bij
     exact asSrt
 
-def findAs (α : Type) [A : Srt.Bij α] (name : String) : Res (@R α Term.ToVal.Terms) := do
+def findAs (α : Type) [A : IsSrt α] (name : String) : Res (R α) := do
   let ⟨srt, h_bij⟩ := A
   let asSrt ← symbols.findAsSrt srt name
   return by
@@ -172,85 +175,37 @@ end
 
 
 
-section variable (idents : ByName.Idents) (α : Type) [A : Srt.Bij α] (name : String)
+namespace Idents
 
-def insertIdent! : ByName.Idents :=
-  ESymbol.mkIdent name A.srt |> idents.insert! name
+def empty := emptyIdents
 
-def insertIdent? : Option ESymbol.Ident × ByName.Idents :=
-  ESymbol.mkIdent name A.srt |> idents.insert? name
+section variable (idents : ByName.Idents) (name : String) (α : Type) [A : IsSrt α]
 
-def insertIdent : Res ByName.Idents :=
-  ESymbol.mkIdent name A.srt |> idents.insert name
+def insert! : ByName.Idents :=
+  ESymbol.mkIdent name A.srt |> idents.genericInsert! name
 
-end
+def insert? : Option ESymbol.Ident × ByName.Idents :=
+  ESymbol.mkIdent name A.srt |> idents.genericInsert? name
 
-
-
-section variable (idents : ByName.Idents) (srt : Srt) (name : String)
-
-def insertIdentSrt! : ByName.Idents :=
-  ESymbol.mkIdent name srt |> idents.insert! name
-
-def insertIdentSrt? : Option ESymbol.Ident × ByName.Idents :=
-  ESymbol.mkIdent name srt |> idents.insert? name
-
-def insertIdentSrt : Res ByName.Idents :=
-  ESymbol.mkIdent name srt |> idents.insert name
+def insert : Res ByName.Idents :=
+  ESymbol.mkIdent name A.srt |> idents.genericInsert name
 
 end
 
+end Idents
 
 
-section variable (terms : ByName.Terms)
 
-/-- Retrieves the erased term of a name, fails if none. -/
-def findETerm? (name : String) : Option ETerm := do
-  let data ← terms.find? name
-  return ETerm.mk data.srt data.getData
+namespace Terms variable (terms : ByName.Terms) (name : String)
 
-@[inherit_doc findETerm?]
-def findETerm (name : String) : Res ETerm := do
-  let data ← terms.find name
-  return ETerm.mk data.srt data.getData
+def find? : Option ESymbol.Term := ByName.find? terms name
 
-@[inherit_doc findETerm]
-def get (name : String) : Res ETerm := terms.findETerm name
+def find : Res ESymbol.Term := ByName.find terms name
 
-section variable (srt : Srt) (name : String)
+def findETerm? : Option ETerm := ESymbol.Term.toETerm <$> terms.find? name
 
-/-- Retrieves the `Srt`-typed term of a name, fails if none or types do not match. -/
-def findTermAsSrt? : Option (Term srt.toType) := do
-  let eTerm ← terms.findETerm? name
-  eTerm.asSrt? (srt := srt)
+def findETerm : Res ETerm := ESymbol.Term.toETerm <$> terms.find name
 
-@[inherit_doc findTermAsSrt?]
-def findTermAsSrt : Res (Term srt.toType) := do
-  terms.findETerm name >>= ETerm.asSrt (srt := srt)
-
-@[inherit_doc findTermAsSrt]
-def getAsSrt : Res (Term srt.toType) := do
-  terms.findTermAsSrt srt name
-
-end
-
-section variable (α : Type) [A : Srt.Bij α] (name : String)
-
-/-- Retrieves the typed term of a name, fails if none or types do not match. -/
-def findTermAs? : Option (Term α) := do
-  terms.findETerm? name >>= ETerm.as? (α := α)
-
-@[inherit_doc findTermAs?]
-def findTermAs : Res (Term α) := do
-  let eTerm ← terms.findETerm name
-  eTerm.as α |>.context ls!"failed to type-check symbol `{name} : {eTerm.srt}` as `{A.srt}`"
-
-@[inherit_doc findTermAs]
-def getAs : Res (Term α) := do
-  terms.findAs α name
-
-end
-
-end
+end Terms
 
 end ByName

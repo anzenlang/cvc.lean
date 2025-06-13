@@ -37,7 +37,7 @@ scoped syntax (name := stateStructureSyntax)
 
 namespace Idents
 def id_IdentsAt := Lean.mkIdent `IdentsAt
-def id_ValsAt := Lean.mkIdent `ValsAt
+def id_ValuesAt := Lean.mkIdent `ValuesAt
 def id_ModelAt := Lean.mkIdent `ModelAt
 def id_TermsAt := Lean.mkIdent `TermsAt
 def id_FunAt := Lean.mkIdent `FunAt
@@ -79,8 +79,8 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 
     abbrev $id_IdentsAt (k : Nat) := $(id_inst).$id_IdentsAt k
     abbrev $id_TermsAt (k : Nat) := $(id_inst).$id_TermsAt k
-    abbrev $id_ValsAt (k : Nat) := $(id_inst).$id_ValsAt k
-    abbrev $id_ModelAt (k : Nat) := $id_ValsAt k
+    abbrev $id_ValuesAt (k : Nat) := $(id_inst).$id_ValuesAt k
+    abbrev $id_ModelAt (k : Nat) := $(id_inst).$id_ModelAt k
 
     abbrev $id_unroll (idents : $id_Idents) (k : Nat := 0) : $id_IdentsAt k :=
       $(id_inst).$id_unroll idents k

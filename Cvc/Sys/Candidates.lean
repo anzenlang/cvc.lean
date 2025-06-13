@@ -263,8 +263,9 @@ def isInvariant? {k : Nat} (unk : Unknown State k.succ) : Option Nat :=
 def toInvariant? {k : Nat} (unk : Unknown State k.succ) : Option (Invariant State k.succ) :=
   return .mk unk.info (← unk.data.toInvariant?)
 
-def checkFalsified {k : Nat} (unk : Unknown State k.succ) : Smt.Sat Bool :=
-  Bool.not <$> Smt.getVal unk.data.currPred
+def checkFalsified {k : Nat} (unk : Unknown State k.succ) : Smt.Sat Bool := do
+  let val ← Smt.getValue unk.data.currPred
+  Bool.not <$> val.boolVal.context ls!"failed to retrieve value of predicate `{unk.name}` at {k}"
 
 def confirmBase {k : Nat} (unk : Unknown State k.succ) : Res (Unknown State k.succ) :=
   return unk.updateData (← unk.data.confirmBase)

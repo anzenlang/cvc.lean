@@ -22,9 +22,6 @@ inductive Trace (State : Symbols Struct) (Repr : Nat → Type) : (length : Nat) 
 abbrev TermTrace (State : Symbols Struct) (length : Nat) :=
   State.Trace State.TermsAt length
 
-abbrev ValTrace (State : Symbols Struct) (length : Nat) :=
-  State.Trace State.ValsAt length
-
 abbrev ValueTrace (State : Symbols Struct) (length : Nat) :=
   State.Trace State.ValuesAt length
 

@@ -6,6 +6,7 @@ Authors: Adrien Champion
 -/
 
 import Cvc.Defs
+import Cvc.Term.Erased
 
 
 
@@ -120,7 +121,7 @@ macro_rules
 -- | `(smt! [| $t:term |]) => `((pure $t))
 | `(smt! ![ $t:term ]) => `($t)
 | `(smt! ($t:smtTerm)) => `(smt! $t)
-| `(smt! ?[ $t:term : $ty:term ]) => `($t >>= fun eTerm => eTerm.as $ty)
+| `(smt! ?[ $t:term : $ty:term ]) => `($t >>= fun eTerm => Cvc.ETerm.as eTerm $ty)
 
 | `(smt! false) => `(Cvc.Term.bool false)
 | `(smt! true) => `(Cvc.Term.bool true)

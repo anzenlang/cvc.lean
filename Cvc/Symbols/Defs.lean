@@ -29,32 +29,32 @@ structures so that `cvc.lean` can provide helpers for declaring function symbols
 class Symbols (Struct : Symbols.Repr) where
   /-- Monadic *map* over a `Struct _`. -/
   mapM {m : Type → Type} [Monad m] (repr : Struct R)
-    (f : {α : Type} → [Term.ToVal α] → R α → m (R' α))
+    (f : {α : Type} → [IsSrt α] → R α → m (R' α))
   : m (Struct R')
   /-- `ForIn`-like iteration/fold over `ESymbol _` elements. -/
   forIn {m : Type → Type} [Monad m] (symbols : Struct R)
-    (init : β) (f : {α : Type} → [Term.ToVal α] → R α → β → m (ForInStep β))
+    (init : β) (f : {α : Type} → [IsSrt α] → R α → β → m (ForInStep β))
   : m β
 
 namespace Symbols variable [Syms : Symbols Struct]
 
 /-- Maps over the symbols in a `Struct F`. -/
 def map (symbols : Struct R)
-  (f : {α : Type} → [Term.ToVal α] → R α → G α)
+  (f : {α : Type} → [IsSrt α] → R α → G α)
 : Struct G :=
   Syms.mapM (m := Id) symbols f
 
 @[default_instance]
-instance instForIn : ForIn m (Struct R) ((α : Type) × (_ : Term.ToVal α) × (R α)) where
+instance instForIn : ForIn m (Struct R) ((α : Type) × (_ : IsSrt α) × (R α)) where
   forIn symbols init f :=
     Syms.forIn symbols init
       fun repr acc => f ⟨_, inferInstance, repr⟩ acc
 
 abbrev Idents := let _ := Syms ; Struct (Symbol.Ident ·)
 abbrev Terms := let _ := Syms ; Struct (Symbol.Term ·)
-abbrev Vals := let _ := Syms ; Struct (Symbol.Val ·)
-abbrev Model := let _ := Syms ; Struct (Symbol.Val ·)
 abbrev Values := let _ := Syms ; Struct (Symbol.Value ·)
+abbrev Model := Syms.Values
+-- abbrev Vals := let _ := Syms ; Struct (Symbol.Val ·)
 
 abbrev FunT m α := Syms.Terms → Term.BuildT m (Term α)
 abbrev FunctionT := @FunT
@@ -75,11 +75,11 @@ abbrev Relation := @Rel
 namespace Idents variable (idents : Syms.Idents)
 
 def mapM [Monad m]
-  (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → m (R α))
+  (f : {α : Type} → [IsSrt α] → Symbol.Ident α → m (R α))
 : m (Struct R) :=
   Syms.mapM idents (fun sym => f sym)
 
-def map (f : {α : Type} → [Term.ToVal α] → Symbol.Ident α → R α) : Struct R :=
+def map (f : {α : Type} → [IsSrt α] → Symbol.Ident α → R α) : Struct R :=
   mapM (m := Id) idents f
 
 def declare : Smt Syms.Terms := mapM idents (fun ident => Symbol.declare ident)
@@ -94,21 +94,18 @@ export Idents (declare)
 namespace Terms variable (terms : Syms.Terms)
 
 def mapM [Monad m]
-  (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → m (R α))
+  (f : {α : Type} → [IsSrt α] → Symbol.Term α → m (R α))
 : m (Struct R) :=
   Syms.mapM terms f
 
-def map (f : {α : Type} → [Term.ToVal α] → Symbol.Term α → R α) : Struct R :=
+def map (f : {α : Type} → [IsSrt α] → Symbol.Term α → R α) : Struct R :=
   mapM (m := Id) terms f
 
 /-- Retrieves the values of all symbols in a *sat* context. -/
-def getModel : Smt.Sat Syms.Model := mapM terms Symbol.getVal
-
-/-- Retrieves the values of all symbols in a *sat* context. -/
-def getVals : Smt.Sat Syms.Vals := mapM terms Symbol.getVal
-
-/-- Retrieves the values of all symbols in a *sat* context. -/
 def getValues : Smt.Sat Syms.Values := mapM terms Symbol.getValue
+
+/-- Retrieves the values of all symbols in a *sat* context. -/
+def getModel : Smt.Sat Syms.Model := terms.getValues
 
 end Terms
 

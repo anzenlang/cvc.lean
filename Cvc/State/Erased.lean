@@ -21,7 +21,7 @@ abbrev TermAt k := ESymbol (Symbol.TermAt k ·)
 abbrev ValueAt k := ESymbol (Symbol.ValueAt k ·)
 
 def unrollAt (ident : ESymbol.Ident) (k : Nat := 0) : ESymbol.IdentAt k :=
-  ident.map (Symbol.unrollAt · k)
+  ident.map (Symbol.Ident.unroll · k)
 
 instance : ToString (IdentAt k) := ⟨fun id => toString id.getData⟩
 instance : ToString (TermAt k) := ⟨fun id => toString id.getData⟩

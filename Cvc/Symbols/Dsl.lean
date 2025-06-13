@@ -80,7 +80,7 @@ def id_Spec := Lean.mkIdent `Spec
 def id_toSymbols := Lean.mkIdent `toSymbols
 def id_Idents := Lean.mkIdent `Idents
 def id_idents := Lean.mkIdent `idents
-def id_Vals := Lean.mkIdent `Vals
+def id_Values := Lean.mkIdent `Values
 def id_Model := Lean.mkIdent `Model
 def id_Terms := Lean.mkIdent `Terms
 def id_Fun := Lean.mkIdent `Fun
@@ -146,8 +146,8 @@ def elabStateStructureSyntax : Lean.Elab.Command.CommandElab
 
     abbrev $id_Idents := $id_inst.$id_Idents
     abbrev $id_idents : $id_Idents := ⟨ $[ $ident'Elms ],* ⟩
-    abbrev $id_Vals := $id_inst.$id_Vals
-    abbrev $id_Model := $id_Vals
+    abbrev $id_Values := $id_inst.$id_Values
+    abbrev $id_Model := $id_inst.$id_Model
     abbrev $id_Terms := $id_inst.$id_Terms
     protected abbrev $id_Fun := $id_inst.$id_Fun
     protected abbrev $id_Function := $id_inst.$id_Function

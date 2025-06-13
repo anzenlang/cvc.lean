@@ -34,14 +34,11 @@ abbrev IdentAt k α := Symbol.At k String α
 /-- Type alias for a `Symbol.Term` at some depth. -/
 abbrev TermAt (k : semiOutParam Nat) α := Symbol.At k (Term α) α
 /-- Type alias for a `Symbol.Val` at some depth. -/
-abbrev ValAt k α [Val : Term.ToVal α] := Symbol.At k Val α
-/-- Type alias for a `Symbol.Value` at some depth. -/
-abbrev ValueAt k α := Symbol.At k (Term α) α
+abbrev ValueAt k α := Symbol.At k (Value α) α
 
-instance : CoeDep (TermAt k α) term (Term α) := ⟨term.getSymbol.get⟩
+instance : CoeDep (Symbol.TermAt k α) term (Term α) := ⟨term.getSymbol.get⟩
 
-def unrollAt (symbol : Symbol.Ident α) (k : Nat := 0) : IdentAt k α :=
-  {symbol with get := At.mkName symbol.name k} |> Symbol.At.mk
+
 
 namespace At
 
@@ -52,7 +49,7 @@ instance [ToString β] : ToString (Symbol.At k β α) := ⟨fun s => toString s.
 
 section variable [Monad m] (sym : Symbol.At k β α)
 
-def getName : String := At.mkName sym.getSymbol.name k
+def name : String := At.mkName sym.getSymbol.name k
 
 /-- Monadic map over the inner symbol. -/
 private def mapSymbolM (f : Symbol β α → m (Symbol γ α)) : m (Symbol.At k γ α) := do
@@ -65,57 +62,54 @@ def map (sym : Symbol.At k β α) (f : β → γ) : Symbol.At k γ α :=
 
 end
 
-def unrollAt (sym : Symbol.IdentAt k α) (k' : Nat := 0) : Symbol.IdentAt k' α :=
-  sym.getSymbol.unrollAt k'
-
-def next (sym : Symbol.IdentAt k α) : Symbol.IdentAt k.succ α :=
-  sym.getSymbol.unrollAt k.succ
-
-
-
-/-- Declares an unrolled symbol, yielding the corresponding unrolled term.
-
-
-# TODO
-
-- users are expected to use `Symbol.declareAt`, not this function: privatize/remove?
--/
-def declare [Srt.Bij α] (sIdent : Symbol.IdentAt k α) : Smt (Symbol.TermAt k α) :=
-  sIdent.mapSymbolM (Symbol.declare ·)
-
-/-- Asserts an unrolled Boolean term. -/
-def assert (sTerm : Symbol.TermAt k Bool) : Smt Unit :=
-  sTerm.getSymbol.assert
-
-/-- Retrieves the value of an unrolled term. -/
-def getValUsing (Val : Term.ToVal α) (sTerm : Symbol.TermAt k α) : Smt.Sat (Symbol.ValAt k α) :=
-  sTerm.mapSymbolM (Symbol.getValUsing Val ·)
-
-@[inherit_doc getValUsing]
-def getVal [Val : Term.ToVal α] (sTerm : Symbol.TermAt k α) : Smt.Sat (Symbol.ValAt k α) :=
-  sTerm.getValUsing Val
-
 end At
 
 
 
-namespace IdentsAt
-export At (declare unrollAt next)
-end IdentsAt
+namespace IdentAt variable [IsSrt α] (ident : Symbol.IdentAt k α)
 
-namespace TermsAt
-export At (assert getValUsing getVal)
-end TermsAt
+def ofIdent (ident : Symbol.Ident α) (k : Nat := 0) : Symbol.IdentAt k α :=
+  {ident with get := At.mkName ident.name k} |> Symbol.At.mk
 
-/-- Declares a symbol at some depth, yielding the corresponding unrolled term. -/
-def declareAt [Srt.Bij α] (sym : Symbol.Ident α) (k : Nat) : Smt (Symbol.TermAt k α) :=
-  sym.unrollAt k |>.declare
+def getIdent : Symbol.Ident α :=
+  Symbol.Ident.mk ident.name
 
-@[inherit_doc Symbol.At.getValUsing]
-abbrev getValAtUsing := @Symbol.At.getValUsing
+def unroll (k' : Nat := k.succ) : Symbol.IdentAt k' α :=
+  ofIdent ident.getIdent k'
 
-@[inherit_doc Symbol.At.getVal]
-abbrev getValAt := @Symbol.At.getValUsing
+def next : Symbol.IdentAt k.succ α :=
+  ident.unroll
+
+def declare : Smt (Symbol.TermAt k α) := ident.mapSymbolM (Symbol.declare ·)
+
+end IdentAt
+
+namespace Ident
+
+def unroll (ident : Symbol.Ident α) (k : Nat := 0) : Symbol.IdentAt k α :=
+  IdentAt.ofIdent ident k
+
+def declareAt [IsSrt α] (ident : Symbol.Ident α) (k : Nat := 0) : Smt (Symbol.TermAt k α) :=
+  ident.unroll k |>.declare
+
+end Ident
+
+namespace At
+export IdentAt (ofIdent getIdent unroll next declare)
+end At
+
+
+
+namespace TermAt variable [IsSrt α] (term : Symbol.TermAt k α)
+
+def getValue : Smt.Sat (Symbol.ValueAt k α) :=
+  term.mapSymbolM (Symbol.getValue)
+
+end TermAt
+
+-- namespace At
+-- export TermAt (getValue)
+-- end At
 
 end Symbol
 
@@ -125,12 +119,12 @@ namespace Symbols variable [Syms : Symbols Struct]
 
 abbrev IdentsAt (k : Nat) := let _ := Syms ; Struct (Symbol.IdentAt k ·)
 abbrev TermsAt (k : Nat) := let _ := Syms ; Struct (Symbol.TermAt k ·)
-abbrev ValsAt (k : Nat) := let _ := Syms ; Struct (Symbol.ValAt k ·)
-abbrev ValuesAt (k : Nat) := let _ := Syms ; Struct (Symbol.TermAt k ·)
+abbrev ModelAt (k : Nat) := let _ := Syms ; Struct (Symbol.ValueAt k ·)
+abbrev ValuesAt (k : Nat) := Syms.ModelAt k
 
-abbrev FunAtM m (k : Nat) α := Syms.TermsAt k → Term.BuildT m (Term α)
-abbrev FunctionAtM := @FunAtM
-abbrev FunAt k α := Syms.FunAtM Id k α
+abbrev FunMAt m (k : Nat) α := Syms.TermsAt k → Term.BuildT m (Term α)
+abbrev FunctionMAt := @FunMAt
+abbrev FunAt k α := Syms.FunMAt Id k α
 abbrev FunctionAt := @FunAt
 
 abbrev PredAt (k : Nat) := Syms.FunAt k Bool
@@ -154,23 +148,23 @@ abbrev NamedPredicates := Syms.NamedPreds
 namespace IdentsAt
 
 def mapM [Monad m] (syms : Syms.IdentsAt k)
-  (f : {α : Type} → [Term.ToVal α] → Symbol.IdentAt k α → m (R α))
+  (f : {α : Type} → [IsSrt α] → Symbol.IdentAt k α → m (R α))
 : m (Struct R) :=
   Syms.mapM syms f
 
 def map (syms : Syms.IdentsAt k)
-  (f : {α : Type} → [Term.ToVal α] → Symbol.IdentAt k α → R α)
+  (f : {α : Type} → [IsSrt α] → Symbol.IdentAt k α → R α)
 : Struct R :=
   mapM (m := Id) syms f
 
 def unroll (syms : Syms.Idents) (k : Nat := 0) : Syms.IdentsAt k :=
-  Syms.map syms (Symbol.unrollAt · k)
+  Syms.map syms (Symbol.Ident.unroll · k)
 
 def next (syms : Syms.IdentsAt k) : Syms.IdentsAt k.succ :=
-  map syms Symbol.At.next
+  map syms .next
 
-def declare (syms : Syms.IdentsAt k) : Smt (Syms.TermsAt k) :=
-  mapM syms Symbol.At.declare
+private def declare (syms : Syms.IdentsAt k) : Smt (Syms.TermsAt k) :=
+  mapM syms Symbol.IdentAt.declare
 
 def declareAt (syms : Syms.Idents) (k : Nat) : Smt (Syms.TermsAt k) :=
   unroll syms k |>.declare
@@ -186,28 +180,23 @@ end Idents
 namespace TermsAt
 
 def mapM [Monad m] (terms : Syms.TermsAt k)
-  (f : {α : Type} → [Term.ToVal α] → Symbol.TermAt k α → m (R α))
+  (f : {α : Type} → [IsSrt α] → Symbol.TermAt k α → m (R α))
 : m (Struct R) :=
   Syms.mapM terms f
 
 def map (terms : Syms.TermsAt k)
-  (f : {α : Type} → [Term.ToVal α] → Symbol.TermAt k α → R α)
+  (f : {α : Type} → [IsSrt α] → Symbol.TermAt k α → R α)
 : Struct R :=
   mapM (m := Id) terms f
 
-def getVals (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValsAt k) :=
-  mapM terms Symbol.At.getVal
+/-- Retrieves the value of each symbol at some depth. -/
+def getModel (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValuesAt k) :=
+  mapM terms Symbol.TermAt.getValue
 
-def getValues (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValuesAt k) :=
-  mapM terms (Symbol.At.getValUsing Term.ToVal.Terms)
+@[inherit_doc getModel]
+def getValues := @getModel
 
 end TermsAt
-
-def declareAt (syms : Syms.Idents) (k : Nat) : Smt (Syms.TermsAt k) :=
-  Syms.unroll syms k |>.declare
-
-def getValsAt (terms : Syms.TermsAt k) : Smt.Sat (Syms.ValsAt k) :=
-  Symbols.TermsAt.getVals terms
 
 end Symbols
 

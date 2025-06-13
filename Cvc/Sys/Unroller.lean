@@ -33,7 +33,7 @@ section var_sys variable (sys : Unroller State length)
 
 protected abbrev length : Nat := let _ := sys ; length
 
-abbrev CexTrace := State.ValTrace sys.length
+abbrev CexTrace := State.ValueTrace sys.length
 
 abbrev TermCexTrace := State.ValueTrace sys.length
 
@@ -42,7 +42,7 @@ abbrev Idx := let _ := sys ; Fin length
 def getTermsAt (i : sys.Idx) : State.TermsAt i := sys.trace.get i
 
 def extractCexTrace : Smt.Sat sys.CexTrace := do
-  sys.trace.mapM fun _ terms => terms.getVals
+  sys.trace.mapM fun _ terms => terms.getValues
 
 def extractTermCexTrace : Smt.Sat sys.TermCexTrace := do
   sys.trace.mapM fun _ terms => terms.getValues

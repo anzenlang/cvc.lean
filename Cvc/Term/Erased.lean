@@ -20,7 +20,7 @@ mk ::
   /-- Sort of the underlying typed-term. -/
   srt : Srt
   /-- Typed version of a type-erased term. -/
-  typed : Term srt.toType
+  typed : Term srt
 
 /-- An erased value for some `Srt`. -/
 structure EValue where
@@ -29,14 +29,14 @@ mk ::
   /-- Sort of the value. -/
   srt : Srt
   /-- Underlying typed value as a `Term`. -/
-  val : Term srt.toType
+  val : Value srt
 
 
 
 namespace ETerm
 
 /-- Constructor from a typed term. -/
-def ofTerm {α : Type} [A : Srt.Bij α] (term : Term α) : ETerm :=
+def ofTerm {α : Type} [A : IsSrt α] (term : Term α) : ETerm :=
   mk A.srt (A.h_bij ▸ term)
 
 section variable (erased : ETerm)
@@ -47,23 +47,23 @@ protected def toString : String := toString erased.typed
 instance : ToString ETerm := ⟨ETerm.toString⟩
 
 /-- Attempts to `Srt`-type an erased term. -/
-def asSrt? (srt : Srt) : Option (Term srt.toType) :=
+def asSrt? (srt : Srt) : Option (Term srt) :=
   let ⟨termSrt, term⟩ := erased
   if h_srt : termSrt = srt then some (h_srt ▸ term) else none
 
 /-- Attempts to `Srt`-type an erased term. -/
-def asSrt (srt : Srt) : Res (Term srt.toType) :=
+def asSrt (srt : Srt) : Res (Term srt) :=
   if let some term := erased.asSrt? srt then .ok term
   else Error.throwUser s!"erased term of type `{erased.srt}` cannot be typed as `{srt}`"
 
 /-- Attempts to retype an erased term. -/
-def as? (α : Type) [A : Srt.Bij α] : Option (Term α) := by
+def as? (α : Type) [A : IsSrt α] : Option (Term α) := by
   cases A ; case mk srt h_bij =>
   cases h_bij
   exact erased.asSrt? srt
 
 /-- Attempts to retype an erased term. -/
-def as (α : Type) [A : Srt.Bij α] : Res (Term α) :=
+def as (α : Type) [A : IsSrt α] : Res (Term α) :=
   if let some term := erased.as? α then return term
   else Error.throwUser s!"erased term of type `{erased.srt}` cannot be typed as `{A.srt}`"
 
@@ -80,14 +80,14 @@ end ETerm
 namespace Term
 
 /-- Erases the type of a typed term. -/
-def erase [Srt.Bij α] : Term α → ETerm := .ofTerm
+def erase [IsSrt α] : Term α → ETerm := .ofTerm
 
 @[inherit_doc ETerm.as?]
-def ofErased? [A : Srt.Bij α] (erased : ETerm) : Option (Term α) :=
+def ofErased? [A : IsSrt α] (erased : ETerm) : Option (Term α) :=
   erased.as? α
 
 @[inherit_doc ETerm.as]
-def ofErased [A : Srt.Bij α] (erased : ETerm) : Res (Term α) :=
+def ofErased [A : IsSrt α] (erased : ETerm) : Res (Term α) :=
   erased.as α
 
 end Term

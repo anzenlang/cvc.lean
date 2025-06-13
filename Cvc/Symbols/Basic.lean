@@ -30,21 +30,20 @@ class Getter (α β : Type) : Type where
 instance : Getter (Symbol β α) β := ⟨get⟩
 
 protected abbrev Ident (α : Type) := Symbol String α
+-- `CoeSort` because `Coe` can't infer `α` from `String`
+instance : CoeSort (Symbol.Ident α) String := ⟨get⟩
 protected abbrev Term (α : Type) := Symbol (Term α) α
 instance : Coe (Symbol.Term α) (Term α) := ⟨get⟩
-protected abbrev Val (α : Type) [Term.ToVal α] := Symbol (getValType α) α
-protected abbrev Value (α : Type) := Symbol (Term α) α
+protected abbrev Value (α : Type) := Symbol (Value α) α
+instance : Coe (Symbol.Value α) (Value α) := ⟨get⟩
 
 protected abbrev Repr :=
-  (α : Type) → [Term.ToVal α] → Type
+  (α : Type) → [IsSrt α] → Type
 
 namespace Repr
-protected abbrev srt (R : Symbol.Repr) (srt : Srt) : Type :=
-  @R srt.toType Term.ToVal.Terms
-
 protected abbrev Ident : Symbol.Repr := fun _ _ => String
 protected abbrev Term : Symbol.Repr := (Term ·)
-protected abbrev Val : Symbol.Repr := getValType
+protected abbrev Value : Symbol.Repr := (Value ·)
 end Repr
 
 
@@ -62,22 +61,29 @@ end
 
 
 def mkIdent (name : String) : Symbol.Ident α := mk name name
+def mkIdent' (name : String) (α : Type) : Symbol.Ident α := mk name name
 
 def mkTerm : String → Term α → Symbol.Term α := mk
 
-def mkVal [Val : Term.ToVal α] : String → Val → Symbol.Val α := mk
+def mkValue : String → Value α → Symbol.Value α := mk
+
+-- def mkVal [Val : Term.ToVal α] : String → Val → Symbol.Val α := mk
 
 
-section ident variable (sIdent : Symbol.Ident α)
+section ident
 
-def declare [Srt.Bij α] : Smt (Symbol.Term α) := do
-  let term ← Smt.declare' sIdent.name
-  return ⟨sIdent.name, term⟩
+def declare (ident : Symbol.Ident α) [IsSrt α] : Smt (Symbol.Term α) := do
+  let term ← Smt.declare' ident.name
+  return ⟨ident.name, term⟩
 
 namespace Ident
 abbrev mk := @Symbol.mkIdent
-protected def toString : String := sIdent.name
-instance : ToString (Symbol.Ident α) := ⟨name⟩
+abbrev mk' := @Symbol.mkIdent'
+
+/-- String representation. -/
+protected def toString (ident : Symbol.Ident α) : String := ident.name
+
+instance : ToString (Symbol.Ident α) := ⟨Ident.toString⟩
 end Ident
 
 end ident
@@ -86,22 +92,39 @@ end ident
 
 section term
 
+/-- Asserts a Boolean term-symbol.
+
+# TODO
+
+- Is this function actually useful?
+-/
 def assert (sTerm : Symbol.Term Bool) : Smt Unit :=
   Smt.assert sTerm.get
 
-/-- Retrieves the value of some symbol in a *sat* context. -/
-def getValUsing (Val : Term.ToVal α) (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Val α) := do
-  let val ← Smt.getVal sTerm.get
-  return ⟨sTerm.name, val⟩
+/-- Retrieves tho symbol-value of a symbol-term in a `Sat` context. -/
+def getValue [IsSrt α] (term : Symbol.Term α) : Smt.Sat (Symbol.Value α) :=
+  Symbol.mkValue term.name <$> term.get.getValue
 
-@[inherit_doc getValUsing]
-def getVal [Val : Term.ToVal α] (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Val α) :=
-  getValUsing Val sTerm
+namespace Term
+/-- String representation. -/
+protected def toString (term : Symbol.Term α) : String := toString term.get
 
-@[inherit_doc getVal]
-def getValue [Srt.Bij α] (sTerm : Symbol.Term α) : Smt.Sat (Symbol.Value α) :=
-  getValUsing Term.ToVal.Terms sTerm
+instance : ToString (Symbol.Term α) := ⟨Term.toString⟩
+end Term
 
 end term
+
+
+
+section value
+
+namespace Value
+/-- String representation. -/
+protected def toString (value : Symbol.Value α) : String := toString value.get
+
+instance : ToString (Symbol.Value α) := ⟨Value.toString⟩
+end Value
+
+end value
 
 end Symbol

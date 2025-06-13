@@ -7,7 +7,6 @@ Authors: Adrien Champion
 
 import Cvc.Srt.Defs
 import Cvc.Srt.Types
-import Cvc.Srt.SrtBij
 import Cvc.Srt.Extra
 
 
@@ -15,7 +14,7 @@ import Cvc.Srt.Extra
 
 - `Cvc.Srt.Defs`: main `Srt` type and its basic features.
 - `Cvc.Srt.Types`: helper types, injection of `Srt` into `Type`.
-- `Cvc.Srt.SrtBij`: injection of `Type` into `Srt`, inverse of the injection of `Srt` into `Type`.
-- `Cvc.Srt.Extra`: more helpers/features building on all the modules above.
+- `Cvc.Srt.Extra`: injection of `Type` into `Srt`, inverse of the injection of `Srt` into `Type`;
+  more helpers/features building on all the modules above.
 
 -/

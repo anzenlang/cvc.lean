@@ -17,7 +17,7 @@ namespace Cvc
 
 
 
-/-- Type-safe cvc5 terms, input type expected to be `Srt.Bij` for most uses.
+/-- Type-safe cvc5 terms, input type expected to be `IsSrt` for most uses.
 
 - No direct constructor exposed publicly, users must go through the `Term.Build` monadic
   constructors.
@@ -36,7 +36,6 @@ abbrev Formula := Term Bool
 
 
 namespace Term
-
 
 /-- Boolean terms. -/
 protected abbrev Bool := Term Bool
@@ -57,30 +56,29 @@ protected abbrev Prod (α β : Type) := Term (α × β)
 
 
 
-section variable [A : Srt.Bij α] (t : Term α)
+section variable [A : IsSrt α] (term : Term α)
 
 /-- Sort of some term.
 
 > Note that due to strong-typing, this function does not perform any FFI.
 -/
-abbrev srt : (t : Term α) → Srt := fun _ => A.srt
+abbrev srt : (term : Term α) → Srt := 𝕂 A.srt
 
-theorem srt_bij : (t : Term α) → α = t.srt.toType := fun _ => A.h_bij
+theorem srt_bij : α = term.srt := A.h_bij
 
 /-- Re-types `t` in terms of the type of `t.srt`. -/
-def retype (t : Term α) : Term t.srt.toType :=
-  t.srt_bij ▸ t
+def retype : Term term.srt := term.srt_bij ▸ term
 
 /-- Helper for dependent-pattern-matching the sort of a term. -/
-def inspectType (t : Term α) (f : (srt : Srt) → Term srt.toType → β) : β :=
-  f t.srt t.retype
+def inspectSrt (f : (srt : Srt) → Term srt → β) : β :=
+  f term.srt term.retype
 
 end
 
 
 
 /-- Monadic constructor from an unsafe term. -/
-private def ofUnsafeM [Monad m] [Srt.Bij α] (hasSymbols : Bool) : m cvc5.Term → m (Term α) :=
+private def ofUnsafeM [Monad m] [IsSrt α] (hasSymbols : Bool) : m cvc5.Term → m (Term α) :=
   (Term.ofUnsafe hasSymbols <$> ·)
 
 /-- SMT-LIB string representation. -/
@@ -279,7 +277,7 @@ end Srt
 namespace Term
 
 /-- Unsafe term creation. -/
-private def mk [Srt.Bij α]
+private def mk [IsSrt α]
   (hasSymbols : Bool) (k : cvc5.Kind) (args : Array cvc5.Term)
 : Build (Term α) :=
   managerDoM fun tm => ofUnsafe hasSymbols <$> tm.mkTerm k args
@@ -349,7 +347,7 @@ def mkNot (term : Term.Bool) : Build Term.Bool :=
 def not := mkNot
 
 /-- Builds an if-then-else term. -/
-def ite [Srt.Bij α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
+def ite [IsSrt α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
   mk (cnd.hasSymbols ∨ thn.hasSymbols ∨ els.hasSymbols)
     .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
 
@@ -357,7 +355,7 @@ def ite [Srt.Bij α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
 
 /-! ### `n`-ary operators (`2 ≤ n`) -/
 section nary2
-variable [A : Srt.Bij α] (terms : Array (Term α)) (lft rgt : Term α)
+variable [A : IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
@@ -468,14 +466,14 @@ end nary2
 /-! #### Arithmetic -/
 section arith
 
-variable [Srt.Bij α] (terms : Array (Term α)) (lft rgt : Term α)
+variable [IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
 )
-variable (Arith : Srt.Bij.Arith α := by
+variable (Arith : IsSrt.Arith α := by
   (try ( exact inferInstance ) ; done)
-  <;> fail "expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.Srt.Bij.Arith`"
+  <;> fail "expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`"
 )
 
 /-- Forbids difference logics. -/
@@ -596,7 +594,7 @@ For this reason, this function detects when it is building an application that y
 term; in this case, it will destruct the underlying higher-order terms (recursively, and if any) and
 rewrite them as a regular (first-order) function application.
 -/
-protected def apply [Srt.Bij β]
+protected def apply [IsSrt β]
   (function : Term (α → β)) (arg : Term α)
 : Term.Build (Term β) := do
   let hasSymbols := function.hasSymbols ∨ arg.hasSymbols
@@ -609,68 +607,198 @@ protected def apply [Srt.Bij β]
 
 end apply
 
+end Term
 
 
-/-- Conversion from `Term`-s of a certain sort to some *concrete value*.
 
-Used to extract values from constant terms, used by `Sat.getVal` and the `Symbols` API.
--/
-class ToVal (α : Type) extends Srt.Bij α where
-mk' ::
-  /-- Concrete-value type for `Term α`-terms. -/
-  Val : Type := α
-  /-- Converts a `Term α` into a concrete value. -/
-  ofTerm : Term α → Term.Build Val
+/-- A term-value, as produced by `getValue`-like (SMT) function. -/
+structure Value (α : Type) where
+/-- Private constructor so that users can't compromise this type's semantics. -/
+private ofTerm ::
+  /-- Underlying term. -/
+  toTerm : Term α
 
-namespace ToVal
+namespace Value
 
-def mk [Srt.Bij α] (Val : Type := α)
-  (ofTerm : Term α → Term.Build Val := fun _ =>
-    Cvc.throwInternal s!"concrete value reconstruction is not yet implemented on sort `{getSrt α}`"
-  )
-: ToVal α :=
-  ⟨Val, ofTerm⟩
+protected def toString (value : Value α) : String := toString value.toTerm
 
-protected def Terms [Srt.Bij α] : ToVal α := ⟨Term α, pure⟩
+instance : ToString (Value α) := ⟨Value.toString⟩
 
-instance : CoeSort (ToVal α) Type := ⟨fun inst => inst.Val⟩
+/-- Boolean values. -/
+protected abbrev Bool := Value Bool
+/-- Integer values. -/
+protected abbrev Int := Value Int
+/-- Real/`Rat` values. -/
+protected abbrev Real := Value Rat
+/-- String values. -/
+protected abbrev String := Value String
+/-- Array values. -/
+protected abbrev Array (α β : Type) := Value (Cvc.TMap α β)
+/-- Sequence values. -/
+protected abbrev Seq (α : Type) := Value (Array α)
+/-- Function values. -/
+protected abbrev Fun (α β : Type) := Value (α → β)
+/-- Product values. -/
+protected abbrev Prod (α β : Type) := Value (α × β)
 
--- instance : ToVal Unit := mk
-instance instBool : ToVal Bool := mk Bool fun t => t.boolVal
-instance : ToString instBool.Val := inferInstanceAs (ToString Bool)
-instance instInt : ToVal Int := mk Int fun t => t.intVal
-instance : ToString instInt.Val := inferInstanceAs (ToString Int)
-instance : ToVal Rat := mk Rat fun t => t.ratVal
-instance : ToString instRat.Val := inferInstanceAs (ToString Rat)
-instance : ToVal String := mk
-instance : ToVal RoundingMode := mk
-instance : ToVal Cvc.Regex := mk
+section variable [A : IsSrt α] (value : Value α)
 
-instance : ToVal (Cvc.AnyFloat exp sig) := mk
-instance : ToVal (Cvc.Abstract k) := mk
-instance : ToVal (Cvc.FiniteField n) := mk
-instance : ToVal (BitVec size) := mk
-instance : ToVal (Uninterpreted name) := mk
+abbrev srt : (value : Value α) → Srt := 𝕂 A.srt
 
-section variable [A : ToVal α] [B : ToVal β]
+theorem srt_bij : α = value.srt := A.h_bij
 
-instance : ToVal (Array α) := mk <| Array A
-instance : ToVal (α × β) := mk <| A × B
-instance : ToVal (α → β) := mk (Term (α → β)) (return ·)
-instance : ToVal (Cvc.TMap α β) := mk <| Cvc.TMap A B
-instance : ToVal (Cvc.Bag α) := mk <| Cvc.Bag A
-instance : ToVal (Cvc.Set α) := mk <| Cvc.Set A
+def retype : Value value.srt := value.srt_bij ▸ value
+
+def inspectSrt (f : (srt : Srt) → Value srt → β) : β :=
+  f value.srt value.retype
 
 end
 
-end ToVal
+def boolVal (value : Value.Bool) : Res Bool := value.toTerm.boolVal
+def intVal (value : Value.Int) : Res Int := value.toTerm.intVal
+def ratVal (value : Value.Real) : Res Rat := value.toTerm.ratVal
 
-/-- The concrete-value type associated with `α`. -/
-abbrev getValType (α : Type) [inst : ToVal α] := inst.Val
+end Value
+
+
+
+namespace Conv
+
+class ValueToVal (m : Type → Type) (α : Type) extends IsSrt α where
+mk' ::
+  Val : Type
+  ofValue : Value α → m Val
+
+namespace ValueToVal
+
+protected abbrev Id (α : Type) [IsSrt α] : ValueToVal Id α := ⟨Value α, id⟩
+
+def mk [IsSrt α] (Val : Type) (ofValue : Value α → m Val) : ValueToVal m α :=
+  ⟨Val, ofValue⟩
+
+def mkId [IsSrt α] : ValueToVal Id α := ⟨Value α, id⟩
+
+instance : CoeSort (ValueToVal m α) Type := ⟨fun conv => conv.Val⟩
+
+abbrev adaptM [A : ValueToVal m α]
+  (lift : {β : Type} → m β → m' β)
+: ValueToVal m' α := ⟨A.Val, lift ∘ A.ofValue⟩
+
+protected abbrev liftM [MonadLiftT m m'] [A : ValueToVal m α] : ValueToVal m' α :=
+  A.adaptM liftM
+
+instance defaultInstUnit : ValueToVal Id Unit := mk Unit fun _ => pure ()
+instance defaultInstBool : ValueToVal Res Bool := mk Bool fun v => v.boolVal
+instance : ToString defaultInstBool.Val := inferInstanceAs (ToString Bool)
+instance defaultInstInt : ValueToVal Res Int := mk Int fun v => v.intVal
+instance : ToString defaultInstInt.Val := inferInstanceAs (ToString Int)
+instance defaultInstRat : ValueToVal Res Rat := mk Rat fun t => t.ratVal
+instance : ToString defaultInstRat.Val := inferInstanceAs (ToString Rat)
+instance defaultInstString : ValueToVal Id String := mkId
+instance defaultInstRoundingMode : ValueToVal Id RoundingMode := mkId
+instance defaultInstRegex : ValueToVal Id Cvc.Regex := mkId
+
+instance defaultInstFloat : ValueToVal Id (Cvc.AnyFloat exp sig) := mkId
+instance defaultInstAbstract : ValueToVal Id (Cvc.Abstract k) := mkId
+instance defaultInstFiniteField : ValueToVal Id (Cvc.FiniteField n) := mkId
+instance defaultInstBitVec : ValueToVal Id (BitVec size) := mkId
+instance defaultInstUninterpreted : ValueToVal Id (Uninterpreted name) := mkId
+
+section variable [IsSrt α] [IsSrt β]
+
+instance defaultInstArray : ValueToVal Id (Array α) := mkId
+instance defaultInstProd : ValueToVal Id (α × β) := mkId
+instance defaultInstFun : ValueToVal Id (α → β) := mkId
+instance defaultInstTMap : ValueToVal Id (Cvc.TMap α β) := mkId
+instance defaultInstBag : ValueToVal Id (Cvc.Bag α) := mkId
+instance defaultInstSet : ValueToVal Id (Cvc.Set α) := mkId
+
+end
+
+abbrev defaultFor : (srt : Srt) → ValueToVal Res srt
+| .abstract _kind => defaultInstAbstract.adaptM .ok
+| .array _idx _elm =>
+  -- let (_, _) := (defaultFor idx, defaultFor elm)
+  defaultInstTMap.adaptM .ok
+| .bag _elm =>
+  -- let _ := defaultFor elm
+  defaultInstBag.adaptM .ok
+| .bool => defaultInstBool
+| .bitVec _n => defaultInstBitVec.adaptM .ok
+| .finiteField _n => defaultInstFiniteField.adaptM .ok
+| .float _exp _sig => defaultInstFloat.adaptM .ok
+| .function _dom _cod =>
+  -- let (_, _) := (defaultFor dom, defaultFor cod)
+  defaultInstFun.adaptM .ok
+| .int => defaultInstInt
+| .prod _lft _rgt =>
+  -- let (_, _) := (defaultFor lft, defaultFor rgt)
+  defaultInstProd.adaptM .ok
+| .real => defaultInstRat
+| .regex => defaultInstRegex.adaptM .ok
+| .roundingMode => defaultInstRoundingMode.adaptM .ok
+| .seq _elm =>
+  -- let _ := defaultFor elm
+  defaultInstArray.adaptM .ok
+| .set _elm =>
+  -- let _ := defaultFor elm
+  defaultInstSet.adaptM .ok
+| .string => defaultInstString.adaptM .ok
+| .unit => defaultInstUnit.adaptM .ok
+| .uninterpreted _ => defaultInstUninterpreted.adaptM .ok
+
+namespace Default
+
+scoped instance (srt : Srt) : ValueToVal Res srt := defaultFor srt
+
+end Default
+
+end ValueToVal
+
+
+
+class ValuesToVal (m : Type → Type) where
+  instValueToVal : (srt : Srt) → ValueToVal m srt
+
+namespace ValuesToVal
+
+protected abbrev Values : ValuesToVal Id := ⟨(ValueToVal.Id ·)⟩
+
+protected abbrev Default : ValuesToVal Res where
+  instValueToVal := ValueToVal.defaultFor
+
+end ValuesToVal
+
+end Conv
+
+
+
+/-! ## Conversion of *term-values* -/
+
+class Srt.ToValType where
+  Val : Srt → Type
+
+def Srt.ToValType.Terms : ToValType where
+  Val (srt : Srt) := Term srt
+
+namespace Term
+
+class ToVals extends toValConv : Srt.ToValType where
+  build : (srt : Srt) → Term srt → Val srt
+
+def ToVals.Terms : ToVals where
+  toValConv := .Terms
+  build := fun _ => id
+
+-- def ToVals.Default : ToVals where
+
+namespace ToVals
+
+-- protected def Terms :
+
+end ToVals
 
 end Term
-
-export Term (getValType)
 
 
 
@@ -729,14 +857,14 @@ def setOption (opt : Cvc.Option) : Smt Unit := do
 
 
 /-- Declares a function symbol. -/
-def declare (symbol : String) (α : Type) [Srt.Bij α] : Smt (Term α) := do
+def declare (symbol : String) (α : Type) [IsSrt α] : Smt (Term α) := do
   let srt := getSrt α
   let (doms, cod) ← srt.toSignature!
   let f ← lift5 <| cvc5.Solver.declareFun symbol doms cod
   return Term.ofUnsafe true f
 
 @[inherit_doc declare]
-def declare' {α : Type} [Srt.Bij α] (symbol : String) : Smt (Term α) :=
+def declare' {α : Type} [IsSrt α] (symbol : String) : Smt (Term α) :=
   declare symbol α
 
 /-- Asserts a formula. -/
@@ -867,40 +995,34 @@ private def lift5 (code : cvc5.SolverT m α) : SatT m α := fun state => do
 
 This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
 -/
-def getValue (term : Term α) : Sat (Term α) := do
+def getValue (term : Term α) : Sat (Value α) := do
   let term! ← lift5 <| cvc5.Solver.getValue (m := Id) term.toUnsafe
-  return Term.ofUnsafe false term!
+  return Term.ofUnsafe false term! |> Value.ofTerm
 
 /-- Retrieves the values of some terms of the same sort in `Sat` mode.
 
 This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
 -/
-def getValues (terms : Array (Term α)) : Sat (Array (Term α × Term α)) := do
+def getValues (terms : Array (Term α)) : Sat (Array (Term α × Value α)) := do
   let mut values := Array.mkEmpty terms.size
   for term in terms do
     let value ← getValue term
     values := values.push (term, value)
   return values
 
-/-- Retrieves the *concrete value* of a term in `Sat` mode.
-
-This function is available the following namespaces: `Cvc.Term`, `Cvc.Term.ToVal`, `Cvc.Smt`, and
-`Cvc.Smt.Sat`.
--/
-def getValUsing (Val : Term.ToVal α) (term : Term α) : Sat Val := do
-  let termVal ← getValue term
-  Val.ofTerm termVal
+/-- Retrieves the *concrete `Val`ue* of a term in `Sat` mode. -/
+def getValUsing [Monad m] [MonadLiftT m Sat]
+  (Val : Conv.ValueToVal m α) (term : Term α)
+: Sat Val :=
+  getValue term >>= liftM ∘ Val.ofValue
 
 @[inherit_doc getValUsing]
-def getVal [Val : Term.ToVal α] (term : Term α) : Sat Val :=
+def getVal [Monad m] [MonadLiftT m Sat] [Val : Conv.ValueToVal m α] (term : Term α) : Sat Val :=
   getValUsing Val term
 
-/-- Retrieves the *concrete values* of some terms of the same sort in `Sat` mode.
-
-This function is available the following namespaces: `Cvc.Term`, `Cvc.Term.ToVal`, `Cvc.Smt`, and
-`Cvc.Smt.Sat`.
--/
-def getValsUsing (Val : Term.ToVal α) (terms : Array (Term α)) : Sat (Array (Term α × Val)) := do
+/-- Retrieves the *concrete values* of some terms of the same sort in `Sat` mode. -/
+def getValsUsing (Val : Conv.ValueToVal Sat α) (terms : Array (Term α))
+: Sat (Array (Term α × Val)) := do
   let mut values := Array.mkEmpty terms.size
   for term in terms do
     let value ← getVal term
@@ -908,7 +1030,7 @@ def getValsUsing (Val : Term.ToVal α) (terms : Array (Term α)) : Sat (Array (T
   return values
 
 @[inherit_doc getValsUsing]
-def getVals [Val : Term.ToVal α] (terms : Array (Term α)) : Sat (Array (Term α × Val)) :=
+def getVals [Val : Conv.ValueToVal Sat α] (terms : Array (Term α)) : Sat (Array (Term α × Val)) :=
   getValsUsing Val terms
 
 end Sat
