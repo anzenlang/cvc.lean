@@ -121,7 +121,7 @@ end Build.State
 
 /-- Term-building error-state-monad transformer. -/
 abbrev BuildT (m : Type → Type u) :=
-  ExceptT Error (StateT Build.State m)
+  ResT (StateT Build.State m)
 
 /-- Term-building error-state-monad in `IO`. -/
 abbrev BuildIO := BuildT IO
@@ -130,6 +130,8 @@ abbrev BuildIO := BuildT IO
 abbrev Build := BuildT Id
 
 namespace BuildT
+
+example [Monad m] : MonadLiftT Res (BuildT m) := inferInstance
 
 instance : MonadLift (Except cvc5.Error) Build where
   monadLift code tm := do
@@ -810,13 +812,16 @@ structure Smt.State where
   private nextActlitIdx' : Nat
 
 abbrev SmtT (m : Type → Type) :=
-  ExceptT Error (StateT Smt.State m)
+  ResT (StateT Smt.State m)
 
 abbrev SmtIO := SmtT IO
 
 abbrev Smt := SmtT Id
 
 namespace Smt variable [Monad m]
+
+instance : MonadLift ResIO SmtIO where
+  monadLift code state := return (← code, state)
 
 instance : MonadLift m (SmtT m) := ⟨fun code state => return (.ok (← code), state)⟩
 
@@ -917,7 +922,7 @@ private mk ::
 different solver mode.
 -/
 abbrev SatT (m : Type → Type u) :=
-  ExceptT Error (StateT Sat.State m)
+  ResT (StateT Sat.State m)
 
 abbrev Sat := SatT (m := Id)
 
@@ -930,7 +935,7 @@ def Sat.unexpected : SatT m α :=
 different solver mode.
 -/
 abbrev UnsatT (m : Type → Type u) :=
-  ExceptT Error (StateT Unsat.State m)
+  ResT (StateT Unsat.State m)
 
 abbrev Unsat := UnsatT (m := Id)
 
@@ -943,7 +948,7 @@ def Unsat.unexpected : UnsatT m α :=
 different solver mode.
 -/
 abbrev UnknownT (m : Type → Type u) :=
-  ExceptT Error (StateT Unknown.State m)
+  ResT (StateT Unknown.State m)
 
 abbrev Unknown := UnknownT (m := Id)
 

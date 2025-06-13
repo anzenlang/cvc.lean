@@ -33,24 +33,18 @@ def idents : ESymbols.ByName.Idents :=
   |>.insert! "isCounting" Bool
   |>.insert! "counter" Int
 
-variable (state : State R)
+variable (state : State Data)
 
 def unwrap [ToString α] : Res α → String
 | .ok a => toString a
 | .error e => s!"{e}"
 
-def startStop [S : ToString (R Bool)] (state : State R) :=
-  state.findAs Bool "startStop" |> @unwrap (R Bool) S
-def reset [S : ToString (R Bool)] (state : State R) :=
-  state.findAs Bool "reset" |> @unwrap (R Bool) S
-def risingStartStop [S : ToString (R Bool)] (state : State R) :=
-  state.findAs Bool "risingStartStop" |> @unwrap (R Bool) S
-def risingReset [S : ToString (R Bool)] (state : State R) :=
-  state.findAs Bool "risingReset" |> @unwrap (R Bool) S
-def isCounting [S : ToString (R Bool)] (state : State R) :=
-  state.findAs Bool "isCounting" |> @unwrap (R Bool) S
-def counter [S : ToString (R Int)] (state : State R) :=
-  state.findAs Int "counter" |> @unwrap (R Int) S
+def startStop (state : State Data) := state.findAs Bool "startStop"
+def reset (state : State Data) := state.findAs Bool "reset"
+def risingStartStop (state : State Data) := state.findAs Bool "risingStartStop"
+def risingReset (state : State Data) := state.findAs Bool "risingReset"
+def isCounting (state : State Data) := state.findAs Bool "isCounting"
+def counter (state : State Data) := state.findAs Int "counter"
 
 end Sw.State
 
@@ -105,22 +99,22 @@ def printLines (sw : Sw k) (desc : String := "sw") : IO Unit := do
   for line in sw.toLines "  " do
     println! line
 
-def printState (state : Sw.instState.ValuesAt k) (pref := "") : IO Unit := do
+def printState (state : Sw.instState.ValuesAt k) (pref := "") : ResIO Unit := do
   println! "{pref}inputs    | \
-    startStop: {state.startStop}, reset: {state.reset}\
+    startStop: {←state.startStop}, reset: {←state.reset}\
   "
   println! "{pref}internals | \
-    risingReset: {state.risingReset}, risingStartStop: {state.risingStartStop}, \
-    isCounting: {state.isCounting}\
+    risingReset: {←state.risingReset}, risingStartStop: {←state.risingStartStop}, \
+    isCounting: {←state.isCounting}\
   "
-  println! "{pref}output    | counter: {state.counter}"
+  println! "{pref}output    | counter: {←state.counter}"
 
-def printTrace (trace : Sw.instState.ValueTrace k) (pref := "") : IO Unit := do
+def printTrace (trace : Sw.instState.ValueTrace k) (pref := "") : ResIO Unit := do
   for ⟨k, state⟩ in trace do
     println! "{pref}- at {k}"
     printState state (pref ++ "  ")
 
-def printCexs : {k : Nat} → (sw : Sw k) → (pref : String := "") → IO Unit
+def printCexs : {k : Nat} → (sw : Sw k) → (pref : String := "") → ResIO Unit
 | 0, _, _ => println! "error: cannot print cex-s on a system at `k = 0`"
 | _ + 1, sw, pref => do
   let fls := sw.candidates.falsified

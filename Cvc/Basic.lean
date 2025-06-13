@@ -331,8 +331,12 @@ export Error (throwUser throwInternal throwUnreachable)
 
 
 
-/-- Alias for `Except Error`. -/
-abbrev Res := Except Error
+abbrev ResT m := ExceptT Error m
+
+abbrev ResIO := ResT IO
+
+/-- `Error`-result monad. -/
+abbrev Res := ResT Id
 
 namespace Res
 @[inherit_doc Except.ok]
@@ -343,8 +347,10 @@ abbrev error : Error → Res α := Except.error
 instance : MonadLift (Except cvc5.Error) Res :=
   ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
 
-instance : MonadLift (Except cvc5.Error) Res.{0} :=
+instance : MonadLift (Except cvc5.Error) Res :=
   ⟨fun | .ok v => .ok v | .error e => .error (Error.ofCvc5 e)⟩
+
+instance [Monad m] : MonadLift Res (ResT m) := ⟨pure⟩
 
 def fail (e : Error) : Res α :=
   .error e
@@ -360,12 +366,6 @@ def context [A : Error.AsString S] (s : S) : Res α → Res α
 | .error e => .error <| e.mapMsg (s!"{·}\n{A.asString s}")
 
 def lift : Except cvc5.Error α → Res α := liftM
-
-def up1 {α : Type} : (res : Res α) → Res.{1} (ULift α)
-| .ok a => .ok (.up a) | .error e => .error e
-
-def lift1 {α : Type} : Except.{0} cvc5.Error α → Res.{1} (ULift α) :=
-  up1 ∘ lift
 
 end Res
 

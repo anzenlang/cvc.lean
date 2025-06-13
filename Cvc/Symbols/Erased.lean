@@ -142,6 +142,9 @@ def find (name : String) : Res (ESymbol R) :=
   if let some term := symbols.rbMap.find? name then return term
   else Error.throwUser s!"unknown symbol `{name}`"
 
+def findMapOr (name : String) (f : ESymbol R → α) (getDefault : Unit → α) : α :=
+  if let some s := symbols.find? name then f s else getDefault ()
+
 def findSrt? (name : String) : Option Srt :=
   symbols.find? name |>.map ESymbol.srt
 
@@ -157,6 +160,9 @@ def findAsSrt (srt : Srt) (name : String) : Res (R srt) := do
   if h : srt' = srt then return h ▸ repr
   else Error.throwUser s!"symbol `{name} : {srt'}` cannot be typed as `{srt}`"
 
+def findMapOrAsSrt (srt : Srt) (name : String) (f : R srt → α) (getDefault : Unit → α) : α :=
+  if let some s := symbols.findAsSrt? srt name then f s else getDefault ()
+
 def findAs? (α : Type) [A : IsSrt α] (name : String) : Option (R α) := do
   let ⟨srt, h_bij⟩ := A
   let asSrt ← symbols.findAsSrt? srt name
@@ -170,6 +176,10 @@ def findAs (α : Type) [A : IsSrt α] (name : String) : Res (R α) := do
   return by
     cases h_bij
     exact asSrt
+
+def findMapOrAs (α : Type) [A : IsSrt α]
+  (name : String) (f : R α → β) (getDefault : Unit → β)
+: β := if let some s := symbols.findAs? α name then f s else getDefault ()
 
 end
 
