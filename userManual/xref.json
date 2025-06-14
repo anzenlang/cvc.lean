@@ -1,0 +1,231 @@
+{"Verso.Genre.Manual.section":
+ {"title": "Sections or chapters of the manual",
+  "description": null,
+  "contents":
+  {"chapIntro_terms":
+   [{"id": "chapIntro_terms",
+     "data":
+     {"title": "Terms",
+      "shortTitle": null,
+      "sectionNum": "1.1.",
+      "context":
+      [{"title": "Cvc.lean User Manual", "shortTitle": null, "number": null},
+       {"title": "Overview", "shortTitle": null, "number": "1"},
+       {"title": "Terms", "shortTitle": null, "number": "1"}]},
+     "address": "/Overview/Terms/"}],
+   "chapIntro":
+   [{"id": "chapIntro",
+     "data":
+     {"title": "Overview",
+      "shortTitle": null,
+      "sectionNum": "1.",
+      "context":
+      [{"title": "Cvc.lean User Manual", "shortTitle": null, "number": null},
+       {"title": "Overview", "shortTitle": null, "number": "1"}]},
+     "address": "/Overview/"}]}},
+ "Verso.Genre.Manual.example":
+ {"title": "Verso.Genre.Manual.example",
+  "description": null,
+  "contents":
+  {"Vars.z":
+   [{"id": "Vars___x",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars.y":
+   [{"id": "Vars___x",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars.x":
+   [{"id": "Vars___x",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars.solveShowIO":
+   [{"id": "Vars___solveShowIO",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars.solveIO":
+   [{"id": "Vars___solveShowIO",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars.flag":
+   [{"id": "Vars___x",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Vars":
+   [{"id": "Vars___x",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.print":
+   [{"id": "Sw___print",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.State.startStop":
+   [{"id": "Sw___State___isCounting",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.State.reset":
+   [{"id": "Sw___State___isCounting",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.State.isCounting":
+   [{"id": "Sw___State___isCounting",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.State.counter":
+   [{"id": "Sw___State___isCounting",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw.State":
+   [{"id": "Sw___State___isCounting",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Sw":
+   [{"id": "Sw",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.step":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.init":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.State.startStop":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.State.reset":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.State.isCounting":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.State.counting":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "Implemented.State":
+   [{"id": "Implemented___step",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.z":
+   [{"id": "AdHocVars___y",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.y":
+   [{"id": "AdHocVars___y",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.x":
+   [{"id": "AdHocVars___y",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.getModel":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.flag":
+   [{"id": "AdHocVars___y",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.declare":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.Values.z":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.Values.y":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.Values.x":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.Values.flag":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars.Values":
+   [{"id": "AdHocVars___getModel",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "AdHocVars":
+   [{"id": "AdHocVars___y",
+     "data": null,
+     "address": "/Overview/Symbols___-States-and-Systems/"}]}},
+ "Verso.Genre.Manual.doc.tech":
+ {"title": "Terminology",
+  "description": "Definitions of technical terms",
+  "contents": {}},
+ "Verso.Genre.Manual.doc.tactic.conv":
+ {"title": "Conversion Tactics",
+  "description": "Tactics for performing targeted rewriting of subterms",
+  "contents": {}},
+ "Verso.Genre.Manual.doc.tactic":
+ {"title": "Tactic Documentation",
+  "description": "Detailed descriptions of tactics",
+  "contents": {}},
+ "Verso.Genre.Manual.doc.option":
+ {"title": "Compiler options", "description": null, "contents": {}},
+ "Verso.Genre.Manual.doc":
+ {"title": "Lean constant reference",
+  "description": "Documentation for Lean constants",
+  "contents":
+  {"Cvc.Term.toUnsafe":
+   [{"id": "Cvc___Term___hasSymbols",
+     "data": null,
+     "address": "/Overview/Terms/"}],
+   "Cvc.Term.ite":
+   [{"id": "Cvc___Term___ite", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.int":
+   [{"id": "Cvc___Term___int", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.hasSymbols":
+   [{"id": "Cvc___Term___hasSymbols",
+     "data": null,
+     "address": "/Overview/Terms/"}],
+   "Cvc.Term.equal":
+   [{"id": "Cvc___Term___equal", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.bool":
+   [{"id": "Cvc___Term___bool", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.and":
+   [{"id": "Cvc___Term___and", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.Int":
+   [{"id": "Cvc___Term___Int", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term.Bool":
+   [{"id": "Cvc___Term___Bool", "data": null, "address": "/Overview/Terms/"}],
+   "Cvc.Term":
+   [{"id": "Cvc___Term___hasSymbols",
+     "data": null,
+     "address": "/Overview/Terms/"}],
+   "Cvc.Smt.declare":
+   [{"id": "Cvc___Smt___declare",
+     "data": null,
+     "address": "/Overview/Solver/"}],
+   "Cvc.Smt.checkSatAnd":
+   [{"id": "Cvc___Smt___checkSatAnd",
+     "data": null,
+     "address": "/Overview/Solver/"}],
+   "Cvc.Smt.checkSat?":
+   [{"id": "Cvc___Smt___checkSat___",
+     "data": null,
+     "address": "/Overview/Solver/"}],
+   "Cvc.Smt.checkSat":
+   [{"id": "Cvc___Smt___checkSat",
+     "data": null,
+     "address": "/Overview/Solver/"}],
+   "Cvc.Smt.assert":
+   [{"id": "Cvc___Smt___assert", "data": null, "address": "/Overview/Solver/"}],
+   "Cvc.Smt.Sat.getValue":
+   [{"id": "Cvc___Smt___Sat___getValue",
+     "data": null,
+     "address": "/Overview/Solver/"}],
+   "Cvc.Smt.Sat":
+   [{"id": "Cvc___Smt___Sat", "data": null, "address": "/Overview/Solver/"}],
+   "Cvc.Formula":
+   [{"id": "Cvc___Formula", "data": null, "address": "/Overview/Terms/"}]}}}
