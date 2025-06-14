@@ -12,18 +12,18 @@
 all: docServe
 
 docClean:
-	cd docbuild ; lake clean
+	cd Docs ; lake clean
 
 docUpdate:
-	cd docbuild ; lake update ; lake run init
+	cd Docs ; lake update ; lake run init
 
 doc:
 	lake build
-	cd docbuild ; lake update Cvc ; lake build Cvc:docs
+	cd Docs ; lake update Cvc ; lake build Cvc:docs
 
 docServe: doc
-	python3 -m http.server -d docbuild/.lake/build/doc
+	python3 -m http.server -d Docs/.lake/build/doc
 
 docOpen: doc
 	open http://[::]:8000 \
-	&& python3 -m http.server -d docbuild/.lake/build/doc
+	&& python3 -m http.server -d Docs/.lake/build/doc
