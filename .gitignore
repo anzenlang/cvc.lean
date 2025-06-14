@@ -1,3 +1,5 @@
 /.lake
 .DS_Store
 /Docs/.lake
+/Manual/_out
+/Manual/.lake

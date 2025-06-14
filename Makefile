@@ -27,3 +27,18 @@ docServe: doc
 docOpen: doc
 	open http://[::]:8000 \
 	&& python3 -m http.server -d Docs/.lake/build/doc
+
+manualClean:
+	cd Manual ; lake clean
+
+manualUpdate:
+	cd Manual ; lake update
+
+manual:
+	lake build
+	cd Manual ; lake update Cvc ; lake exe textbook --output _out/html --depth 2
+
+manualServe: manual
+	python3 -m http.server -d Manual/_out/html/html-multi
+
+.PHONY: Docs Manual manual

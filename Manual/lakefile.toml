@@ -1,0 +1,19 @@
+name = "cvcManual"
+defaultTargets = ["textbook"]
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso"
+rev = "v4.20.0"
+
+[[require]]
+name = "cvc"
+path = ".."
+
+[[lean_lib]]
+name = "Manual"
+root = "Manual"
+
+[[lean_exe]]
+name = "textbook"
+root = "Main"

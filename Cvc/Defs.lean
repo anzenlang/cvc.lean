@@ -37,13 +37,13 @@ abbrev Formula := Term Bool
 
 namespace Term
 
-/-- Boolean terms. -/
+/-- Boolean terms: `Term Bool`. -/
 protected abbrev Bool := Term Bool
-/-- Integer terms. -/
+/-- Integer terms: `Term Int`. -/
 protected abbrev Int := Term Int
-/-- Real/`Rat` terms. -/
+/-- Real/`Rat` terms: `Term Rat`. -/
 protected abbrev Real := Term Rat
-/-- String terms. -/
+/-- String terms: `Term String`. -/
 protected abbrev String := Term String
 /-- Array terms. -/
 protected abbrev Array (α β : Type) := Term (Cvc.TMap α β)
@@ -356,21 +356,12 @@ def ite [IsSrt α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
 
 
 /-! ### `n`-ary operators (`2 ≤ n`) -/
-section nary2
-variable [A : IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
+section nary2_bool
+variable (terms : Array (Term Bool)) (lft rgt : Term Bool)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
 )
-
-/-- Builds an equality term. -/
-def mkEqual : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .EQUAL (terms.map toUnsafe)
-
-@[inherit_doc mkEqual]
-def equal : Build Formula :=
-  mkEqual #[lft, rgt]
 
 /-- Builds a conjunction term. -/
 def mkAnd : Build Formula :=
@@ -411,6 +402,26 @@ def mkImplies : Build Formula :=
 def implies : Build Formula :=
   mkImplies #[lft, rgt]
 
+end nary2_bool
+
+
+
+section nary2_generic
+variable [IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
+variable (h_size : 2 ≤ terms.size := by
+  (try (try simp <;> try omega) ; done)
+  <;> fail "expected an array of **at least** two terms"
+)
+
+/-- Builds an equality term. -/
+def mkEqual : Build Formula :=
+  let _ := h_size
+  mk (terms.any hasSymbols) .EQUAL (terms.map toUnsafe)
+
+@[inherit_doc mkEqual]
+def equal : Build Formula :=
+  mkEqual #[lft, rgt]
+
 /-- Builds a pairwise-*distinct* term. -/
 def mkDistinct : Build Formula :=
   let _ := h_size
@@ -424,6 +435,17 @@ def distinct : Build Formula :=
 abbrev mkNEqual := @distinct
 @[inherit_doc distinct]
 abbrev nequal := @distinct
+
+end nary2_generic
+
+
+
+section nary2_arith
+variable [IsSrt.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
+variable (h_size : 2 ≤ terms.size := by
+  (try (try simp <;> try omega) ; done)
+  <;> fail "expected an array of **at least** two terms"
+)
 
 /-- Builds a less-than term. -/
 def mkLt : Build Formula :=
@@ -461,14 +483,14 @@ def mkGt : Build Formula :=
 def gt : Build Formula :=
   mkGt #[lft, rgt]
 
-end nary2
+end nary2_arith
 
 
 
 /-! #### Arithmetic -/
 section arith
 
-variable [IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
+variable [IsSrt α] (terms : Array (Term α)) (term lft rgt : Term α)
 variable (h_size : 2 ≤ terms.size := by
   (try (try simp <;> try omega) ; done)
   <;> fail "expected an array of **at least** two terms"
@@ -508,6 +530,21 @@ def mkAdd : Build (Term α) := do
 @[inherit_doc mkAdd]
 def add : Build (Term α) :=
   mkAdd #[lft, rgt]
+
+/-- Builds a subtraction term. -/
+def mkSub : Build (Term α) := do
+  nonDiff
+  let _ := h_size ; let _ := Arith
+  mk (terms.any hasSymbols) .SUB (terms.map toUnsafe)
+
+@[inherit_doc mkSub]
+def sub : Build (Term α) :=
+  mkSub #[lft, rgt]
+
+def neg : Build (Term α) :=
+  let _ := Arith
+  mk term.hasSymbols cvc5.Kind.NEG #[term.toUnsafe]
+
 
 /-- Builds a multiplication term.
 
@@ -924,6 +961,7 @@ different solver mode.
 abbrev SatT (m : Type → Type u) :=
   ResT (StateT Sat.State m)
 
+@[inherit_doc SatT]
 abbrev Sat := SatT (m := Id)
 
 def Sat.unexpected : SatT m α :=
@@ -937,6 +975,7 @@ different solver mode.
 abbrev UnsatT (m : Type → Type u) :=
   ResT (StateT Unsat.State m)
 
+@[inherit_doc UnsatT]
 abbrev Unsat := UnsatT (m := Id)
 
 def Unsat.unexpected : UnsatT m α :=
@@ -950,6 +989,7 @@ different solver mode.
 abbrev UnknownT (m : Type → Type u) :=
   ResT (StateT Unknown.State m)
 
+@[inherit_doc UnknownT]
 abbrev Unknown := UnknownT (m := Id)
 
 def Unknown.unexpected : UnknownT m α :=

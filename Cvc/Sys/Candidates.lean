@@ -88,6 +88,9 @@ namespace Invariant
 protected def toString (inv : Invariant State depth) : String :=
   toString inv
 
+def provedAt {k : Nat} (inv : Invariant State k.succ) : Nat :=
+  inv.data.provedAt
+
 def next {k : Nat} (nextState : State.TermsAt k.succ)
 : Invariant State k.succ → Smt (Invariant State k.succ.succ)
 | .mk info data => return .mk info (← data.next info nextState)
@@ -123,6 +126,12 @@ namespace Falsified
 
 protected def toString (fls : Falsified State depth) : String :=
   toString fls
+
+abbrev falsifiedAt {k : Nat} (fls : Falsified State k.succ) : Nat :=
+  fls.data.falsifiedAt
+
+def cex {k : Nat} (fls : Falsified State k.succ) : State.ValueTrace fls.falsifiedAt.succ :=
+  fls.data.cex
 
 def next {k : Nat} (state : State.TermsAt k.succ)
 : Falsified State k.succ → Smt (Falsified State k.succ.succ)
@@ -244,6 +253,9 @@ def next (nextState : State.TermsAt k)
   return .mk info (← Unknown.Data.init info nextState)
 | .mk info data =>
   return .mk info (← data.next info nextState)
+
+def baseValidUpTo? {k : Nat} (unk : Unknown State k.succ) : Option Nat :=
+  unk.data.baseValidUpTo
 
 def isBaseValid {k : Nat} (unk : Unknown State k.succ) : Bool :=
   unk.data.isBaseValid
