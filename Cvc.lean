@@ -13,6 +13,7 @@ import Cvc.Defs
 import Cvc.Term
 import Cvc.Actlit
 import Cvc.Symbols
+import Cvc.State
 import Cvc.Sys
 
 
@@ -69,7 +70,21 @@ appropriate mode.
 - `Cvc.Defs`: strongly-typed `Cvc.Term`s, `Cvc.Term.Build`er, and `Cvc.Smt`-like monadic
   environments and associated SMT-LIB commands including `Cvc.Smt.Sat`, `Cvc.Smt.Unsat`, and
   `Cvc.Smt.Unknown`.
+- `Cvc.Term`: extra term-related features such as erased terms and the term DSL.
+- `Cvc.Actlit`: activation literal API.
+- `Cvc.Symbols`: specification for a collection of SMT symbols, typically used to define a notion of
+  state. The main class (`Cvc.Symbols`) supports user-defined strongly-typed symbols structures, as
+  well as generic symbols structures such the provided `Cvc.Symbols.ByName` which wraps an `RBMap`
+  from symbols names (`String`) to untyped terms.
 
+  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed symbols structures.
+- `Cvc.State`: builds on `Cvc.Symbols` but adds a notion of state, *i.e.* symbol/term/value
+  parameterized with an unrolling index `k : Nat`.
+
+  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed state structures.
+- `Cvc.Sys`: transition system `k`-induction API, builds on `Cvc.State`.
+
+  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed system structures.
 
 [cvc5]: https://cvc5.github.io (cvc5 official github page)
 
