@@ -1,4 +1,4 @@
-<html lang="en"><head><meta charset="UTF-8"></meta><meta name="viewport" content="width=device-width, initial-scale=1"></meta><link rel="stylesheet" href="./style.css"></link><link rel="icon" href="./favicon.svg"></link><link rel="mask-icon" href="./favicon.svg" color="#000000"></link><link rel="prefetch" href=".//declarations/declaration-data.bmp" as="image"></link><title>Cvc</title><script defer="true" src="./mathjax-config.js"></script><script defer="true" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script><script defer="true" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script>const SITE_ROOT="./";</script><script>const MODULE_NAME="Cvc";</script><script type="module" src="./jump-src.js"></script><script type="module" src="./search.js"></script><script type="module" src="./expand-nav.js"></script><script type="module" src="./how-about.js"></script><script type="module" src="./instances.js"></script><script type="module" src="./importedBy.js"></script></head><body><input id="nav_toggle" type="checkbox"></input><header><h1><label for="nav_toggle"></label><span>Documentation</span></h1><h2 class="header_filename break_within"><span class="name">Cvc</span></h2><form id="search_form"><input type="text" name="q" autocomplete="off"></input>&#32;<button id="search_button" onclick="javascript: form.action='./search.html';">Search</button></form></header><nav class="internal_nav"><p><a href="#top">return to top</a></p><p class="gh_nav_link"><a href="https://github.com/anzenlang/cvc.lean/blob/ef53cc5728cad18d20e10e7b7ef21021ac65b261/Cvc.lean">source</a></p><div class="imports"><details><summary>Imports</summary><ul><li><a href="./Init.html">Init</a></li><li><a href="./Cvc/Basic.html">Cvc.Basic</a></li><li><a href="./Cvc/Defs.html">Cvc.Defs</a></li><li><a href="./Cvc/Dsl.html">Cvc.Dsl</a></li><li><a href="./Cvc/Logic.html">Cvc.Logic</a></li><li><a href="./Cvc/Option.html">Cvc.Option</a></li><li><a href="./Cvc/Srt.html">Cvc.Srt</a></li><li><a href="./Cvc/Symbols.html">Cvc.Symbols</a></li></ul></details><details><summary>Imported by</summary><ul id="imported-by-Cvc" class="imported-by-list"></ul></details></div></nav><main>
+<html lang="en"><head><meta charset="UTF-8"></meta><meta name="viewport" content="width=device-width, initial-scale=1"></meta><link rel="stylesheet" href="./style.css"></link><link rel="icon" href="./favicon.svg"></link><link rel="mask-icon" href="./favicon.svg" color="#000000"></link><link rel="prefetch" href=".//declarations/declaration-data.bmp" as="image"></link><title>Cvc</title><script defer="true" src="./mathjax-config.js"></script><script defer="true" src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script><script defer="true" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script>const SITE_ROOT="./";</script><script>const MODULE_NAME="Cvc";</script><script type="module" src="./jump-src.js"></script><script type="module" src="./search.js"></script><script type="module" src="./expand-nav.js"></script><script type="module" src="./how-about.js"></script><script type="module" src="./instances.js"></script><script type="module" src="./importedBy.js"></script></head><body><input id="nav_toggle" type="checkbox"></input><header><h1><label for="nav_toggle"></label><span>Documentation</span></h1><h2 class="header_filename break_within"><span class="name">Cvc</span></h2><form id="search_form"><input type="text" name="q" autocomplete="off"></input>&#32;<button id="search_button" onclick="javascript: form.action='./search.html';">Search</button></form></header><nav class="internal_nav"><p><a href="#top">return to top</a></p><p class="gh_nav_link"><a href="https://github.com/anzenlang/cvc.lean/blob/23e9a531ec59eb698b9a424d43887288e3003308/Cvc.lean">source</a></p><div class="imports"><details><summary>Imports</summary><ul><li><a href="./Init.html">Init</a></li><li><a href="./Cvc/Actlit.html">Cvc.Actlit</a></li><li><a href="./Cvc/Basic.html">Cvc.Basic</a></li><li><a href="./Cvc/Defs.html">Cvc.Defs</a></li><li><a href="./Cvc/Logic.html">Cvc.Logic</a></li><li><a href="./Cvc/Option.html">Cvc.Option</a></li><li><a href="./Cvc/Srt.html">Cvc.Srt</a></li><li><a href="./Cvc/State.html">Cvc.State</a></li><li><a href="./Cvc/Symbols.html">Cvc.Symbols</a></li><li><a href="./Cvc/Sys.html">Cvc.Sys</a></li><li><a href="./Cvc/Term.html">Cvc.Term</a></li></ul></details><details><summary>Imported by</summary><ul id="imported-by-Cvc" class="imported-by-list"></ul></details></div></nav><main>
 <div class="mod_doc"><h1 class="markdown-heading" id="cvc-lean">cvc.lean <a class="hover-link" href="#cvc-lean">#</a></h1><p>Lean 4 API for the <a href="https://cvc5.github.io" title="cvc5 official github page">cvc5 SMT solver</a> with a strong concern for ergonomics and type-safety.
 Cvc5 is heavily based on the <a href="https://smt-lib.org" title="SMT-LIB official website">SMT-LIB standard</a> which the documentation of this library will
 frequently reference.</p><p>The general workflow is to build strongly-typed <code><a href="./Cvc/Defs.html#Cvc.Term">Cvc.Term</a></code>-s of some SMT-LIB sort <code>Srt</code>, in
@@ -29,12 +29,34 @@ def run [Monad m]
   <a href="./Cvc/Defs.html#Cvc.Smt.checkSatAnd">Cvc.Smt.checkSatAnd</a> (ifSat := mySatCode) (ifUnsat := myUnsatCode)
 </code></pre><p>This guarantees that sat/unsat/unknown-specific commands only run when the solver is in the
 appropriate mode.</p><h2 class="markdown-heading" id="Top-level-modules">Top-level modules <a class="hover-link" href="#Top-level-modules">#</a></h2><ul>
-<li><code><a href="./Cvc/Basic.html">Cvc.Basic</a></code>: basic helpers.</li>
-<li><code><a href="./Cvc/Logic.html#Cvc.Logic">Cvc.Logic</a></code>: SMT-LIB logic definition and helpers.</li>
-<li><code><a href="./Cvc/Option.html#Cvc.Option">Cvc.Option</a></code>: cvc5's options definition and helpers.</li>
-<li><code><a href="./Cvc/Srt/Defs.html#Cvc.Srt">Cvc.Srt</a></code>: SMT-LIB sort definition and helpers.</li>
-<li><code><a href="./Cvc/Defs.html">Cvc.Defs</a></code>: strongly-typed <code><a href="./Cvc/Defs.html#Cvc.Term">Cvc.Term</a></code>s, <code><a href="./Cvc/Defs.html#Cvc.Term.Build">Cvc.Term.Build</a></code>er, and <code><a href="./Cvc/Defs.html#Cvc.Smt">Cvc.Smt</a></code>-like monadic
+<li><p><code><a href="./Cvc/Basic.html">Cvc.Basic</a></code>: basic helpers.</p>
+</li>
+<li><p><code><a href="./Cvc/Logic.html#Cvc.Logic">Cvc.Logic</a></code>: SMT-LIB logic definition and helpers.</p>
+</li>
+<li><p><code><a href="./Cvc/Option.html#Cvc.Option">Cvc.Option</a></code>: cvc5's options definition and helpers.</p>
+</li>
+<li><p><code><a href="./Cvc/Srt/Defs.html#Cvc.Srt">Cvc.Srt</a></code>: SMT-LIB sort definition and helpers.</p>
+</li>
+<li><p><code><a href="./Cvc/Defs.html">Cvc.Defs</a></code>: strongly-typed <code><a href="./Cvc/Defs.html#Cvc.Term">Cvc.Term</a></code>s, <code><a href="./Cvc/Defs.html#Cvc.Term.Build">Cvc.Term.Build</a></code>er, and <code><a href="./Cvc/Defs.html#Cvc.Smt">Cvc.Smt</a></code>-like monadic
 environments and associated SMT-LIB commands including <code><a href="./Cvc/Defs.html#Cvc.Smt.Sat">Cvc.Smt.Sat</a></code>, <code><a href="./Cvc/Defs.html#Cvc.Smt.Unsat">Cvc.Smt.Unsat</a></code>, and
-<code><a href="./Cvc/Defs.html#Cvc.Smt.Unknown">Cvc.Smt.Unknown</a></code>.</li>
+<code><a href="./Cvc/Defs.html#Cvc.Smt.Unknown">Cvc.Smt.Unknown</a></code>.</p>
+</li>
+<li><p><code><a href="./Cvc/Defs.html#Cvc.Term">Cvc.Term</a></code>: extra term-related features such as erased terms and the term DSL.</p>
+</li>
+<li><p><code><a href="./Cvc/Actlit.html#Cvc.Actlit">Cvc.Actlit</a></code>: activation literal API.</p>
+</li>
+<li><p><code><a href="./Cvc/Symbols/Defs.html#Cvc.Symbols">Cvc.Symbols</a></code>: specification for a collection of SMT symbols, typically used to define a notion of
+state. The main class (<code><a href="./Cvc/Symbols/Defs.html#Cvc.Symbols">Cvc.Symbols</a></code>) supports user-defined strongly-typed symbols structures, as
+well as generic symbols structures such the provided <code>Cvc.Symbols.ByName</code> which wraps an <code>RBMap</code>
+from symbols names (<code><a href="./Init/Prelude.html#String">String</a></code>) to untyped terms.</p>
+<p>See <code><a href="./Cvc/Symbols/Dsl.html">Cvc.Symbols.Dsl</a></code> for easy user-defined strongly-typed symbols structures.</p>
+</li>
+<li><p><code><a href="./Cvc/State.html">Cvc.State</a></code>: builds on <code><a href="./Cvc/Symbols/Defs.html#Cvc.Symbols">Cvc.Symbols</a></code> but adds a notion of state, <em>i.e.</em> symbol/term/value
+parameterized with an unrolling index <code>k : <a href="./Init/Prelude.html#Nat">Nat</a></code>.</p>
+<p>See <code><a href="./Cvc/Symbols/Dsl.html">Cvc.Symbols.Dsl</a></code> for easy user-defined strongly-typed state structures.</p>
+</li>
+<li><p><code><a href="./Cvc/Sys/Defs.html#Cvc.Sys">Cvc.Sys</a></code>: transition system <code>k</code>-induction API, builds on <code><a href="./Cvc/State.html">Cvc.State</a></code>.</p>
+<p>See <code><a href="./Cvc/Symbols/Dsl.html">Cvc.Symbols.Dsl</a></code> for easy user-defined strongly-typed system structures.</p>
+</li>
 </ul></div></main>
 <nav class="nav"><iframe src="./navbar.html" class="navframe" frameBorder="0"></iframe></nav></body></html>
