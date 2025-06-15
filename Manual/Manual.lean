@@ -48,7 +48,7 @@ a *transition system* API equipped with a `k`-induction engine.
 This user manual is *not* an introduction to SMT solvers. It assumes readers are familiar with the
 basics of SMT solving and of the [SMT-LIB standard][smtlib].
 
-[docs]: https://www.anzenlang.io/cvc.lean/wip
+[docs]: https://www.anzenlang.io/cvc.lean/doc/Cvc.html
 [cvc.lean]: https://github.com/anzenlang/cvc.lean
 [lean-cvc5]: https://github.com/abdoo8080/lean-cvc5
 [cvc5]: https://cvc5.github.io

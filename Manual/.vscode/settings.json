@@ -3,5 +3,4 @@
     "_out": true,
     ".lake": true,
   },
-  "lean4.elaborationDelay": 60000,
 }
