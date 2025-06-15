@@ -11,34 +11,36 @@
 
 all: docServe
 
+build:
+	lake build
+
+test:
+	lake test
+
 docClean:
 	cd Docs ; lake clean
 
 docUpdate:
 	cd Docs ; lake update ; lake run init
 
-doc:
-	lake build
+doc: build
 	cd Docs ; lake update Cvc ; lake build Cvc:docs
 
 docServe: doc
 	python3 -m http.server -d Docs/.lake/build/doc
 
-docOpen: doc
-	open http://[::]:8000 \
-	&& python3 -m http.server -d Docs/.lake/build/doc
-
 manualClean:
 	cd Manual ; lake clean
 
 manualUpdate:
-	cd Manual ; lake update
+	cd Manual ; lake update ; lake run init
 
-manual:
-	lake build
+manual: build
 	cd Manual ; lake update Cvc ; lake exe textbook --output _out/html --depth 2
 
 manualServe: manual
 	python3 -m http.server -d Manual/_out/html/html-multi
+
+check: build test doc manual
 
 .PHONY: Docs Manual manual
