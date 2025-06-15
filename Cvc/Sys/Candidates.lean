@@ -19,38 +19,52 @@ namespace Sys
 
 namespace Candidate
 
+/-- Basic candidate information. -/
 structure Info (State : Symbols S) where
+  /-- Name of the candidate. -/
   name : String
+  /-- State predicate of the candidate. -/
   pred : State.StatePredicate
 
-inductive Status (State : Symbols S) (α : Nat → Type) : (depth : Nat) → Type
+/-- Status of a candidate, only carries `α`-information when `0 < length`.  -/
+inductive Status (State : Symbols S) (α : Nat → Type) : (length : Nat) → Type
 | init (info : Info State) : Status State α 0
 | mk (info : Info State) (data : α k) : Status State α k.succ
 
 namespace Status
 
-def info : Status State α depth → Info State
+/-- Candidate information. -/
+def info : Status State α len → Info State
 | .init info .. | .mk info .. => info
 
+/-- Deconstructs a candidate status, only for `Status _ (_ + 1)`. -/
 def decons {k : Nat} : Status State α k.succ → Info State × α k
 | .mk info data => (info, data)
 
+/-- Data in a candidate status, only for `State _ (_ + 1)`. -/
 def data {k : Nat} (status : Status State α k.succ) : α k :=
   status.decons.snd
 
+/-- Changes the data in a candidate status. -/
 private def updateData {k : Nat} (data : α k) : Status State α k.succ → Status State α k.succ
 | .mk info _ => .mk info data
 
-section variable (status : Status State α depth)
+section variable (status : Status State α length)
+
+@[inherit_doc Info.name]
 def name : String := status.info.name
+
+@[inherit_doc Info.pred]
 def pred : State.StatePredicate := status.info.pred
+
 end
 
-protected def toString [∀ k, ToString (α k)] : Status State α depth → String
+/-- String representation. -/
+protected def toString [∀ k, ToString (α k)] : Status State α length → String
 | .init info => s!"`{info.name}`: init"
 | .mk info data => s!"`{info.name}`: {data}"
 
-instance [∀ k, ToString (α k)] : ToString (Status State α depth) := ⟨Status.toString⟩
+instance [∀ k, ToString (α k)] : ToString (Status State α length) := ⟨Status.toString⟩
 
 end Status
 
