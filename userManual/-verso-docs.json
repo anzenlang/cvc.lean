@@ -199,7 +199,7 @@
  "166":
  "<code>Cvc.Sys.Candidates {S : Symbols.Repr} (State : Symbols S) (depth : Nat) : Type</code>",
  "165":
- "<code>Cvc.Symbols.Unroller {Struct : Symbols.Repr} (State : Symbols Struct) (length : Nat) : Type</code>",
+ "<code>Cvc.Symbols.Unroller {Struct : Symbols.Repr} (State : Symbols Struct) (length : Nat) : Type</code><span class=\"sep\"></span><code class=\"docstring\">Unroller for a trace of `length` states. </code>",
  "164":
  "<code><span class=\"literal string\">\"counter ≠ 2\"</span> : String</code>",
  "163":
