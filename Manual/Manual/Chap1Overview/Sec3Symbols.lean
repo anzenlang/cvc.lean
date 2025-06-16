@@ -444,25 +444,20 @@ First, let's only allow unrolling up to two states, meaning one `step`:
 ```savedLean (name := sysDemo1)
 #eval Smt.runIO do
   Smt.setOption .produceModels
-  -- none of the type annotations here are needed
+  -- none of the type annotations are needed
   let stateIdents := Sw.State.idents
   let sw0 : Sw 0 := Sw.ofIdents stateIdents
-  let maxUnrolling := 2
-  println! "checking up to {maxUnrolling.pred} step(s)"
-  let result : (k : Nat) × Sw k ←
-    sw0.kInduction maxUnrolling
-  -- have to deal with `Sw k` when `k = 0`
-  -- can never happen → **will be improved soon**
-  match result with
-  | ⟨0, _sys⟩ => println! "unreachable 🙀"
-  | ⟨k + 1, sys⟩ =>
-    println! "→ done at `k = {k}`\n"
-    sys.print
+  let maxSteps := 2
+  println! "running with `maxSteps := {maxSteps}`"
+  let res : (k : Nat) × Sw k.succ ← sw0.kInduction maxSteps
+  let ⟨k, sw⟩ := res
+  println! "→ done at `length = {k.succ} = depth + 1`\n"
+  sw.print
 ```
 
 ```leanOutput sysDemo1
-checking up to 1 step(s)
-→ done at `k = 1`
+running with `maxSteps := 2`
+→ done at `length = 2 = depth + 1`
 
 candidates status at depth 1:
 - 1 unknown(s)
@@ -473,28 +468,77 @@ candidates status at depth 1:
 
 That was not enough to falsify our bad candidate. Let's start again but unroll deeper.
 
-```savedLean (name := sysDemo1)
+```savedLean (name := sysDemo2)
 #eval Smt.runIO do
   Smt.setOption .produceModels
-  -- none of the type annotations here are needed
-  let stateIdents := Sw.State.idents
+  -- none of the type annotations are needed
+  let stateIdents : Sw.State.Idents := Sw.State.idents
   let sw0 : Sw 0 := Sw.ofIdents stateIdents
-  let maxUnrolling := 10
-  println! "checking up to {maxUnrolling.pred} step(s)"
-  let result : (k : Nat) × Sw k ←
-    sw0.kInduction maxUnrolling
-  -- have to deal with `Sw k` when `k = 0`
-  -- can never happen → **will be improved soon**
-  match result with
-  | ⟨0, _sys⟩ => println! "unreachable 🙀"
-  | ⟨k + 1, sys⟩ =>
-    println! "→ done at `k = {k}`\n"
-    sys.print
+  let maxSteps := 10
+  println! "running with `maxSteps := {maxSteps}`"
+  let res : (k : Nat) × Sw (k + 1) ← sw0.kInduction maxSteps
+  let ⟨k, sw⟩ := res
+  println! "→ done at `length = {k.succ} = depth + 1`\n"
+  sw.print
 ```
 
-```leanOutput sysDemo1
-checking up to 9 step(s)
-→ done at `k = 2`
+```leanOutput sysDemo2
+running with `maxSteps := 10`
+→ done at `length = 3 = depth + 1`
+
+candidates status at depth 2:
+- 1 invariant(s)
+  `counter positive`, 1-inductive
+- 1 falsified
+  `counter ≠ 2`, falsified in 2 steps
+  - at 2: startStop := false, reset := false, isCounting := true, counter := 2
+  - at 1: startStop := true, reset := false, isCounting := true, counter := 1
+  - at 0: startStop := false, reset := false, isCounting := false, counter := 0
+```
+
+Before moving on, note that {lean}`Sys.kInduction` is not limited to `Sw 0`. Let's see what
+combining the two previous examples looks like before moving on.
+
+```savedLean (name := sysDemo3)
+#eval Smt.runIO do
+  Smt.setOption .produceModels
+  -- none of the type annotations are needed
+  let stateIdents := Sw.State.idents
+  let sw0 : Sw 0 := Sw.ofIdents stateIdents
+  let maxSteps := 2
+  println! "running with `maxSteps := {maxSteps}`"
+  let res : (k : Nat) × Sw k.succ ← sw0.kInduction maxSteps
+  let ⟨k, sw⟩ := res
+  println! "→ done at `length = {k.succ} = depth + 1`\n"
+  sw.print
+
+  if sw.isDone then
+    println! "\nunexpected: no more unknown candidates"
+    return ()
+
+  println! "\nsome candidates are still unknown...\n"
+  let maxSteps := 10
+  println! "running with `maxSteps := {maxSteps}`"
+  let res : (k : Nat) × Sw (k + 1) ← sw.kInduction maxSteps
+  let ⟨k, sw⟩ := res
+  println! "→ done at `length = {k.succ} = depth + 1`\n"
+  sw.print
+```
+
+```leanOutput sysDemo3
+running with `maxSteps := 2`
+→ done at `length = 2 = depth + 1`
+
+candidates status at depth 1:
+- 1 unknown(s)
+  `counter ≠ 2`, valid up to step 1
+- 1 invariant(s)
+  `counter positive`, 1-inductive
+
+some candidates are still unknown...
+
+running with `maxSteps := 10`
+→ done at `length = 3 = depth + 1`
 
 candidates status at depth 2:
 - 1 invariant(s)

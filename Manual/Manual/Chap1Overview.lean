@@ -12,6 +12,7 @@ import Manual.Meta.Lean
 import Manual.Chap1Overview.Sec1Terms
 import Manual.Chap1Overview.Sec2Solver
 import Manual.Chap1Overview.Sec3Symbols
+import Manual.Chap1Overview.Sec4Erased
 
 import Cvc
 
@@ -31,8 +32,21 @@ set_option pp.rawOnError true
 tag := "chapIntro"
 %%%
 
-This section gives a brief overview of cvc.lean's main features: term management, solver
-interactions, and symbols/state/system extra features.
+This chapter gives a brief overview of cvc.lean's main features.
+
+- {ref "chapOverview_terms"}[Terms] discusses strongly-typed terms and the term DSL;
+
+- {ref "chapOverview_solver"}[Solver] presents basic solver interactions;
+
+- {ref "chapOverview_symbols"}[Symbols/States/Systems] showcases a high-level part of cvc.lean that
+  serves both as
+  - an actual API for symbol/state/transition system representation and model-checking;
+  - an example of the kind of high-level features one can build on top of cvc.lean.
+
+- {ref "chapOverview_erased"}[Type-erased] surveys the _erased_ facet of cvc.lean which relaxes
+  strong-typing so that terms/symbols/states/systems can be used without knowing at compile-time
+  the type of the symbols manipulated. This is particularly useful when parsing end-user-defined
+  terms/symbols/states/systems.
 
 
 
@@ -41,3 +55,5 @@ interactions, and symbols/state/system extra features.
 {include 1 Manual.Chap1Overview.Sec2Solver}
 
 {include 1 Manual.Chap1Overview.Sec3Symbols}
+
+{include 1 Manual.Chap1Overview.Sec4Erased}
