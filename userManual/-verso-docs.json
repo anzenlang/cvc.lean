@@ -131,29 +131,101 @@
  "<code>Cvc.Term.and (lft rgt : Term Bool) : Term.Build Formula</code><span class=\"sep\"></span><code class=\"docstring\">Builds a conjunction term. </code>",
  "26":
  "<code>Bool.true : Bool</code><span class=\"sep\"></span><code class=\"docstring\">The Boolean value `true`, not to be confused with the proposition `True`. </code>",
+ "252": "<code>ESw (k + 1)</code>",
+ "251": "<code>(k : Nat) × ESw (k + 1)</code>",
+ "250": "<code>(k : Nat) × ESw k.succ</code>",
  "25":
  "<code>Cvc.Term.bool (b : Bool) : Term.Build Term.Bool</code><span class=\"sep\"></span><code class=\"docstring\">Builds a constant Boolean term. </code>",
+ "249": "<code>ESw 0</code>",
+ "248": "<code><span class=\"literal string\">\"???\"</span> : String</code>",
+ "247":
+ "<code>ToString.toString.{u} {α : Type u} [self : ToString α] : α → String</code><span class=\"sep\"></span><code class=\"docstring\">Converts a value into a string. </code>",
+ "246":
+ "<code>Cvc.ESymbols.ByName.findMapOr.{u_1} {R : Symbol.Repr} (symbols : ByName R) {α : Sort u_1} (name : String)\n  (f : ESymbol R → α) (getDefault : Unit → α) : α</code>",
+ "245": "<code>String → String</code>",
+ "244": "<code>Sys.Candidate.Falsified ByName.instState k.succ</code>",
+ "243": "<code>Sys.Candidate.Invariant ByName.instState k.succ</code>",
+ "242": "<code>Sys.Candidate.Unknown ByName.instState k.succ</code>",
+ "241": "<code>Sys.Candidate.FalsifiedMap ByName.instState k.succ</code>",
+ "240": "<code>Sys.Candidate.InvariantMap ByName.instState k.succ</code>",
  "24": "<code>Formula</code>",
+ "239": "<code>Sys.Candidate.UnknownMap ByName.instState k.succ</code>",
+ "238": "<code>ESw k.succ</code>",
+ "237":
+ "<code>ESw.print {k : Nat} (sw : ESw k.succ) : IO Unit</code><span class=\"sep\"></span><code class=\"docstring\">`Sw k.succ`, in `Sw 0` candidates have no status. </code>",
+ "236":
+ "<code>Cvc.Sys.addCandidates.{u_1} {S : Symbols.Repr} [State : Symbols S] {α : Type u_1}\n  [ForIn Res α (String × Symbols.StatePred)] (sys : Sys State) (candidates : α) : Res (Sys State)</code>",
+ "235":
+ "<code>Cvc.ESys.ByName.mk (idents : ByName.Idents) (init : ByName.StatePred) (step : ByName.StateRel) : ESys.ByName</code>",
+ "234":
+ "<code>Cvc.Res (α : Type) : Type</code><span class=\"sep\"></span><code class=\"docstring\">`Error`-result monad. </code>",
+ "233": "<code>ESw.mk : Res (ESw 0)</code>",
+ "232": "<code>ESw (length : Nat) : Type</code>",
+ "231": "<code>ESw.candidate2 : String × ByName.StatePredicate</code>",
+ "230": "<code>ESw.candidate1 : String × ByName.StatePredicate</code>",
  "23":
  "<code>Cvc.Term.int (i : Int) : Term.Build Term.Int</code><span class=\"sep\"></span><code class=\"docstring\">Builds a constant integer term. </code>",
+ "229": "<code>Symbol.TermAt k✝.succ Srt.int.toType</code>",
+ "228": "<code>Symbol.TermAt k✝.succ Srt.bool.toType</code>",
+ "227": "<code>ByName.TermsAt k✝.succ</code>",
+ "226": "<code>Cvc.ESymbols.ByName.StateRelation : Type</code>",
+ "225": "<code>ESw.step : ByName.StateRelation</code>",
+ "224": "<code>ESw.init' : ByName.StatePredicate</code>",
+ "223": "<code>Symbol.TermAt k✝ Srt.int.toType</code>",
+ "222":
+ "<code>Cvc.ESymbols.ByName.findAsSrt {R : Symbol.Repr} (symbols : ByName R) (srt : Srt) (name : String) : Res (R srt.toType)</code>",
+ "221": "<code>Symbol.TermAt k✝ Srt.bool.toType</code>",
+ "220": "<code>ByName.TermsAt k✝</code>",
  "22": "<code>Term.Int</code>",
+ "219": "<code>Cvc.ESymbols.ByName.StatePredicate : Type</code>",
+ "218": "<code>ESw.init : ByName.StatePredicate</code>",
+ "217":
+ "<code><span class=\"literal string\">\"counter\"</span> : String</code>",
+ "216":
+ "<code><span class=\"literal string\">\"isCounting\"</span> : String</code>",
+ "215": "<code><span class=\"literal string\">\"reset\"</span> : String</code>",
+ "214":
+ "<code>Cvc.Srt.bool : Srt</code><span class=\"sep\"></span><code class=\"docstring\">Boolean sort. </code>",
+ "213":
+ "<code><span class=\"literal string\">\"startStop\"</span> : String</code>",
+ "212":
+ "<code>Cvc.ESymbols.ByName.Idents.insert! (idents : ByName.Idents) (name : String) (α : Type) [A : IsSrt α] : ByName.Idents</code>",
+ "211": "<code>Cvc.ESymbols.ByName.emptyIdents : ByName.Idents</code>",
+ "210": "<code>ESw.userSymbols : ByName.Idents</code>",
  "21":
  "<code>Cvc.Term.BuildT.runIO {α : Type} (build : Term.BuildIO α) (state? : Option Term.Build.State := none) : IO α</code><span class=\"sep\"></span><code class=\"docstring\">Runs term-building code in `IO`, creates an initial build state if none is provided </code>",
+ "209":
+ "<code>Cvc.ESymbols.ByName.Idents.insert! (idents : ESymbols.ByName.Idents) (name : String) (α : Type) [A : IsSrt α] :\n  ESymbols.ByName.Idents</code>",
+ "208":
+ "<code>Cvc.ESymbols.ByName.Idents.insert (idents : ESymbols.ByName.Idents) (name : String) (α : Type) [A : IsSrt α] :\n  Res ESymbols.ByName.Idents</code>",
+ "207": "<code>Cvc.ESymbols.ByName.emptyIdents : ESymbols.ByName.Idents</code>",
+ "206": "<code>Cvc.ESymbols.ByName.Idents : Type</code>",
+ "205": "<code>Cvc.ESys.ByName (depth : Nat := 0) : Type</code>",
+ "204": "<code>Cvc.ESymbols.ByName (R : Symbol.Repr) : Type</code>",
+ "203":
+ "<code>Cvc.ESymbol (R : Symbol.Repr := fun x [IsSrt x] =&gt; Symbol.Ident x) : Type</code>",
+ "202":
+ "<code>Cvc.EValue : Type</code><span class=\"sep\"></span><code class=\"docstring\">An erased value for some `Srt`. </code>",
+ "201":
+ "<code>Cvc.Srt.int : Srt</code><span class=\"sep\"></span><code class=\"docstring\">Integer sort. </code>",
+ "200":
+ "<code>Cvc.ETerm : Type</code><span class=\"sep\"></span><code class=\"docstring\">Type-erased version `Term`. </code>",
  "20":
  "<code class=\"docstring\">`#eval e` evaluates the expression `e` by compiling and evaluating it.\n\n* The command attempts to use `ToExpr`, `Repr`, or `ToString` instances to print the result.\n* If `e` is a monadic value of type `m ty`, then the command tries to adapt the monad `m`\n  to one of the monads that `#eval` supports, which include `IO`, `CoreM`, `MetaM`, `TermElabM`, and `CommandElabM`.\n  Users can define `MonadEval` instances to extend the list of supported monads.\n\nThe `#eval` command gracefully degrades in capability depending on what is imported.\nImporting the `Lean.Elab.Command` module provides full capabilities.\n\nDue to unsoundness, `#eval` refuses to evaluate expressions that depend on `sorry`, even indirectly,\nsince the presence of `sorry` can lead to runtime instability and crashes.\nThis check can be overridden with the `#eval! e` command.\n\nOptions:\n* If `eval.pp` is true (default: true) then tries to use `ToExpr` instances to make use of the\n  usual pretty printer. Otherwise, only tries using `Repr` and `ToString` instances.\n* If `eval.type` is true (default: false) then pretty prints the type of the evaluated value.\n* If `eval.derive.repr` is true (default: true) then attempts to auto-derive a `Repr` instance\n  when there is no other way to print the result.\n\nSee also: `#reduce e` for evaluation by term reduction.\n</code>",
  "2":
  "<code>Cvc.IsSrt (α : Type) : Type</code><span class=\"sep\"></span><code class=\"docstring\">Provides a `srt : Srt` such that `α = srt.toType`. </code>",
+ "199":
+ "<code>Cvc.Sys.isDone {S : Symbols.Repr} {depth : Nat} [State : Symbols S] (sys : Sys State depth) : Bool</code>",
  "198": "<code>Sw (k + 1)</code>",
- "197": "<code>(k : Nat) × Sw k</code>",
- "196":
- "<code>Nat.pred : Nat → Nat</code><span class=\"sep\"></span><code class=\"docstring\">The predecessor of a natural number is one less than it. The precedessor of `0` is defined to be\n`0`.\n\nThis definition is overridden in the compiler with an efficient implementation. This definition is\nthe logical model.\n</code>",
+ "197": "<code>(k : Nat) × Sw (k + 1)</code>",
+ "196": "<code>(k : Nat) × Sw k.succ</code>",
  "195":
  "<code>Sw.ofIdents : Symbols.Idents → Sw</code><span class=\"sep\"></span><code class=\"docstring\">Constructor. </code>",
  "194": "<code>Sw</code>",
  "193": "<code>Sw.State.idents : Sw.State.Idents</code>",
  "192": "<code>Sw.State.Idents</code>",
  "191":
- "<code>Cvc.Sys.kInduction {S : Symbols.Repr} [State : Symbols S] {k : Nat} (sys : Sys State k) (maxSteps : Nat) :\n  Smt ((k' : Nat) × Sys State k')</code>",
+ "<code>Cvc.Sys.kInduction {S : Symbols.Repr} [State : Symbols S] {k : Nat} (sys : Sys State k) (maxSteps : Nat) :\n  Smt ((k' : Nat) × Sys State k'.succ)</code>",
  "190":
  "<code>Cvc.Sys {Struct : Symbols.Repr} (State : Symbols Struct) (depth : Nat := 0) : Type</code>",
  "19": "<code>Term.Bool</code>",

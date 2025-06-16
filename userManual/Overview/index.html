@@ -1554,31 +1554,64 @@ window.onload = () => {
             <div class="split-toc">
               <div class="title">
                 <label for="--verso-manual-toc-chapIntro" class="toggle-split-toc"><input type="checkbox" class="toggle-split-toc" id="--verso-manual-toc-chapIntro" checked="checked"></label><span class="number">1.</span> <span class="current"><a href="Overview/#chapIntro">Overview</a></span></div>
-              <table><tr class="numbered"><td class="num">1.1.</td><td><a href="Overview/Terms/#chapIntro_terms">Terms</a></td></tr><tr class="numbered"><td class="num">1.2.</td><td><a href="Overview/Solver/#Cvc___lean-User-Manual--Overview--Solver">Solver</a></td></tr><tr class="numbered"><td class="num">1.3.</td><td><a href="Overview/Symbols___-States-and-Systems/#Cvc___lean-User-Manual--Overview--Symbols___-States-and-Systems">Symbols, States and Systems</a></td></tr></table></div>
+              <table><tr class="numbered"><td class="num">1.1.</td><td><a href="Overview/Terms/#chapOverview_terms">Terms</a></td></tr><tr class="numbered"><td class="num">1.2.</td><td><a href="Overview/Solver/#chapOverview_solver">Solver</a></td></tr><tr class="numbered"><td class="num">1.3.</td><td><a href="Overview/Symbols___-States-and-Systems/#chapOverview_symbols">Symbols, States and Systems</a></td></tr><tr class="numbered"><td class="num">1.4.</td><td><a href="Overview/Type-Erased-API/#chapOverview_erased">Type-Erased API</a></td></tr></table></div>
             </div>
           </div>
         <div class="last"></div>
         </nav>
       <main><div class="content-wrapper">
           <nav class="prev-next-buttons">
-            <a class="local-button active" href="#" rel="prev" title=" Cvc.lean User Manual"><span class="arrow">←</span><span class="where"> Cvc.lean User Manual</span></a><a class="local-button active" href="Overview/Terms/#chapIntro_terms" rel="next" title="1.1. Terms"><span class="where">1.1. Terms</span><span class="arrow">→</span></a></nav>
+            <a class="local-button active" href="#" rel="prev" title=" Cvc.lean User Manual"><span class="arrow">←</span><span class="where"> Cvc.lean User Manual</span></a><a class="local-button active" href="Overview/Terms/#chapOverview_terms" rel="next" title="1.1. Terms"><span class="where">1.1. Terms</span><span class="arrow">→</span></a></nav>
           <section>
             <h1>
               1. Overview<span class="permalink-widget inline"><a href="find/?domain=Verso.Genre.Manual.section&name=chapIntro" title="Permalink">🔗</a></span></h1>
             <p>
-              This section gives a brief overview of cvc.lean's main features: term management, solver
-interactions, and symbols/state/system extra features.</p>
+              This chapter gives a brief overview of cvc.lean's main features.</p>
+            <ul>
+              <li>
+                <p>
+                  <a href="Overview/Terms/#chapOverview_terms">Terms</a> discusses strongly-typed terms and the term DSL;</p>
+                </li>
+              <li>
+                <p>
+                  <a href="Overview/Solver/#chapOverview_solver">Solver</a> presents basic solver interactions;</p>
+                </li>
+              <li>
+                <p>
+                  <a href="Overview/Symbols___-States-and-Systems/#chapOverview_symbols">Symbols/States/Systems</a> showcases a high-level part of cvc.lean that
+  serves both as</p>
+                <ul>
+                  <li>
+                    <p>
+                      an actual API for symbol/state/transition system representation and model-checking;</p>
+                    </li>
+                  <li>
+                    <p>
+                      an example of the kind of high-level features one can build on top of cvc.lean.</p>
+                    </li>
+                  </ul>
+                </li>
+              <li>
+                <p>
+                  <a href="Overview/Type-Erased-API/#chapOverview_erased">Type-erased</a> surveys the <em>erased</em> facet of cvc.lean which relaxes
+  strong-typing so that terms/symbols/states/systems can be used without knowing at compile-time
+  the type of the symbols manipulated. This is particularly useful when parsing end-user-defined
+  terms/symbols/states/systems.</p>
+                </li>
+              </ul>
             <ol class="section-toc">
               <li>
-                <a href="Overview/Terms/#chapIntro_terms"><span class="number">1.1.</span> Terms</a></li>
+                <a href="Overview/Terms/#chapOverview_terms"><span class="number">1.1.</span> Terms</a></li>
               <li>
-                <a href="Overview/Solver/#Cvc___lean-User-Manual--Overview--Solver"><span class="number">1.2.</span> Solver</a></li>
+                <a href="Overview/Solver/#chapOverview_solver"><span class="number">1.2.</span> Solver</a></li>
               <li>
-                <a href="Overview/Symbols___-States-and-Systems/#Cvc___lean-User-Manual--Overview--Symbols___-States-and-Systems"><span class="number">1.3.</span> Symbols, States and Systems</a></li>
+                <a href="Overview/Symbols___-States-and-Systems/#chapOverview_symbols"><span class="number">1.3.</span> Symbols, States and Systems</a></li>
+              <li>
+                <a href="Overview/Type-Erased-API/#chapOverview_erased"><span class="number">1.4.</span> Type-Erased API</a></li>
               </ol>
             </section>
           <nav class="prev-next-buttons">
-            <a class="local-button active" href="#" rel="prev" title=" Cvc.lean User Manual"><span class="arrow">←</span><span class="where"> Cvc.lean User Manual</span></a><a class="local-button active" href="Overview/Terms/#chapIntro_terms" rel="next" title="1.1. Terms"><span class="where">1.1. Terms</span><span class="arrow">→</span></a></nav>
+            <a class="local-button active" href="#" rel="prev" title=" Cvc.lean User Manual"><span class="arrow">←</span><span class="where"> Cvc.lean User Manual</span></a><a class="local-button active" href="Overview/Terms/#chapOverview_terms" rel="next" title="1.1. Terms"><span class="where">1.1. Terms</span><span class="arrow">→</span></a></nav>
           </div>
         </main></div>
     </body>

@@ -2,8 +2,8 @@
  {"title": "Sections or chapters of the manual",
   "description": null,
   "contents":
-  {"chapIntro_terms":
-   [{"id": "chapIntro_terms",
+  {"chapOverview_terms":
+   [{"id": "chapOverview_terms",
      "data":
      {"title": "Terms",
       "shortTitle": null,
@@ -13,6 +13,41 @@
        {"title": "Overview", "shortTitle": null, "number": "1"},
        {"title": "Terms", "shortTitle": null, "number": "1"}]},
      "address": "/Overview/Terms/"}],
+   "chapOverview_symbols":
+   [{"id": "chapOverview_symbols",
+     "data":
+     {"title": "Symbols, States and Systems",
+      "shortTitle": null,
+      "sectionNum": "1.3.",
+      "context":
+      [{"title": "Cvc.lean User Manual", "shortTitle": null, "number": null},
+       {"title": "Overview", "shortTitle": null, "number": "1"},
+       {"title": "Symbols, States and Systems",
+        "shortTitle": null,
+        "number": "3"}]},
+     "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "chapOverview_solver":
+   [{"id": "chapOverview_solver",
+     "data":
+     {"title": "Solver",
+      "shortTitle": null,
+      "sectionNum": "1.2.",
+      "context":
+      [{"title": "Cvc.lean User Manual", "shortTitle": null, "number": null},
+       {"title": "Overview", "shortTitle": null, "number": "1"},
+       {"title": "Solver", "shortTitle": null, "number": "2"}]},
+     "address": "/Overview/Solver/"}],
+   "chapOverview_erased":
+   [{"id": "chapOverview_erased",
+     "data":
+     {"title": "Type-Erased API",
+      "shortTitle": null,
+      "sectionNum": "1.4.",
+      "context":
+      [{"title": "Cvc.lean User Manual", "shortTitle": null, "number": null},
+       {"title": "Overview", "shortTitle": null, "number": "1"},
+       {"title": "Type-Erased API", "shortTitle": null, "number": "4"}]},
+     "address": "/Overview/Type-Erased-API/"}],
    "chapIntro":
    [{"id": "chapIntro",
      "data":
@@ -111,6 +146,36 @@
    [{"id": "Implemented___step",
      "data": null,
      "address": "/Overview/Symbols___-States-and-Systems/"}],
+   "ESw.userSymbols":
+   [{"id": "ESw___userSymbols",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw.step":
+   [{"id": "ESw___step",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw.print":
+   [{"id": "ESw", "data": null, "address": "/Overview/Type-Erased-API/"}],
+   "ESw.mk":
+   [{"id": "ESw", "data": null, "address": "/Overview/Type-Erased-API/"}],
+   "ESw.init'":
+   [{"id": "ESw___step",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw.init":
+   [{"id": "ESw___step",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw.candidate2":
+   [{"id": "ESw___step",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw.candidate1":
+   [{"id": "ESw___step",
+     "data": null,
+     "address": "/Overview/Type-Erased-API/"}],
+   "ESw":
+   [{"id": "ESw", "data": null, "address": "/Overview/Type-Erased-API/"}],
    "AdHocVars.z":
    [{"id": "AdHocVars___y",
      "data": null,
