@@ -2,9 +2,8 @@ name = "cvcManual"
 defaultTargets = ["textbook"]
 
 [[require]]
+scope = "leanprover"
 name = "verso"
-git = "https://github.com/leanprover/verso"
-rev = "v4.20.0"
 
 [[require]]
 name = "cvc"

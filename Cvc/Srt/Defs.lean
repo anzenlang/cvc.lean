@@ -381,6 +381,7 @@ where
     | k@.NULL_SORT => failKind k
     | k@.UNDEFINED_SORT_KIND => failKind k
     | k@.INTERNAL_SORT_KIND => failKind k
+    | k@.LAST_SORT_KIND => failKind k
 
 
 abbrev isFunction : Srt → Bool
