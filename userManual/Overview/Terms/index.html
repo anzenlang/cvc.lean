@@ -14,9 +14,9 @@
     <script>
       const __versoSiteRoot = document.baseURI;</script>
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js" integrity="sha384-zbcZAIxlvJtNE3Dp5nxLXdXtXyxwOdnILY1TDPVmKFhl4r4nSUG1r8bcFXGVa4Te" crossorigin="anonymous"></script>
-    <script src="-verso-js/popper.js"></script>
-    <script src="-verso-js/tippy.js"></script>
-    <link rel="stylesheet" href="-verso-css/tippy-border.css">
+    <script src="-verso-data/popper.js"></script>
+    <script src="-verso-data/tippy.js"></script>
+    <link rel="stylesheet" href="-verso-data/tippy-border.css">
     <style>
 
 .hl.lean {
@@ -95,22 +95,6 @@
   margin-top: 0rem;
 }
 
-/*
-@media (hover: hover) {
-  .hl.lean .has-info:hover > .hover-container > .hover-info:not(.tactic *),
-  .hl.lean .tactic:has(> .tactic-toggle:checked) .has-info:hover > .hover-container > .hover-info,
-  .hl.lean .token:hover > .hover-container > .hover-info:not(.has-info *):not(.tactic *),
-  .hl.lean .tactic:has(> .tactic-toggle:checked) .token:hover > .hover-container > .hover-info:not(.has-info *) {
-    display: inline-block;
-    position: absolute;
-    top: 1rem;
-    font-weight: normal;
-    font-style: normal;
-    width: min-content;
-  }
-}
-*/
-
 .hl.lean.block {
   display: block;
 }
@@ -133,7 +117,7 @@
 }
 
 
-.hl.lean .has-info {
+.hl.lean .has-info .token:not(.tactic-state):not(.tactic-state *), .hl.lean .has-info .inter-text:not(.tactic-state):not(.tactic-state *) {
   text-decoration-style: wavy;
   text-decoration-line: underline;
   text-decoration-thickness: from-font;
@@ -149,7 +133,7 @@
   text-align: left;
 }
 
-.hl.lean .has-info.error {
+.hl.lean .has-info.error :not(.tactic-state):not(.tactic-state *){
   text-decoration-color: red;
 }
 
@@ -173,7 +157,7 @@
     color: red;
 }
 
-.hl.lean .has-info.warning {
+.hl.lean .has-info.warning :not(.tactic-state):not(.tactic-state *) {
   text-decoration-color: var(--verso-warning-color);
 }
 
@@ -198,7 +182,7 @@
 }
 
 
-.hl.lean .has-info.info {
+.hl.lean .has-info.info :not(.tactic-state):not(.tactic-state *) {
   text-decoration-color: blue;
 }
 
@@ -253,14 +237,12 @@
 .hl.lean .tactic-state {
   display: none;
   position: relative;
-  left: 2rem;
   width: fit-content;
   border: 1px solid #888888;
   border-radius: 0.1rem;
   padding: 0.5rem;
   font-family: sans-serif;
   background-color: #ffffff;
-  z-index: 200;
 }
 
 .hl.lean.popup .tactic-state {
@@ -276,32 +258,26 @@
 
 .hl.lean .tactic {
   position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  vertical-align: top;
 }
 
 .hl.lean .tactic-toggle:checked ~ .tactic-state {
-  display: block;
+  display: inline-block;
+  vertical-align: top;
+  grid-row: 2;
+  justify-self: start;
 }
-
-/*
-@media (hover: hover) {
-  .hl.lean .tactic:hover > .tactic-toggle:not(:checked) ~ .tactic-state {
-    display: block;
-    position: absolute;
-    left: 0;
-    transform: translate(0.25rem, 0);
-    z-index: 250;
-  }
-}
-*/
 
 .hl.lean .tactic > label {
   position: relative;
-  transition: all 0.5s;
+  grid-row: 1;
 }
 
 @media (hover: hover) {
-  .hl.lean .tactic > label:hover {
-    border-bottom: 1px dotted #bbbbbb;
+  .hl.lean .tactic:has(.tactic-toggle:not(:checked)) > label:hover {
+    background-color: #eeeeee;
   }
 }
 
@@ -519,8 +495,6 @@
   color: black;
   border: 3px solid #99b3c2;
 }
-
-
 
 .tippy-box[data-theme~='tactic'] {
   background-color: white;
@@ -1436,19 +1410,42 @@ window.onload = () => {
     let docsJson = siteRoot + "-verso-docs.json";
     fetch(docsJson).then((resp) => resp.json()).then((versoDocData) => {
 
+      function hideParentTooltips(element) {
+        let parent = element.parentElement;
+        while (parent) {
+          const tippyInstance = parent._tippy;
+          if (tippyInstance) {
+            tippyInstance.hide();
+          }
+          parent = parent.parentElement;
+        }
+      }
+
+
+
       const defaultTippyProps = {
         /* DEBUG -- remove the space: * /
         onHide(any) { return false; },
         trigger: "click",
         // */
-        theme: "lean",
+        /* theme: "lean", */
         maxWidth: "none",
         appendTo: () => document.body,
         interactive: true,
         delay: [100, null],
-        ignoreAttributes: true,
+        /* ignoreAttributes: true, */
+        followCursor: 'initial',
         onShow(inst) {
-          if (inst.reference.querySelector(".hover-info") || "versoHover" in inst.reference.dataset) {
+          if (inst.reference.className == 'tactic') {
+
+            const toggle = inst.reference.querySelector("input.tactic-toggle");
+            if (toggle && toggle.checked) {
+              return false;
+            }
+            hideParentTooltips(inst.reference);
+            //if (blockedByTippy(inst.reference)) { return false; }
+
+          } else if (inst.reference.querySelector(".hover-info") || "versoHover" in inst.reference.dataset) {
             if (blockedByTactic(inst.reference)) { return false };
             if (blockedByTippy(inst.reference)) { return false; }
           } else { // Nothing to show here!
@@ -1457,77 +1454,68 @@ window.onload = () => {
         },
         content (tgt) {
           const content = document.createElement("span");
-          content.className = "hl lean";
-          content.style.display = "block";
-          content.style.maxHeight = "300px";
-          content.style.overflowY = "auto";
-          content.style.overflowX = "hidden";
-          const hoverId = tgt.dataset.versoHover;
-          const hoverInfo = tgt.querySelector(".hover-info");
-          if (hoverId) { // Docstrings from the table
-            // TODO stop doing an implicit conversion from string to number here
-            let data = versoDocData[hoverId];
-            if (data) {
-              const info = document.createElement("span");
-              info.className = "hover-info";
-              info.style.display = "block";
-              info.innerHTML = data;
-              content.appendChild(info);
-              /* Render docstrings - TODO server-side */
-              if ('undefined' !== typeof marked) {
-                  for (const d of content.querySelectorAll("code.docstring, pre.docstring")) {
-                      const str = d.innerText;
-                      const html = marked.parse(str);
-                      const rendered = document.createElement("div");
-                      rendered.classList.add("docstring");
-                      rendered.innerHTML = html;
-                      d.parentNode.replaceChild(rendered, d);
-                  }
+          if (tgt.className == 'tactic') {
+            const state = tgt.querySelector(".tactic-state").cloneNode(true);
+            state.style.display = "block";
+            content.appendChild(state);
+            content.style.display = "block";
+            content.className = "hl lean popup";
+          } else {
+            content.className = "hl lean";
+            content.style.display = "block";
+            content.style.maxHeight = "300px";
+            content.style.overflowY = "auto";
+            content.style.overflowX = "hidden";
+            const hoverId = tgt.dataset.versoHover;
+            const hoverInfo = tgt.querySelector(".hover-info");
+            if (hoverId) { // Docstrings from the table
+              // TODO stop doing an implicit conversion from string to number here
+              let data = versoDocData[hoverId];
+              if (data) {
+                const info = document.createElement("span");
+                info.className = "hover-info";
+                info.style.display = "block";
+                info.innerHTML = data;
+                content.appendChild(info);
+                /* Render docstrings - TODO server-side */
+                if ('undefined' !== typeof marked) {
+                    for (const d of content.querySelectorAll("code.docstring, pre.docstring")) {
+                        const str = d.innerText;
+                        const html = marked.parse(str);
+                        const rendered = document.createElement("div");
+                        rendered.classList.add("docstring");
+                        rendered.innerHTML = html;
+                        d.parentNode.replaceChild(rendered, d);
+                    }
+                }
+              } else {
+                content.innerHTML = "Failed to load doc ID: " + hoverId;
               }
-            } else {
-              content.innerHTML = "Failed to load doc ID: " + hoverId;
+            } else if (hoverInfo) { // The inline info, still used for compiler messages
+              content.appendChild(hoverInfo.cloneNode(true));
             }
-          } else if (hoverInfo) { // The inline info, still used for compiler messages
-            content.appendChild(hoverInfo.cloneNode(true));
           }
           return content;
         }
       };
 
-      const addTippy = (selector, props) => {
-        tippy(selector, Object.assign({}, defaultTippyProps, props));
-      };
-      addTippy('.hl.lean .const.token, .hl.lean .keyword.token, .hl.lean .literal.token, .hl.lean .option.token, .hl.lean .var.token, .hl.lean .typed.token', {theme: 'lean'});
-      addTippy('.hl.lean .has-info.warning', {theme: 'warning message'});
-      addTippy('.hl.lean .has-info.info', {theme: 'info message'});
-      addTippy('.hl.lean .has-info.error', {theme: 'error message'});
 
-      tippy('.hl.lean .tactic', {
-        allowHtml: true,
-        /* DEBUG -- remove the space: * /
-        onHide(any) { return false; },
-        trigger: "click",
-        // */
-        maxWidth: "none",
-        onShow(inst) {
-          const toggle = inst.reference.querySelector("input.tactic-toggle");
-          if (toggle && toggle.checked) {
-            return false;
-          }
-          if (blockedByTippy(inst.reference)) { return false; }
-        },
-        theme: "tactic",
-        placement: 'bottom-start',
-        content (tgt) {
-          const content = document.createElement("span");
-          const state = tgt.querySelector(".tactic-state").cloneNode(true);
-          state.style.display = "block";
-          content.appendChild(state);
-          content.style.display = "block";
-          content.className = "hl lean popup";
-          return content;
-        }
+      document.querySelectorAll('.hl.lean .const.token, .hl.lean .keyword.token, .hl.lean .literal.token, .hl.lean .option.token, .hl.lean .var.token, .hl.lean .typed.token, .hl.lean .level-var, .hl.lean .level-const, .hl.lean .level-op, .hl.lean .sort').forEach(element => {
+        element.setAttribute('data-tippy-theme', 'lean');
       });
+      document.querySelectorAll('.hl.lean .has-info.warning').forEach(element => {
+        element.setAttribute('data-tippy-theme', 'warning message');
+      });
+      document.querySelectorAll('.hl.lean .has-info.info').forEach(element => {
+        element.setAttribute('data-tippy-theme', 'info message');
+      });
+      document.querySelectorAll('.hl.lean .has-info.error').forEach(element => {
+        element.setAttribute('data-tippy-theme', 'error message');
+      });
+      document.querySelectorAll('.hl.lean .tactic').forEach(element => {
+        element.setAttribute('data-tippy-theme', 'tactic');
+      });
+      let insts = tippy('.hl.lean .const.token, .hl.lean .keyword.token, .hl.lean .literal.token, .hl.lean .option.token, .hl.lean .var.token, .hl.lean .typed.token, .hl.lean .has-info, .hl.lean .tactic, .hl.lean .level-var, .hl.lean .level-const, .hl.lean .level-op, .hl.lean .sort', defaultTippyProps);
   });
 }
 </script>
@@ -1590,13 +1578,13 @@ window.onload = () => {
             <h1>
               1.1. Terms<span class="permalink-widget inline"><a href="find/?domain=Verso.Genre.Manual.section&name=chapOverview_terms" title="Permalink">🔗</a></span></h1>
             <p>
-              <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Cvc.Term</span></a> <span class="var token" data-binding="var-_uniq.2" data-verso-hover="1">α</span></code> represents a cvc5 term of some type <code class="hl lean inline" data-lean-context="examples"><span class="var token" data-binding="var-_uniq.4" data-verso-hover="1">α</span></code>.
+              <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Cvc.Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.2" data-verso-hover="1">α</span></code> represents a cvc5 term of some type <code class="hl lean inline" data-lean-context="examples"><span class="var token" data-binding="var-_uniq.4" data-verso-hover="1">α</span></code>.
 <span class="marginalia"><span class="note">
-  In practice, most cvc.lean features expect <code class="hl lean inline" data-lean-context="examples"><span class="var token" data-binding="var-_uniq.6" data-verso-hover="1">α</span></code> to have a <code class="hl lean inline" data-lean-context="examples"><span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span> <span class="var token" data-binding="var-_uniq.8" data-verso-hover="1">α</span></code> instance,
+  In practice, most cvc.lean features expect <code class="hl lean inline" data-lean-context="examples"><span class="var token" data-binding="var-_uniq.6" data-verso-hover="1">α</span></code> to have a <code class="hl lean inline" data-lean-context="examples"><span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.8" data-verso-hover="1">α</span></code> instance,
   which guarantees that <code class="hl lean inline" data-lean-context="examples"><span class="var token" data-binding="var-_uniq.10" data-verso-hover="1">α</span></code> corresponds to some SMT sort (<code class="hl lean inline" data-lean-context="examples"><span class="const token" data-binding="const-Cvc.Srt" data-verso-hover="3">Srt</span></code>).
 </span></span></p>
             <div class="namedocs" id="Cvc___Term___hasSymbols">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.toUnsafe" title="Permalink">🔗</a></span><span class="label">structure</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term (<span class="var token" data-binding="var-_uniq.21" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>) : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div><div class="narrow-only">Cvc.Term (<span class="var token" data-binding="var-_uniq.21" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>) : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.toUnsafe" title="Permalink">🔗</a></span><span class="label">structure</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.245" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.245" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div></pre><div class="text">
                 <p>
                   Type-safe cvc5 terms, input type expected to be <code class="hl lean inline" data-lean-context="docstring-examples"><span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span></code> for most uses.</p>
                 <ul>
@@ -1623,24 +1611,24 @@ constructors.</p>
                 </div>
               </div>
             <p>
-              For this introduction, we will mostly use <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span></code> and <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code> for the
+              For this introduction, we will mostly use <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span></code> and <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code> for the
 sake of simplicity. Note that these term variants are often mentioned through aliases:</p>
             <div class="namedocs" id="Cvc___Formula">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Formula" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Formula : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div><div class="narrow-only">Cvc.Formula : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Formula" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Formula</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Formula</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div></pre><div class="text">
                 <p>
-                  Abbreviation for a <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code>.</p>
+                  Abbreviation for a <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code>.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___Int">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.Int" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.Int : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div><div class="narrow-only">Cvc.Term.Int : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.Int" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.Int</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.Int</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div></pre><div class="text">
                 <p>
-                  Integer terms: <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span></code>.</p>
+                  Integer terms: <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span></code>.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___Bool">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.Bool" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.Bool : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div><div class="narrow-only">Cvc.Term.Bool : <span class="sort token" data-binding="" data-verso-hover="4">Type</span></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.Bool" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.Bool</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.Bool</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span></div></pre><div class="text">
                 <p>
-                  Boolean terms: <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code>.</p>
+                  Boolean terms: <code class="hl lean inline" data-lean-context="docstring-examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span></code>.</p>
                 </div>
               </div>
             <p>
@@ -1654,38 +1642,38 @@ for instance for term creation.</p>
               Here are a few term-creation functions, note that they are all in the <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a></code> namespace but
 produce results in the <code class="hl lean inline" data-lean-context="examples"><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span></code> monad.</p>
             <div class="namedocs" id="Cvc___Term___int">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.int" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.int (<span class="var token" data-binding="var-_uniq.32" data-verso-hover="12">i</span> : <span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span>) : <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Term___Int"><span class="const token" data-binding="const-Cvc.Term.Int" data-verso-hover="13">Term.Int</span></a></div><div class="narrow-only">Cvc.Term.int (<span class="var token" data-binding="var-_uniq.32" data-verso-hover="12">i</span> : <span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span>) :
-  <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Term___Int"><span class="const token" data-binding="const-Cvc.Term.Int" data-verso-hover="13">Term.Int</span></a></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.int" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.int</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.845" data-verso-hover="12">i</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Int"><span class="const token" data-binding="const-Cvc.Term.Int" data-verso-hover="13">Term.Int</span></a></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.int</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.845" data-verso-hover="12">i</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Int" data-verso-hover="10">Int</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text">
+  </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Int"><span class="const token" data-binding="const-Cvc.Term.Int" data-verso-hover="13">Term.Int</span></a></div></pre><div class="text">
                 <p>
                   Builds a constant integer term.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___bool">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.bool" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.bool (<span class="var token" data-binding="var-_uniq.36" data-verso-hover="14">b</span> : <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span>) : <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a></div><div class="narrow-only">Cvc.Term.bool (<span class="var token" data-binding="var-_uniq.36" data-verso-hover="14">b</span> : <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span>) :
-  <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.bool" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.bool</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.902" data-verso-hover="14">b</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.bool</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.902" data-verso-hover="14">b</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text">
+  </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a></div></pre><div class="text">
                 <p>
                   Builds a constant Boolean term.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___equal">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.equal" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.equal {<span class="var token" data-binding="var-_uniq.42" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>} (<span class="var token" data-binding="var-_uniq.43" data-verso-hover="16">lft </span><span class="var token" data-binding="var-_uniq.45" data-verso-hover="16">rgt</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.42" data-verso-hover="1">α</span>) : <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div><div class="narrow-only">Cvc.Term.equal {<span class="var token" data-binding="var-_uniq.42" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>}
-  (<span class="var token" data-binding="var-_uniq.43" data-verso-hover="16">lft </span><span class="var token" data-binding="var-_uniq.45" data-verso-hover="16">rgt</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.42" data-verso-hover="1">α</span>) : <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.equal" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.equal</span><span class="inter-text"> </span><span class="unknown token" data-binding="">{</span><span class="var token" data-binding="var-_uniq.961" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">}</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.962" data-verso-hover="16">lft</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.964" data-verso-hover="16">rgt</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.961" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.equal</span><span class="inter-text"> </span><span class="unknown token" data-binding="">{</span><span class="var token" data-binding="var-_uniq.961" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">}</span><span class="inter-text">
+  </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.962" data-verso-hover="16">lft</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.964" data-verso-hover="16">rgt</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.961" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div></pre><div class="text">
                 <p>
                   Builds an equality term.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___and">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.and" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.and (<span class="var token" data-binding="var-_uniq.50" data-verso-hover="18">lft </span><span class="var token" data-binding="var-_uniq.52" data-verso-hover="18">rgt</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span>) : <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div><div class="narrow-only">Cvc.Term.and (<span class="var token" data-binding="var-_uniq.50" data-verso-hover="18">lft </span><span class="var token" data-binding="var-_uniq.52" data-verso-hover="18">rgt</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span>) :
-  <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> <a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.and" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.and</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1050" data-verso-hover="18">lft</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1052" data-verso-hover="18">rgt</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.and</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1050" data-verso-hover="18">lft</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1052" data-verso-hover="18">rgt</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool" data-verso-hover="7">Bool</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text">
+  </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Formula"><span class="const token" data-binding="const-Cvc.Formula" data-verso-hover="17">Formula</span></a></div></pre><div class="text">
                 <p>
                   Builds a conjunction term.</p>
                 </div>
               </div>
             <div class="namedocs" id="Cvc___Term___ite">
-              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.ite" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only">Cvc.Term.ite {<span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>} [<span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>] (<span class="var token" data-binding="var-_uniq.63" data-verso-hover="19">cnd</span> : <a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a>) (<span class="var token" data-binding="var-_uniq.64" data-verso-hover="16">thn </span><span class="var token" data-binding="var-_uniq.66" data-verso-hover="16">els</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>) :
-  <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> (<a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>)</div><div class="narrow-only">Cvc.Term.ite {<span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span> : <span class="sort token" data-binding="" data-verso-hover="4">Type</span>} [<span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>]
-  (<span class="var token" data-binding="var-_uniq.63" data-verso-hover="19">cnd</span> : <a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a>) (<span class="var token" data-binding="var-_uniq.64" data-verso-hover="16">thn </span><span class="var token" data-binding="var-_uniq.66" data-verso-hover="16">els</span> : <a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>) :
-  <span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span> (<a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a> <span class="var token" data-binding="var-_uniq.60" data-verso-hover="1">α</span>)</div></pre><div class="text">
+              <span class="permalink-widget block"><a href="find/?domain=Verso.Genre.Manual.doc&name=Cvc.Term.ite" title="Permalink">🔗</a></span><span class="label">def</span><pre class="signature hl lean block"><div class="wide-only"><span class="unknown token" data-binding="">Cvc.Term.ite</span><span class="inter-text"> </span><span class="unknown token" data-binding="">{</span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">}</span><span class="inter-text"> </span><span class="unknown token" data-binding="">[</span><span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">]</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1129" data-verso-hover="19">cnd</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1130" data-verso-hover="16">thn</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1132" data-verso-hover="16">els</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text">
+  </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span></div><div class="narrow-only"><span class="unknown token" data-binding="">Cvc.Term.ite</span><span class="inter-text"> </span><span class="unknown token" data-binding="">{</span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><span class="sort token" data-binding="sort-7243200735919010059" data-verso-hover="4">Type</span><span class="unknown token" data-binding="">}</span><span class="inter-text"> </span><span class="unknown token" data-binding="">[</span><span class="const token" data-binding="const-Cvc.IsSrt" data-verso-hover="2">IsSrt</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">]</span><span class="inter-text">
+  </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1129" data-verso-hover="19">cnd</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___Bool"><span class="const token" data-binding="const-Cvc.Term.Bool" data-verso-hover="15">Term.Bool</span></a><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="var token" data-binding="var-_uniq.1130" data-verso-hover="16">thn</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1132" data-verso-hover="16">els</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">:</span><span class="inter-text">
+  </span><span class="const token" data-binding="const-Cvc.Term.Build" data-verso-hover="5">Term.Build</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1126" data-verso-hover="1">α</span><span class="unknown token" data-binding="">)</span></div></pre><div class="text">
                 <p>
                   Builds an if-then-else term.</p>
                 </div>
@@ -1693,38 +1681,38 @@ produce results in the <code class="hl lean inline" data-lean-context="examples"
             <p>
               Let's see this in action.</p>
             <code class="hl lean block" data-lean-context="examples"><span class="has-info info"><span class="hover-container"><span class="hover-info messages"><code class="message info">ite: (ite (and true (= 7 5)) 21 12)
-</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-1663" data-verso-hover="20">#eval</span></span> <span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span> <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-1690">do</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1695">let</span> <span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span> <span class="unknown token" data-binding="">←</span> <a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a> <span class="typed token" data-binding="" data-verso-hover="12">7</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1722">let</span> <span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span> <span class="unknown token" data-binding="">←</span> <a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a> <span class="typed token" data-binding="" data-verso-hover="12">5</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1748">let</span> <span class="var token" data-binding="var-_uniq.531" data-verso-hover="24">cnd</span> <span class="unknown token" data-binding="">←</span> <span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span> <a href="Overview/Terms/#Cvc___Term___bool"><span class="const token" data-binding="const-Cvc.Term.bool" data-verso-hover="25">Term.bool</span></a> <span class="const token" data-binding="const-Bool.true" data-verso-hover="26">true</span><span class="unknown token" data-binding="">)</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___and"><span class="const token" data-binding="const-Cvc.Term.and" data-verso-hover="27">and</span></a> <span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span> <span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___equal"><span class="const token" data-binding="const-Cvc.Term.equal" data-verso-hover="28">equal</span></a> <span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span><span class="unknown token" data-binding="">)</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1810">let</span> <span class="var token" data-binding="var-_uniq.758" data-verso-hover="29">ite</span> <span class="unknown token" data-binding="">←</span> <span class="var token" data-binding="var-_uniq.531" data-verso-hover="24">cnd</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___ite"><span class="const token" data-binding="const-Cvc.Term.ite" data-verso-hover="30">ite</span></a> <span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span> <a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a> <span class="typed token" data-binding="" data-verso-hover="12">21</span><span class="unknown token" data-binding="">)</span> <span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span> <a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a> <span class="typed token" data-binding="" data-verso-hover="12">12</span><span class="unknown token" data-binding="">)</span>
-  <span class="keyword token" data-binding="kw-occ-termPrintln!__-1868">println!</span> <span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.758" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span>
-<span class="unknown token" data-binding=""></span></code><div class="information">
+</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-1663" data-verso-hover="20">#eval</span></span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-1690">do</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1695">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">7</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1722">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">5</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1748">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.531" data-verso-hover="24">cnd</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___bool"><span class="const token" data-binding="const-Cvc.Term.bool" data-verso-hover="25">Term.bool</span></a><span class="inter-text"> </span><span class="const token" data-binding="const-Bool.true" data-verso-hover="26">true</span><span class="unknown token" data-binding="">)</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___and"><span class="const token" data-binding="const-Cvc.Term.and" data-verso-hover="27">and</span></a><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___equal"><span class="const token" data-binding="const-Cvc.Term.equal" data-verso-hover="28">equal</span></a><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span><span class="unknown token" data-binding="">)</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-1810">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.758" data-verso-hover="29">ite</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.531" data-verso-hover="24">cnd</span><span class="unknown token" data-binding="">.</span><a href="Overview/Terms/#Cvc___Term___ite"><span class="const token" data-binding="const-Cvc.Term.ite" data-verso-hover="30">ite</span></a><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">21</span><span class="unknown token" data-binding="">)</span><span class="inter-text"> </span><span class="unknown token" data-binding="">(</span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><a href="Overview/Terms/#Cvc___Term___int"><span class="const token" data-binding="const-Cvc.Term.int" data-verso-hover="23">Term.int</span></a><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">12</span><span class="unknown token" data-binding="">)</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-termPrintln!__-1868">println!</span><span class="inter-text"> </span><span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.758" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span><span class="inter-text">
+</span><span class="unknown token" data-binding=""></span></code><div class="information">
               <pre>ite: (ite (and true (= 7 5)) 21 12)
 </pre></div>
             <p>
               That's not great, we can see that for complex terms the syntax will become painful very fast.
 Cvc.lean provides an <code>smt!</code> syntax extension so that we can write <code class="hl lean inline" data-lean-context="examples"><a href="Overview/Terms/#Cvc___Term___hasSymbols"><span class="const token" data-binding="const-Cvc.Term" data-verso-hover="0">Term</span></a></code>s like we would lean
 propositions.</p>
-            <code class="hl lean block" data-lean-context="examples"><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.open-2201" data-verso-hover="31">open</span> <span class="unknown token" data-binding="">Cvc.Term.Dsl</span> <span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.in-2201">in</span>
-<span class="has-info info"><span class="hover-container"><span class="hover-info messages"><code class="message info">ite: (ite (and true (= 7 5)) 21 12)
-</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-2222" data-verso-hover="20">#eval</span></span> <span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span> <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-2249">do</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2254">let</span> <span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span> <span class="unknown token" data-binding="">←</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2268">smt!</span> <span class="typed token" data-binding="" data-verso-hover="12">7</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2277">let</span> <span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span> <span class="unknown token" data-binding="">←</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2290">smt!</span> <span class="typed token" data-binding="" data-verso-hover="12">5</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2299">let</span> <span class="var token" data-binding="var-_uniq.714" data-verso-hover="24">cnd</span> <span class="unknown token" data-binding="">←</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2311">smt!</span> <span class="unknown token" data-binding="">true</span> <span class="unknown token" data-binding="">∧</span> <span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span> <span class="unknown token" data-binding="">=</span> <span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2340">let</span> <span class="var token" data-binding="var-_uniq.1019" data-verso-hover="29">ite</span> <span class="unknown token" data-binding="">←</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2352">smt!</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">if</span> <span class="var token" data-binding="var-_uniq.714" data-verso-hover="24">cnd</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">then</span> <span class="typed token" data-binding="" data-verso-hover="12">21</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">else</span> <span class="typed token" data-binding="" data-verso-hover="12">12</span>
-  <span class="keyword token" data-binding="kw-occ-termPrintln!__-2382">println!</span> <span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.1019" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span>
-<span class="unknown token" data-binding=""></span></code><div class="information">
+            <code class="hl lean block" data-lean-context="examples"><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.open-2201" data-verso-hover="31">open</span><span class="inter-text"> </span><span class="unknown token" data-binding="">Cvc.Term.Dsl</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.in-2201">in</span><span class="inter-text">
+</span><span class="has-info info"><span class="hover-container"><span class="hover-info messages"><code class="message info">ite: (ite (and true (= 7 5)) 21 12)
+</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-2222" data-verso-hover="20">#eval</span></span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-2249">do</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2254">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2268">smt!</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">7</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2277">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2290">smt!</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">5</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2299">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.714" data-verso-hover="24">cnd</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2311">smt!</span><span class="inter-text"> </span><span class="unknown token" data-binding="">true</span><span class="inter-text"> </span><span class="unknown token" data-binding="">∧</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.262" data-verso-hover="22">seven</span><span class="inter-text"> </span><span class="unknown token" data-binding="">=</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.332" data-verso-hover="22">five</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2340">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.1019" data-verso-hover="29">ite</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2352">smt!</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">if</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.714" data-verso-hover="24">cnd</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">then</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">21</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2357">else</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">12</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-termPrintln!__-2382">println!</span><span class="inter-text"> </span><span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.1019" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span><span class="inter-text">
+</span><span class="unknown token" data-binding=""></span></code><div class="information">
               <pre>ite: (ite (and true (= 7 5)) 21 12)
 </pre></div>
             <p>
               Writing the final term as just one line is way more readable:</p>
-            <code class="hl lean block" data-lean-context="examples"><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.open-2570" data-verso-hover="31">open</span> <span class="unknown token" data-binding="">Cvc.Term.Dsl</span> <span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.in-2570">in</span>
-<span class="has-info info"><span class="hover-container"><span class="hover-info messages"><code class="message info">ite: (ite (and true (= 7 5)) 21 12)
-</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-2591" data-verso-hover="20">#eval</span></span> <span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span> <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-2618">do</span>
-  <span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2623">let</span> <span class="var token" data-binding="var-_uniq.823" data-verso-hover="29">ite</span> <span class="unknown token" data-binding="">←</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2635">smt!</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">if</span> <span class="unknown token" data-binding="">true</span> <span class="unknown token" data-binding="">∧</span> <span class="typed token" data-binding="" data-verso-hover="12">7</span> <span class="unknown token" data-binding="">=</span> <span class="typed token" data-binding="" data-verso-hover="12">5</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">then</span> <span class="typed token" data-binding="" data-verso-hover="12">21</span> <span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">else</span> <span class="typed token" data-binding="" data-verso-hover="12">12</span>
-  <span class="keyword token" data-binding="kw-occ-termPrintln!__-2676">println!</span> <span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.823" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span>
-<span class="unknown token" data-binding=""></span></code><div class="information">
+            <code class="hl lean block" data-lean-context="examples"><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.open-2570" data-verso-hover="31">open</span><span class="inter-text"> </span><span class="unknown token" data-binding="">Cvc.Term.Dsl</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.in-2570">in</span><span class="inter-text">
+</span><span class="has-info info"><span class="hover-container"><span class="hover-info messages"><code class="message info">ite: (ite (and true (= 7 5)) 21 12)
+</code></span></span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Command.eval-2591" data-verso-hover="20">#eval</span></span><span class="inter-text"> </span><span class="const token" data-binding="const-Cvc.Term.BuildT.runIO" data-verso-hover="21">Cvc.Term.Build.runIO</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.do-2618">do</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-Lean.Parser.Term.doLetArrow-2623">let</span><span class="inter-text"> </span><span class="var token" data-binding="var-_uniq.823" data-verso-hover="29">ite</span><span class="inter-text"> </span><span class="unknown token" data-binding="">←</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.termSmt!___-2635">smt!</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">if</span><span class="inter-text"> </span><span class="unknown token" data-binding="">true</span><span class="inter-text"> </span><span class="unknown token" data-binding="">∧</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">7</span><span class="inter-text"> </span><span class="unknown token" data-binding="">=</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">5</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">then</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">21</span><span class="inter-text"> </span><span class="keyword token" data-binding="kw-occ-Cvc.Term.Dsl.smtTermIf__Then__Else__-2640">else</span><span class="inter-text"> </span><span class="typed token" data-binding="" data-verso-hover="12">12</span><span class="inter-text">
+  </span><span class="keyword token" data-binding="kw-occ-termPrintln!__-2676">println!</span><span class="inter-text"> </span><span class="unknown token" data-binding="">"ite: {</span><span class="var token" data-binding="var-_uniq.823" data-verso-hover="29">ite</span><span class="unknown token" data-binding="">}"</span><span class="inter-text">
+</span><span class="unknown token" data-binding=""></span></code><div class="information">
               <pre>ite: (ite (and true (= 7 5)) 21 12)
 </pre></div>
             </section>
