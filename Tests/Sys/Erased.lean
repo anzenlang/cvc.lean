@@ -139,7 +139,7 @@ Smt.test! [ESys.sw.all]
   Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 10
-k-induction stopped at 6
+k-induction stopped at 5
 sw@6:
   candidates at 5 {
     no unknown

@@ -105,7 +105,7 @@ def mkWith (candidates : List (String × Sw.StatePred)) : Res Sw :=
   mk.addCandidates candidates
 
 def printLines (sw : Sw k) (desc : String := "sw") : IO Unit := do
-  println! "\n{desc}, depth is {sw.depth}:"
+  println! "\n{desc}, length is {sw.depth}:"
   for line in sw.toLines "  " do
     println! line
 
@@ -153,7 +153,7 @@ Smt.test! [Sys.basics.manualCex0]
         println! "expected empty unknown/invariant candidates"
       Sw.printCexs sw
 /-- info:
-base-checked sw, depth is 1:
+base-checked sw, length is 1:
   candidates at 0 {
     no unknown
     no invariant
@@ -178,9 +178,9 @@ Smt.test! [Sys.basics.kInductionCex0]
   Sw.printLines sw
   Sw.printCexs sw
 /-- info:
-k-induction stopped at `1`
+k-induction stopped at `0`
 
-sw, depth is 1:
+sw, length is 1:
   candidates at 0 {
     no unknown
     no invariant
@@ -205,15 +205,15 @@ Smt.test! [Sys.basics.kInductionCex5]
   Sw.printLines sw "base-checked sw"
   Sw.printCexs sw
 /-- info:
-initial sw, depth is 0:
+initial sw, length is 0:
   candidates in init {
     unknown: {}
       `counter ≠ 5`: init
     }
   }
-k-induction stopped at `6`
+k-induction stopped at `5`
 
-base-checked sw, depth is 6:
+base-checked sw, length is 6:
   candidates at 5 {
     no unknown
     no invariant
@@ -262,7 +262,7 @@ Smt.test! [Sys.basics.kInduction1]
   Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 2
-k-induction stopped at 2
+k-induction stopped at 1
 sw@2:
   candidates at 1 {
     no unknown
@@ -298,7 +298,7 @@ Smt.test! [Sys.basics.kInduction2]
   Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 5
-k-induction stopped at 5
+k-induction stopped at 4
 sw@5:
   candidates at 4 {
     unknown: {}
@@ -327,7 +327,7 @@ Smt.test! [Sys.basics.kInduction3]
   Sw.printCexs sw
 /-- info:
 running k-induction, step(s) := 5
-k-induction stopped at 2
+k-induction stopped at 1
 sw@2:
   candidates at 1 {
     no unknown

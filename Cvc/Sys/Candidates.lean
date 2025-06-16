@@ -470,14 +470,23 @@ def unknown : Candidates State depth → UnknownMap State depth
 def isDone (cs : Candidates State depth) : Bool :=
   cs.unknown.isEmpty
 
-
-def isNextBaseReady : (self : Candidates State depth) → Bool
+abbrev isNextBaseReady : (self : Candidates State depth) → Bool
 | .init unk => true
 | .mk unk .. => unk.isNextBaseReady
 
-def isNextStepReady : (self : Candidates State depth) → Bool
+@[simp]
+theorem isNextBaseReady_0 (self : Candidates State 0) : self.isNextBaseReady := by
+  simp only [isNextBaseReady, Nat.succ_eq_add_one]
+  split ; rfl ; contradiction
+
+abbrev isNextStepReady : (self : Candidates State depth) → Bool
 | .init unk => true
 | .mk unk .. => unk.isNextStepReady
+
+@[simp]
+theorem isNextStepReady_0 (self : Candidates State 0) : self.isNextStepReady := by
+  simp only [isNextStepReady, Nat.succ_eq_add_one]
+  split ; rfl ; contradiction
 
 def invariant {depth : Nat} : Candidates State depth.succ → InvariantMap State depth.succ
 | .mk _ inv _ => inv
@@ -569,14 +578,13 @@ def addStepActivators : Array Formula → Term.Build (Array Formula) :=
 
 end
 
-def next (state : State.TermsAt k)
+def next' (state : State.TermsAt k)
 : (candidates : Candidates State k)
-→ (h : ¬ candidates.isDone := by assumption)
 → Smt (Candidates State k.succ)
-| .init unk, _ => do
+| .init unk => do
   let unk ← unk.mapOnlyValM fun u => u.next state
   return .mk unk .empty .empty
-| .mk unk inv fls, _ => do
+| .mk unk inv fls => do
   -- refuse unrolling if any `u ∈ unk` is *s.t.* `¬ u.isBaseValid ∧ ¬ u.isStepInvalid`
   let badCount := 0 |> unk.foldl fun badCount _ unk =>
     if unk.isBaseValid ∨ (0 < k ∧ unk.isStepInvalid) then badCount else badCount + 1
@@ -594,6 +602,10 @@ def next (state : State.TermsAt k)
   let inv ← inv.mapOnlyValM fun i => i.next state
   let fls ← fls.mapOnlyValM fun f => f.next state
   return .mk unk inv fls
+
+def next (state : State.TermsAt k) (candidates : Candidates State k)
+: (h : ¬ candidates.isDone := by assumption) → Smt (Candidates State k.succ)
+| _ => candidates.next' state
 
 section variable {k : Nat} (self : Candidates State k.succ)
 

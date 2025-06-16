@@ -86,11 +86,11 @@ def getUnknownCandidates : Candidate.UnknownMap State depth :=
 
 abbrev isDone : Bool := sys.candidates.isDone
 
-def isNextBaseReady : Bool := sys.candidates.isNextBaseReady
-def isNextStepReady : Bool := sys.candidates.isNextStepReady
-def isNextReady : Bool := sys.isNextBaseReady ∧ sys.isNextStepReady
-def isBaseOver : Bool := sys.isNextBaseReady
-def isStepOver : Bool := sys.isNextStepReady
+abbrev isNextBaseReady : Bool := sys.candidates.isNextBaseReady
+abbrev isNextStepReady : Bool := sys.candidates.isNextStepReady
+abbrev isNextReady : Bool := sys.isNextBaseReady ∧ sys.isNextStepReady
+abbrev isBaseOver : Bool := sys.isNextBaseReady
+abbrev isStepOver : Bool := sys.isNextStepReady
 
 def getStateAt (k : Nat) (h : k < depth := by omega) : State.TermsAt k :=
   sys.toUnroller.trace.get k
@@ -101,15 +101,18 @@ def getState0 (sys : Sys State depth.succ) : State.TermsAt 0 :=
 def getLatestState (sys : Sys State (k + 1)) : State.TermsAt k :=
   sys.getStateAt k
 
-def unroll (sys : State.Sys depth)
-: (h : ¬ sys.isDone := by assumption)
-→ Smt (State.Sys depth.succ) := fun _ => do
+def unroll' (sys : State.Sys depth) : Smt (State.Sys depth.succ) := do
   let (nextState, toUnroller) ← sys.toUnroller.unroll
-  let candidates ← sys.candidates.next nextState
+  let candidates ← sys.candidates.next' nextState
   return ⟨toUnroller, candidates⟩
 
+def unroll (sys : State.Sys depth)
+: (h : ¬ sys.isDone := by (try simp [*] <;> assumption))
+→ Smt (State.Sys depth.succ) := fun _ => do
+  sys.unroll'
+
 def checkBase {k : Nat} (sys : State.Sys k.succ)
-: (h : ¬ sys.isBaseOver := by assumption)
+: (h : ¬ sys.isBaseOver := by (try simp ; done) <;> assumption)
 → (maxIter : Nat := sys.candidates.unknown.size.succ)
 → Smt (State.Sys k.succ)
 | _, maxIter + 1 => do
@@ -125,7 +128,7 @@ def checkBase {k : Nat} (sys : State.Sys k.succ)
 "
 
 def checkStep {k : Nat} (sys : State.Sys k.succ.succ)
-: (h : ¬ sys.isStepOver := by assumption)
+: (h : ¬ sys.isStepOver := by (try simp ; done) <;> assumption)
 → (maxIter : Nat := sys.candidates.unknown.size)
 → (maxIterRef : Nat := sys.candidates.unknown.size)
 → Smt (State.Sys k.succ.succ)
@@ -152,13 +155,12 @@ def checkStep {k : Nat} (sys : State.Sys k.succ.succ)
   "
 
 def unrollCheckBaseStep {k : Nat} (sys : State.Sys k)
-: (h_base : sys.isBaseOver := by assumption)
-→ (h_step : sys.isStepOver := by assumption)
-→ (h : ¬ sys.isDone := by assumption)
+: (h_base : sys.isBaseOver := by (try simp ; done) <;> assumption)
+→ (h_step : sys.isStepOver := by (try simp ; done) <;> assumption)
+→ (h : ¬ sys.isDone := by (try simp ; done) <;> assumption)
 → Smt (State.Sys k.succ) := fun _ _ _ => do
   let mut sys ← sys.unroll
-  if h : ¬ sys.isBaseOver then
-    sys ← sys.checkBase
+  if h : ¬ sys.isBaseOver then sys ← sys.checkBase
   else Error.throwInternal s!"\
     [unreachable] system `sys` is `¬ sys.isDone`, but verifies `sys.isBaseOver` after unrolling\
   "
@@ -171,9 +173,16 @@ def unrollCheckBaseStep {k : Nat} (sys : State.Sys k)
         [unreachable] system `sys` is `¬ sys.isDone`, but it is `sys.isStepOver` before step-check\
       "
 
-def kInduction {k} (sys : State.Sys k)
-: (maxSteps : Nat) → Smt ((k' : Nat) × State.Sys k')
-| maxSteps + 1 => do
+def kInduction : {k : Nat} → (sys : State.Sys k) → (maxSteps : Nat)
+→ Smt ((k' : Nat) × State.Sys k'.succ)
+| 0, sys, maxSteps => do
+  if h : ¬ sys.isDone then
+    let sys ← sys.unrollCheckBaseStep
+    match h : maxSteps with
+    | 0 => return ⟨0, sys⟩
+    | maxSteps + 1 => sys.kInduction maxSteps
+  else Error.throwUser s!"cannot run k-induction: system has no candidates"
+| k + 1, sys, maxSteps + 1 => do
   if h_sys : sys.isDone then return ⟨k, sys⟩ else
     if h : sys.isBaseOver ∧ sys.isStepOver then
       let ⟨_, _⟩ := h
@@ -185,8 +194,10 @@ def kInduction {k} (sys : State.Sys k)
           | (false, true) => "base is"
           | (true, true) => none
         if let some desc := desc then
-          Error.throwInternal s!"after `unrollCheckBaseStep` {k} → {k.succ}, {desc} not over"
-        sys.kInduction maxSteps
+          Error.throwInternal
+            s!"after `unrollCheckBaseStep` {k.succ} → {k.succ.succ}, {desc} not over"
+        else
+          sys.kInduction maxSteps
     else
       let desc := match h' : (sys.isBaseOver, sys.isStepOver) with
         | (false, false) => "neither base nor step are"
@@ -194,7 +205,7 @@ def kInduction {k} (sys : State.Sys k)
         | (false, true) => "base is"
         | (true, true) => by simp at h' ; contradiction
       Error.throwInternal s!"will not run `kInduction`: {desc} not ready at {k}"
-| 0 => return ⟨k, sys⟩
+| k + 1, sys, 0 => return ⟨k, sys⟩
 
 end
 
