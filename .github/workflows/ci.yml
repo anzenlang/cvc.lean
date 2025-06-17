@@ -12,8 +12,23 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
-      # uses lean standard action with all default input values
-      - uses: leanprover/lean-action@v1
-        with:
-          lint: "false"
+    - name: Setup Lean Environment
+      uses: leanprover/lean-action@v1
+      with:
+        # auto-config: false
+        use-github-cache: true
+    # - name: Download cvc5 Release
+    #   run: lake update
+    - name: Build
+      run: lake build
+    - name: Test
+      run: lake test
+    # - name: Purge Disk Cache # https://github.com/actions/runner-images/issues/2619
+    #   if: github.event_name == 'release' && runner.os == 'macOS'
+    #   run: sudo /usr/sbin/purge
+    # - name: Upload Release Artifact
+    #   if: github.event_name == 'release'
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #     TAG: ${{ github.event.release.tag_name }}
+    #   run: lake upload $TAG
