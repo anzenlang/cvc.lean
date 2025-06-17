@@ -17,8 +17,8 @@ jobs:
     - name: Setup Lean Environment
       uses: leanprover/lean-action@v1
       with:
-        # auto-config: false
-        use-github-cache: true
+        auto-config: false
+        use-github-cache: false
     - name: Update
       run: lake update
     - name: Build
