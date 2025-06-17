@@ -17,8 +17,8 @@ jobs:
       with:
         # auto-config: false
         use-github-cache: true
-    # - name: Download cvc5 Release
-    #   run: lake update
+    - name: Update
+      run: lake update
     - name: Build
       run: lake build
     - name: Test
