@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "_out": true,
+    ".lake": true,
+  },
+}

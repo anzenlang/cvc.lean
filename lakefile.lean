@@ -10,15 +10,16 @@ open Lake DSL
 
 package cvc {
   precompileModules := true
-  testDriver := "CvcTest"
+  testDriver := "cvcTests"
 }
 
-require cvc5 from
-  git "https://github.com/anzenlang/lean-cvc5" @ "dry_defs_macro"
+require "leanprover-community" / batteries
+
+require "abdoo8080" / cvc5
 
 @[default_target]
 lean_lib Cvc {}
 
-lean_lib CvcTest {
-  globs := #[Glob.submodules `CvcTest]
+lean_lib cvcTests {
+  globs := #[Glob.submodules `Tests]
 }

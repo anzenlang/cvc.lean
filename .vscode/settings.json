@@ -1,8 +1,44 @@
 {
   "cSpell.words": [
+    "actlit",
+    "actlits",
     "Adrien",
+    "bitvec",
+    "bitvector",
+    "cex",
+    "cexs",
+    "codomain",
+    "conv",
+    "datatypes",
+    "decons",
+    "elab",
+    "eprintln",
+    "FLOATINGPOINT",
     "Idents",
+    "interp",
+    "mult",
+    "nequal",
     "println",
-    "Unsat"
-  ]
+    "preds",
+    "REGLAN",
+    "ROUNDINGMODE",
+    "satisfiability",
+    "significand",
+    "smtlib",
+    "substs",
+    "succ",
+    "suff",
+    "Syms",
+    "uncurries",
+    "unroller",
+    "unsat"
+  ],
+  "cSpell.customDictionaries": {
+    "custom-dictionary-workspace": {
+      "name": "custom-dictionary-workspace",
+      "path": "${workspaceFolder:test}/.cspell/custom-dictionary-workspace.txt",
+      "addWords": true,
+      "scope": "workspace"
+    }
+  }
 }
