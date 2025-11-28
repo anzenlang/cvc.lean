@@ -13,7 +13,7 @@ package cvc {
   testDriver := "cvcTests"
 }
 
-require "leanprover-community" / batteries
+require "leanprover-community" / batteries @git "v4.24.0"
 
 require "abdoo8080" / cvc5
 
