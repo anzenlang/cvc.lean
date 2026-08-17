@@ -10,15 +10,14 @@ module
 import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Srt
-import all Cvc.Untyped.Term.Defs
+import all Cvc.Untyped.Core.Defs
 import all Cvc.Untyped.BVar
 
 public import Cvc.Basic
 public import Cvc.Basic.Env
 public import Cvc.Srt
 public import Cvc.Logic
-public import Cvc.Untyped.Term.Defs
-public import Cvc.Untyped.Term.Value
+public import Cvc.Untyped.Core.Value
 public import Cvc.Untyped.BVar
 public import Cvc.Untyped.Mode
 

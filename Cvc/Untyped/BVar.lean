@@ -7,11 +7,11 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Term.Bool
+public import Cvc.Untyped.Core.Bool
 
 import all Cvc.Basic.Env
 import all Cvc.Srt
-import all Cvc.Untyped.Term.Defs
+import all Cvc.Untyped.Core.Defs
 
 
 

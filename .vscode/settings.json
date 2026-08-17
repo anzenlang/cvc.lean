@@ -28,7 +28,8 @@
     "substs",
     "succ",
     "suff",
-    "Syms",
+    "syms",
+    "typs",
     "uncurries",
     "unroller",
     "unsat"

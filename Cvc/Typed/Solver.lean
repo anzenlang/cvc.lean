@@ -9,18 +9,13 @@ module
 
 import all Cvc.Basic
 import all Cvc.Basic.Env
-import all Cvc.Untyped.Term.Defs
-import all Cvc.Typed.Term.Defs
--- `import all` and not a plain `import`: a typed term is definitionally its sort-erased one, and
--- that is what lets these delegate, but a plain import keeps the index opaque
--- `import all` again: the lift from `EnvT` into a mode monad is private, so that arbitrary code
--- cannot be run where an answer is being relied on. Re-typing here is exactly the sanctioned use.
+import all Cvc.Untyped.Core.Defs
+import all Cvc.Typed.Core.Defs
 import all Cvc.Untyped.Solver
-import all Cvc.Typed.Grammar
+import all Cvc.Typed.Theory.Grammar
 
 public import Cvc.Untyped.Solver
-public import Cvc.Typed.Grammar
-public import Cvc.Typed.Term
+public import Cvc.Typed.Theory.Grammar
 public import Cvc.Typed.BVar
 
 

@@ -7,16 +7,8 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.Term
+public import Cvc.Typed.BVar
+public import Cvc.Typed.Core
 public import Cvc.Typed.Solver
-public import Cvc.Typed.Datatype
-public import Cvc.Typed.Grammar
-public import Cvc.Typed.Synth
-
-
-
-/-! # The typed layer
-
-One directory per part of the API being lifted; `Typed/Term/` is term creation and
-`Typed/Solver.lean` is the solver.
--/
+public import Cvc.Typed.Symbols
+public import Cvc.Typed.Theory

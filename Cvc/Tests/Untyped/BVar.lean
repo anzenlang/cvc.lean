@@ -8,11 +8,11 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped.BVar
-import Cvc.Untyped.Term
+import Cvc.Untyped.Theory
 import Cvc.Untyped.Solver
 
 public meta import Cvc.Untyped.BVar
-public meta import Cvc.Untyped.Term
+public meta import Cvc.Untyped.Theory
 public meta import Cvc.Untyped.Solver
 
 

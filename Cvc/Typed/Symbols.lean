@@ -7,10 +7,10 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.Term.Defs
+public import Cvc.Typed.Core.Arith
 public import Cvc.Typed.Solver
 
-import all Cvc.Typed.Term.Defs
+import all Cvc.Typed.Core.Defs
 
 
 

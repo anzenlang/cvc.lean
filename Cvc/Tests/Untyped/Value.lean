@@ -7,11 +7,9 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Term
-import Cvc.Untyped.Solver
+import Cvc.Untyped
 
-public meta import Cvc.Untyped.Term
-public meta import Cvc.Untyped.Solver
+public meta import Cvc.Untyped
 
 
 

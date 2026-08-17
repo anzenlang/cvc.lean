@@ -8,14 +8,14 @@ Authors: Adrien Champion
 module
 
 public import Cvc.Untyped.BVar
-public import Cvc.Typed.Term.Bool
+public import Cvc.Typed.Core.Bool
 
 import all Cvc.Basic.Env
 import all Cvc.Untyped.BVar
 -- `import all` and not a plain `import`: `BVar α` is `Term α` is `Untyped.Term`, and that chain is
 -- what lets a typed bound variable be built by the sort-erased constructor
-import all Cvc.Untyped.Term.Defs
-import all Cvc.Typed.Term.Defs
+import all Cvc.Untyped.Core.Defs
+import all Cvc.Typed.Core.Defs
 
 
 

@@ -7,11 +7,15 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Term
-import Cvc.Typed.Term
+import Cvc.Untyped.Core
+import Cvc.Untyped.Theory
+import Cvc.Typed.Core
+import Cvc.Typed.Theory
 
-public meta import Cvc.Untyped.Term
-public meta import Cvc.Typed.Term
+public meta import Cvc.Untyped.Core
+public meta import Cvc.Untyped.Theory
+public meta import Cvc.Typed.Core
+public meta import Cvc.Typed.Theory
 
 
 

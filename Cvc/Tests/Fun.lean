@@ -7,15 +7,19 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Typed.Term
-import Cvc.Untyped.Term
+import Cvc.Typed.Core
+import Cvc.Typed.Theory
+import Cvc.Untyped.Core
+import Cvc.Untyped.Theory
 import Cvc.Types.Set
 import Cvc.Types.Bag
 import Cvc.Types.Array
 import Cvc.Types.Float
 
-public meta import Cvc.Typed.Term
-public meta import Cvc.Untyped.Term
+public meta import Cvc.Typed.Core
+public meta import Cvc.Typed.Theory
+public meta import Cvc.Untyped.Core
+public meta import Cvc.Untyped.Theory
 public meta import Cvc.Types.Set
 public meta import Cvc.Types.Bag
 public meta import Cvc.Types.Array

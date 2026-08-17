@@ -7,16 +7,8 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Term
+public import Cvc.Untyped.Core
+public import Cvc.Untyped.BVar
+public import Cvc.Untyped.Mode
 public import Cvc.Untyped.Solver
-public import Cvc.Untyped.Datatype
-public import Cvc.Untyped.Grammar
-public import Cvc.Untyped.Synth
-
-
-
-/-! # The sort-erased layer
-
-One directory per part of the API being lifted; `Untyped/Term/` is term creation and
-`Untyped/Solver.lean` is the solver.
--/
+public import Cvc.Untyped.Theory

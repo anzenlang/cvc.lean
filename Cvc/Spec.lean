@@ -21,6 +21,7 @@ public import Cvc.Spec.Regex
 public import Cvc.Spec.Float
 public import Cvc.Spec.FiniteField
 public import Cvc.Spec.Fun
+public import Cvc.Spec.Sep
 
 
 
