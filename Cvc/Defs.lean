@@ -180,9 +180,7 @@ term API. They are re-exported here so that naming one does not mean reaching in
 
 public section variable [Ω]
 
-export cvc5 (Kind SortKind Op)
-
-def0% Proof ← cvc5.Proof
+export cvc5 (Kind SortKind Op ProofRule ProofRewriteRule)
 
 def1% Command ← cvc5.Command
 

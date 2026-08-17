@@ -42,6 +42,13 @@ namespace Cvc.Untyped public section
 /-- A solver instance. -/
 def Solver [Ω] := cvc5.Solver
 
+/-- A proof produced by some solver. -/
+def Solver.Proof [Ω] : (solver : Solver) → (pc : Proof.Component) → Type := 𝕂² cvc5.Proof
+
+/-- An array of `Solver.Proof`. -/
+abbrev Solver.Proofs [Ω] (solver : Solver) (pc : Proof.Component) : Type :=
+  Array (solver.Proof pc)
+
 
 
 /-! ## Solver-mode monadic environments
@@ -425,8 +432,8 @@ def getUnsatCore : EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCore
 def getUnsatCoreLemmas : EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCoreLemmas
 
 @[inherit_doc S.getProof]
-def getUnsatProof (c : Proof.Component := Proof.Component.full) : EnvUnsat (Array Proof) :=
-  runUnsafe' do s.toUnsafe.getProof c.toUnsafe
+def getUnsatProof (pc : Proof.Component := .full) : EnvUnsat (s.Proofs pc) :=
+  runUnsafe' do s.toUnsafe.getProof pc.toUnsafe
 
 
 
@@ -441,3 +448,56 @@ def getTimeoutCore : EnvUnknown (Result × Terms) := runUnsafe' do
 def getTimeoutCoreAssuming (assumptions : Terms) : EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCoreAssuming assumptions
   return (Result.ofUnsafe res, terms)
+
+end
+
+namespace Proof variable {solver : Solver} (p : solver.Proof pc)
+
+@[inherit_doc cvc5.Proof.getRule]
+def getRule : ProofRule := cvc5.Proof.getRule p
+
+@[inherit_doc cvc5.Proof.getResult]
+def getResult : Term := cvc5.Proof.getResult p
+
+@[inherit_doc cvc5.Proof.getArguments]
+def getArguments : Terms := cvc5.Proof.getArguments p
+
+@[inherit_doc cvc5.Proof.getChildren]
+def getChildren : solver.Proofs pc := cvc5.Proof.getChildren p
+
+/-- Get the proof rewrite rule used by the root step of the proof, if it has one.
+
+Answers `none` unless `getRule` is `ProofRule.DSL_REWRITE` or `ProofRule.THEORY_REWRITE`: those two
+rules are the only ones carrying a rewrite rule.
+
+See also `getRewriteRule`, which takes that condition as a hypothesis instead of answering an
+`Option`.
+-/
+def getRewriteRule? : Option ProofRewriteRule := cvc5.Proof.getRewriteRule? p
+
+/-- Get the proof rewrite rule used by the root step of the proof.
+
+Requires that `getRule` returns `ProofRule.DSL_REWRITE` or `ProofRule.THEORY_REWRITE`; cvc5 fails
+otherwise. Matching on `getRule` is where the hypothesis comes from:
+
+```lean
+match h : p.getRule with
+| .DSL_REWRITE => some (p.getRewriteRule (.inl h))
+| .THEORY_REWRITE => some (p.getRewriteRule (.inr h))
+| _ => none
+```
+-/
+def getRewriteRule : p.getRule = .DSL_REWRITE ∨ p.getRule = .THEORY_REWRITE → ProofRewriteRule :=
+  𝕂 cvc5.Proof.getRewriteRule! p
+
+/-- String representation. -/
+def toString : Env String := Env.lift5 <| cvc5.Solver.proofToString solver p .NONE
+
+/-- String representation with formatter. -/
+def toStringFmt (fmt : Proof.Format := default)
+: (valid : fmt = .no ∨ pc = .full := by grind) → Env String :=
+  𝕂 Env.lift5 <| cvc5.Solver.proofToString solver p fmt.toUnsafe
+
+end Proof
+
+end Solver

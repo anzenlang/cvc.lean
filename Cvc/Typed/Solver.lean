@@ -42,6 +42,19 @@ namespace Cvc.Typed public section
 /-- A solver instance. -/
 abbrev Solver [Ω] := Cvc.Untyped.Solver
 
+@[inherit_doc Untyped.Solver.Proof]
+abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
+
+/-- An array of `Solver.Proof`.
+
+Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proofs`, following
+`Terms`: the element type has to be *this* layer's, or taking an element out of the array — with
+`for`, `map`, `getElem` — unfolds to the sort-erased head and the sort-erased accessors answer.
+-/
+abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (Solver.Proof s pc)
+
+
+
 /-- What a check-sat answered. -/
 abbrev Result := Cvc.Untyped.Solver.Result
 
@@ -222,6 +235,17 @@ def% getUnsatAssumptions : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatAs
 def% getUnsatCore : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatCore
 def% getUnsatCoreLemmas : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatCoreLemmas
 
+/-- Written out rather than stated with `def%`, twice over: the component argument has a default,
+which eta-expansion would collapse, and the result has to be spelled at *this* layer's `Proofs`.
+
+That last point is what makes the re-typing worth anything. `Proofs` is an abbreviation of the
+sort-erased one, so the body is the sort-erased function unchanged — but the type as *written* is
+what dot notation resolves against, so a proof obtained here answers `Term Bool` from `getResult`
+where an inherited one would answer a sort-erased term.
+-/
+def getUnsatProof (pc : Proof.Component := Proof.Component.full) : EnvUnsat (s.Proofs pc) :=
+  U.getUnsatProof s pc
+
 
 
 /-! ## Where the answer was unknown -/
@@ -232,3 +256,36 @@ def% getTimeoutCoreAssuming :
 ← getTimeoutCoreAssuming
 
 end
+
+namespace Proof variable {solver : Solver} (p : solver.Proof pc)
+
+@[inherit_doc Untyped.Solver.Proof.getRule]
+def getRule : ProofRule := Untyped.Solver.Proof.getRule p
+
+@[inherit_doc Untyped.Solver.Proof.getResult]
+def getResult : Term Bool := Untyped.Solver.Proof.getResult p
+
+@[inherit_doc Untyped.Solver.Proof.getArguments]
+def getArguments : Untyped.Terms := Untyped.Solver.Proof.getArguments p
+
+@[inherit_doc Untyped.Solver.Proof.getChildren]
+def getChildren : solver.Proofs pc := Untyped.Solver.Proof.getChildren p
+
+@[inherit_doc Untyped.Solver.Proof.getRewriteRule?]
+def getRewriteRule? : Option ProofRewriteRule := Untyped.Solver.Proof.getRewriteRule? p
+
+@[inherit_doc Untyped.Solver.Proof.getRewriteRule]
+def getRewriteRule : p.getRule = .DSL_REWRITE ∨ p.getRule = .THEORY_REWRITE → ProofRewriteRule :=
+  Untyped.Solver.Proof.getRewriteRule p
+
+@[inherit_doc Untyped.Solver.Proof.toString]
+def toString : Env String := Untyped.Solver.Proof.toString p
+
+@[inherit_doc Untyped.Solver.Proof.toStringFmt]
+def toStringFmt (fmt : Proof.Format := default) (valid : fmt = .no ∨ pc = .full := by grind)
+: Env String :=
+  Untyped.Solver.Proof.toStringFmt p fmt valid
+
+end Proof
+
+end Solver

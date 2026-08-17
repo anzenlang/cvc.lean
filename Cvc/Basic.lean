@@ -20,6 +20,11 @@ namespace Cvc -- variable [Ω]
 
 section open Lean Elab Command
 
+/-- The constant combinator. -/
+macro "𝕂 " t:term : term => `(fun _ => $t)
+/-- The constant combinator ignoring its first two arguments. -/
+macro "𝕂² " t:term : term => `(fun _ _ => $t)
+
 syntax (name := enumDefStx)
   atomic( (docComment)? "enum_def%") ident " ← " ("[" ident "/" ident "]")? ident
     (ppLine ppIndent(
@@ -175,14 +180,14 @@ enum_def% LearnedLitType ← cvc5.LearnedLitType
   /-- Special case for when produce-learned-literals is not set. -/
   | unknown ← UNKNOWN
 
-enum_def% Proof.Component ← cvc5.ProofComponent
+enum_def% Proof.Component ← [ofUnsafe / toUnsafe] cvc5.ProofComponent
   | rawPreprocess ← RAW_PREPROCESS
   | preprocess ← PREPROCESS
   | sat ← SAT
   | theoryLemmas ← THEORY_LEMMAS
   | default! full ← FULL
 
-enum_def% Proof.Format ← cvc5.ProofFormat
+enum_def% Proof.Format ← [ofUnsafe / toUnsafe] cvc5.ProofFormat
   | no ← NONE
   | dot ← DOT
   | lfsc ← LFSC
