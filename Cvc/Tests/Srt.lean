@@ -121,7 +121,7 @@ uninterp : isUninterpretedSort true
   let pred ← Srt.predicate #[int]
   println! "predicate: isFunction {pred.isFunction}, isPredicate {pred.isPredicate}"
   let u ← Srt.uninterpreted "U"
-  println! "uninterp : isUninterpretedSort {u.isUninterpretedSort}"
+  println! "uninterp : isUninterpretedSort {u.isUninterpreted}"
 
 
 

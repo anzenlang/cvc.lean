@@ -205,8 +205,11 @@ def pop (nscopes : UInt32 := 1) : Env Unit := runUnsafe' do s.toUnsafe.pop nscop
 /-! ### Declaring sorts -/
 
 @[inherit_doc S.declareSort]
-def declareSrt (symbol : String) (arity : UInt32) (fresh : Bool := false) : Env Srt :=
-  runUnsafe' do s.toUnsafe.declareSort symbol arity fresh
+def declareSrt (symbol : String) (arity : UInt32) (fresh : Bool := false) : Env Srt := do
+  Srt.checkFreshSortSymbol symbol
+  let srt ← runUnsafe' do s.toUnsafe.declareSort symbol arity fresh
+  registerSort symbol srt
+  return srt
 
 
 

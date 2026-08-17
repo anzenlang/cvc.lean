@@ -281,7 +281,7 @@ inductive Typ
 
 A *structural* sort constructor like `set` or `seq`, not a declared datatype: building it twice
 gives the same sort, so `toSrt` rebuilds it rather than looking it up. cvc5 implements it as a
-monomorphised datatype underneath, one per element sort, which is invisible from here.
+monomorphized datatype underneath, one per element sort, which is invisible from here.
 -/
 | nullable (elm : Typ)
 | prod (args : List Typ)
@@ -294,6 +294,7 @@ rather than reconstructing it, which is also why the case carries no constructor
 | datatype (name : String)
 | abstract (a : Srt.Abstract)
 | function (dom : Typ) (cod : Typ)
+| uninterpreted (name : String)
 deriving Ord, Hashable
 
 namespace Typ
@@ -328,6 +329,7 @@ protected def beq : Typ → Typ → Bool
   -- says the two agree, so `simp` cannot turn the boolean back into an equality
   | abstract a₁, abstract a₂ => decide (a₁ = a₂)
   | function d₁ c₁, function d₂ c₂ => Typ.beq d₁ d₂ && Typ.beq c₁ c₂
+  | uninterpreted name₁, uninterpreted name₂ => name₁ == name₂
   | _, _ => false
 -- `structural` and not the well-founded default: only a structural definition reduces, and
 -- `decide` on a `Typ` equation needs it to
@@ -356,6 +358,7 @@ protected theorem beq_refl : (t : Typ) → Typ.beq t t = true
   | bag e | set e | seq e | nullable e => by simp [Typ.beq, Typ.beq_refl e]
   | prod ts => by simp [Typ.beq, Typ.beqList_refl ts]
   | function d c => by simp [Typ.beq, Typ.beq_refl d, Typ.beq_refl c]
+  | uninterpreted name => by simp [Typ.beq]
 
 @[inherit_doc Typ.beq_refl]
 protected theorem beqList_refl : (ts : List Typ) → Typ.beqList ts ts = true
@@ -385,6 +388,7 @@ protected theorem eq_of_beq : (t₁ t₂ : Typ) → Typ.beq t₁ t₂ = true →
   | function _ _, t₂, h => by
     cases t₂ <;> simp_all [Typ.beq]
     exact ⟨Typ.eq_of_beq _ _ h.left, Typ.eq_of_beq _ _ h.right⟩
+  | uninterpreted name, t₂, h => by cases t₂ <;> simp_all [Typ.beq]
 
 @[inherit_doc Typ.eq_of_beq]
 protected theorem eq_of_beqList : (ts₁ ts₂ : List Typ) → Typ.beqList ts₁ ts₂ = true → ts₁ = ts₂
@@ -421,6 +425,7 @@ protected def toString (t : Typ) (paren : Bool := false) : String :=
   | datatype name => name
   | abstract a => paren s!"Abstract {a}"
   | function dom cod => paren s!"{dom.toString false} → {cod.toString false}"
+  | uninterpreted name => paren s!"Uninterpreted `{name}`"
 where
   tupleArgsFold : (args : List Typ) → (acc : String := "") → String
     | [], "" => "Unit"

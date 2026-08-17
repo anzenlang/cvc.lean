@@ -29,7 +29,7 @@ abbrev isFlat : Typ → Bool
   | bool | int | real | string | regex | roundingMode
   | bitVec _ | float _ _ | finiteField _ | arrayTo _ _
   | bag _ | set _ | seq _ | nullable _
-  | datatype _ | abstract _ | function _ _ => true
+  | datatype _ | abstract _ | function _ _ | uninterpreted _ => true
 
 end Typ
 
