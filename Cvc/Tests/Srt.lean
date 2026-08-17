@@ -9,9 +9,12 @@ module
 
 import Cvc.Srt
 import Cvc.Types
+-- for the datatype builders, so that a declared sort has something to round-trip
+import Cvc.Untyped.Theory.Datatype
 
 public meta import Cvc.Srt
 public meta import Cvc.Types
+public meta import Cvc.Untyped.Theory.Datatype
 
 
 
@@ -214,6 +217,117 @@ substituted              : (Array Real Bool)
   let int ← Srt.int
   let arr ← Srt.arrayTo int (← Srt.bool)
   println! "substituted              : {← arr.substitute #[int] #[← Srt.real]}"
+
+
+
+/-! ## `Typ` ↔ `Srt`
+
+`Typ.toSrt` builds a sort from the pure Lean description; `Srt.toTyp` reads one back. Every case
+`Typ` has round-trips, which is what these check — the sort each produces is pinned too, since the
+two conversions agreeing on a *wrong* sort would otherwise go unnoticed.
+
+Two cases are rebuilt rather than read off, both because `toSrt` flattens them:
+
+- a **function**'s domain is n-ary in cvc5 and curried in `Typ`, so `toTyp` folds the spine back to
+  the right. This is stable because a cvc5 codomain is never itself a function sort: `α → β → γ`
+  *is* `(-> α β γ)`, and `(α → β) → γ` is the different sort `(-> (-> α β) γ)`, where the nesting
+  sits in the domain;
+- a **tuple**'s components are flat on both sides, so they come back as they went.
+-/
+
+/-- info:
+Bool                   → Bool                           ✓
+Int                    → Int                            ✓
+Real                   → Real                           ✓
+String                 → String                         ✓
+Regex                  → RegLan                         ✓
+RoundingMode           → RoundingMode                   ✓
+BitVec 8               → (_ BitVec 8)                   ✓
+Float 8 24             → (_ FloatingPoint 8 24)         ✓
+FiniteField 5          → (_ FiniteField 5)              ✓
+Array Int Bool         → (Array Int Bool)               ✓
+Set Int                → (Set Int)                      ✓
+Bag Int                → (Bag Int)                      ✓
+Seq Int                → (Seq Int)                      ✓
+Option Int             → (Nullable Int)                 ✓
+Int × Bool × String    → (Tuple Int Bool String)        ✓
+Int × (Bool × String)  → (Tuple Int (Tuple Bool String)) ✓
+Int → Bool → Real      → (-> Int Bool Real)             ✓
+Int → Bool → Real      → (-> (-> Int Bool) Real)        ✓
+Set (Int → Bool)       → (Set (-> Int Bool))            ✓
+Abstract BitVec _      → ?BITVECTOR_TYPE                ✓
+Abstract Float _ _     → ?FLOATINGPOINT_TYPE            ✓
+Abstract FiniteField _ → ?FINITE_FIELD_TYPE             ✓
+Abstract _ → _         → ?->                            ✓
+-/
+#guard_msgs in #eval Env.runIO do
+  let cases : List Typ := [
+    .bool, .int, .real, .string, .regex, .roundingMode,
+    .bitVec 8, .float 8 24, .finiteField 5,
+    .arrayTo .int .bool, .set .int, .bag .int, .seq .int, .nullable .int,
+    .prod [.int, .bool, .string], .prod [.int, .prod [.bool, .string]],
+    .function .int (.function .bool .real), .function (.function .int .bool) .real,
+    .set (.function .int .bool),
+    .abstract .bitVec, .abstract .float, .abstract .finiteField, .abstract .function,
+  ]
+  let pad (s : String) (n : Nat) : String := s ++ "".pushn ' ' (n - s.length)
+  for typ in cases do
+    let srt ← typ.toSrt
+    let back ← srt.toTyp
+    let mark := if back == typ then "✓" else s!"✗ came back as {back}"
+    println! "{pad (toString typ) 22} → {pad (toString srt) 30} {mark}"
+
+/-! A *declared* sort round-trips through its name, and `toTyp` checks that name against the
+scope's registry — a `Typ` naming a sort the registry does not hold, or holds under a different
+sort, would not resolve back and is refused rather than answered. -/
+
+/-- info:
+datatype      : Pair → Pair ✓
+uninterpreted : Loc → Uninterpreted `Loc` ✓
+-/
+#guard_msgs in #eval Env.runIO do
+  let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+  let mk ← mk.addSelector "fst" (← Srt.int)
+  let decl ← Cvc.Datatype.Decl.mk "Pair"
+  let pair ← Srt.datatype (← decl.addConstructor mk)
+  let loc ← Srt.uninterpreted "Loc"
+
+  let pairTyp ← pair.toTyp
+  let locTyp ← loc.toTyp
+  println! "datatype      : {pair} → {pairTyp} \
+{if pairTyp == Typ.datatype "Pair" then "✓" else "✗"}"
+  println! "uninterpreted : {loc} → {locTyp} \
+{if locTyp == Typ.uninterpreted "Loc" then "✓" else "✗"}"
+
+/-! What no `Typ` case describes is refused, rather than approximated.
+
+The **abstract container** sorts are the surprising entry: cvc5 keeps only a bit-vector, float,
+finite-field or function abstraction as an abstract sort. An abstract array, bag, set or sequence
+becomes that container over the fully abstract sort `?` — `Srt.abstract .set` *is* `(Set ?)`, of
+sort kind `SET_SORT` — and `Typ` has no case for `?`. So those four are the one place where
+`Typ.toSrt` produces a sort `Srt.toTyp` cannot read back.
+-/
+
+/-- info:
+abstract array : `Typ` has no case for `?`, the fully abstract sort
+abstract set   : `Typ` has no case for `?`, the fully abstract sort
+abstract bag   : `Typ` has no case for `?`, the fully abstract sort
+abstract seq   : `Typ` has no case for `?`, the fully abstract sort
+record         : `Typ` has no case for the record sort `__cvc5_record_fst_Int`
+sort ctor      : `Typ` has no case for `U`, an uninterpreted sort constructor: it names a sort of arity greater than zero, which `Typ.uninterpreted` cannot describe
+instantiated   : `Typ` has no case for `(U Int)`, an instantiated sort: `Typ.datatype` and `Typ.uninterpreted` carry a name and nothing else
+-/
+#guard_msgs in #eval Env.runIO do
+  let caught (code : Env Typ) : Env String := try pure s!"{← code}" catch e => pure s!"{e}"
+  for (name, a) in
+    [("array ", Srt.Abstract.array), ("set   ", .set), ("bag   ", .bag), ("seq   ", .seq)]
+  do
+    println! "abstract {name}: {← caught do (← Srt.abstract a).toTyp}"
+
+  println! "record         : {← caught do (← Srt.record #[("fst", ← Srt.int)]).toTyp}"
+  let ctor ← Srt.uninterpretedConstructor 1 "U"
+  println! "sort ctor      : {← caught ctor.toTyp}"
+  println! "instantiated   : {← caught do (← ctor.instantiate #[← Srt.int]).toTyp}"
 
 
 

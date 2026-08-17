@@ -137,8 +137,11 @@ def finiteFieldOfString (size : String) (base : UInt32 := 10) : Env Srt :=
   lift% mkFiniteFieldSortOfString size base
 
 /-- An uninterpreted sort constructor, which an `arity` of parameters instantiate into a sort. -/
-def uninterpretedConstructor (arity : Nat) (symbol : String := "") : Env Srt :=
-  lift% mkUninterpretedSortConstructorSort arity symbol
+def uninterpretedConstructor (arity : Nat) (symbol : String := "") : Env Srt := do
+  Srt.checkFreshSortSymbol symbol
+  let u ← (lift% mkUninterpretedSortConstructorSort arity symbol)
+  registerSort symbol u
+  return u
 
 /-- A placeholder for a datatype sort not yet resolved.
 
@@ -389,6 +392,104 @@ where
       foldProdArgs tl <| args.push hd
 
 end Typ
+
+
+
+namespace Srt
+
+/-- The name a *declared* sort round-trips through, checked against the scope's registry.
+
+A `Typ` for a declared sort is only worth anything if `Typ.toSrt` can resolve it back, so the name
+is verified to be registered *and* to name this very sort. Skipping the check would silently answer
+a `Typ` that resolves to a different sort — cvc5 lets two distinct sorts print the same name, which
+is the whole reason the registry exists.
+-/
+private def checkDeclared (srt : Srt) (name : String) : Env String := do
+  let some registered ← getRegisteredSort? name
+    | throwUser s!"\
+      cannot convert the declared sort `{name}` to a `Typ`: no sort of that name is declared in \
+      this scope"
+  if registered != srt.toUnsafe then
+    throwUser s!"\
+      cannot convert the declared sort `{name}` to a `Typ`: the name is registered to a different \
+      sort in this scope"
+  return name
+
+/-- Conversion to `Typ`, the inverse of `Typ.toSrt` wherever a `Typ` can describe the sort.
+
+`partial` because the recursion is on `Srt`, which is opaque: it is cvc5's `Sort` under the hood,
+so nothing here is structurally smaller to Lean.
+
+**The order of the tests is load-bearing.** cvc5 implements tuples, records and nullables *as*
+datatypes, so `isDatatype` is true of all three and the narrower testers have to be asked first.
+
+Two shapes are rebuilt rather than read off, both because `Typ.toSrt` flattens them:
+
+- a **function** sort's domain is n-ary in cvc5 and curried in `Typ`, so the spine is folded back
+  to the right — `(-> α β γ)` becomes `function α (function β γ)`;
+- a **tuple**'s components are already flat on both sides, so `prod` takes them as they come.
+
+Sorts that no `Typ` case describes fail rather than approximate: records, uninterpreted sort
+constructors and their instantiations, and the datatype-operator sorts.
+-/
+public partial def toTyp (srt : Srt) : Env Typ := do
+  if srt.isBool then return .bool
+  else if srt.isInt then return .int
+  else if srt.isReal then return .real
+  else if srt.isString then return .string
+  else if srt.isRegex then return .regex
+  else if srt.isRoundingMode then return .roundingMode
+  else if srt.isBitVec then return .bitVec (← srt.getBitVecSize).toNat
+  else if srt.isFloat then
+    return .float (← srt.getFloatExponentSize).toNat (← srt.getFloatSignificandSize).toNat
+  else if srt.isFiniteField then return .finiteField (← srt.getFiniteFieldSize)
+  else if srt.isAbstract then
+    -- cvc5 keeps only *some* abstractions as abstract sorts: an abstract array, bag, set or
+    -- sequence comes back as that container over the fully abstract sort `?`, so it never reaches
+    -- here. What does reach here is `?` itself, which no `Typ` case describes.
+    let kind ← srt.getAbstractedKind
+    if kind matches .ABSTRACT_SORT then
+      throwUser s!"`Typ` has no case for `{srt}`, the fully abstract sort"
+    return .abstract (← Srt.Abstract.ofKind kind)
+  else if srt.isArray then
+    return .arrayTo (← (← srt.getArrayIndexSort).toTyp) (← (← srt.getArrayElementSort).toTyp)
+  else if srt.isSet then return .set (← (← srt.getSetElementSort).toTyp)
+  else if srt.isBag then return .bag (← (← srt.getBagElementSort).toTyp)
+  else if srt.isSeq then return .seq (← (← srt.getSeqElementSort).toTyp)
+  -- before `isDatatype`: cvc5 implements a nullable as a mono-morphized datatype
+  else if srt.isNullable then return .nullable (← (← srt.getNullableElementSort).toTyp)
+  -- likewise a tuple
+  else if srt.isTuple then
+    return .prod (← (← srt.getTupleSorts).toList.mapM toTyp)
+  else if srt.isFunction then
+    let dom ← (← srt.getFunctionDomainSorts).toList.mapM toTyp
+    let cod ← (← srt.getFunctionCodomainSort).toTyp
+    return dom.foldr .function cod
+  -- an *instantiated* sort — a parametric datatype or an uninterpreted sort constructor applied to
+  -- arguments — has a name but no `Typ`: the named cases carry a name and nothing else. This comes
+  -- before them because cvc5 reports `(U Int)` as an uninterpreted sort, and because
+  -- `isInstantiated` on its own is true even of a *non*-parametric datatype — the parameters are
+  -- what actually distinguishes the two
+  else if !(srt.getInstantiatedParameters?.getD #[]).isEmpty then
+    throwUser s!"\
+      `Typ` has no case for `{srt}`, an instantiated sort: `Typ.datatype` and `Typ.uninterpreted` \
+      carry a name and nothing else"
+  else if srt.isUninterpreted then
+    let some symbol := srt.getSymbol?
+      | throwUser s!"cannot convert the uninterpreted sort `{srt}` to a `Typ`: it has no name"
+    return .uninterpreted (← srt.checkDeclared symbol)
+  else if srt.isRecord then
+    throwUser s!"`Typ` has no case for the record sort `{srt}`"
+  else if srt.isUninterpretedSortConstructor then
+    throwUser s!"\
+      `Typ` has no case for `{srt}`, an uninterpreted sort constructor: it names a sort of arity \
+      greater than zero, which `Typ.uninterpreted` cannot describe"
+  else if srt.isDatatype then
+    -- a datatype sort has no *symbol*; its name is the declaration's
+    return .datatype (← srt.checkDeclared (← (← srt.getDatatype).getName))
+  else throwUser s!"`Typ` has no case for the sort `{srt}` (sort kind `{← srt.getKind}`)"
+
+end Srt
 
 
 /-- The `Typ` associated to some type. -/

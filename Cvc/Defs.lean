@@ -281,7 +281,7 @@ inductive Typ
 
 A *structural* sort constructor like `set` or `seq`, not a declared datatype: building it twice
 gives the same sort, so `toSrt` rebuilds it rather than looking it up. cvc5 implements it as a
-monomorphized datatype underneath, one per element sort, which is invisible from here.
+mono-morphized datatype underneath, one per element sort, which is invisible from here.
 -/
 | nullable (elm : Typ)
 | prod (args : List Typ)
