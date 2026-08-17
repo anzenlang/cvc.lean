@@ -13,13 +13,11 @@ package cvc {
   testDriver := "cvcTests"
 }
 
-require "leanprover-community" / batteries @"git#v4.21.0"
-
-require "abdoo8080" / cvc5 @"git#dd6300c"
+require "abdoo8080" / cvc5
 
 @[default_target]
 lean_lib Cvc {}
 
 lean_lib cvcTests {
-  globs := #[Glob.submodules `Tests]
+  globs := #[Glob.submodules `Cvc.Tests]
 }
