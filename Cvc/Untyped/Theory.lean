@@ -16,6 +16,7 @@ public import Cvc.Untyped.Theory.Float
 public import Cvc.Untyped.Theory.Fun
 public import Cvc.Untyped.Theory.Grammar
 public import Cvc.Untyped.Theory.Nullable
+public import Cvc.Untyped.Theory.Record
 public import Cvc.Untyped.Theory.Regex
 public import Cvc.Untyped.Theory.Relation
 public import Cvc.Untyped.Theory.Sep

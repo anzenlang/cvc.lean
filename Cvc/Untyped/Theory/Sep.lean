@@ -33,7 +33,7 @@ round — and it is the price of keeping the area in one place.
 `Solver.declareSepHeap` fixes the heap's location and data sorts, once per solver, and cvc5 checks
 nothing else against them: `(pto 1 true)` is built without complaint against a heap of
 `Loc × Int` and fails only at check-sat, reporting a type error about `set.union` — cvc5's internal
-encoding showing through. See [Cvc5Issues.md](Cvc5Issues.md).
+encoding showing through.
 
 So `declareSepHeap` answers a **handle**, and the two heap-dependent constructors hang off it:
 

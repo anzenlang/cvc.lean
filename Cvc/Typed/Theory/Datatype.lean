@@ -67,7 +67,7 @@ end Args
 /-- A datatype constructor, at the index of the datatype it builds. -/
 structure Ctor (α : Type) where
   private mk ::
-  private ctor : Cvc.Datatype.Constructor
+  private ctor : Cvc.Datatype.Ctor
   private term : Untyped.Term
   private tester : Untyped.Term
 
@@ -93,7 +93,7 @@ def reflect (α : Type) [ToTyp α] : Env Cvc.Datatype := do
 
 /-- The constructor of the given name. -/
 def ctor (α : Type) [ToTyp α] (name : String) : Env (Ctor α) := do
-  let c ← (← reflect α).getConstructor name
+  let c ← (← reflect α).getCtorNamed name
   return ⟨c, ← c.getTerm, ← c.getTesterTerm⟩
 
 end Datatype
@@ -134,7 +134,7 @@ def apply (args : Args := .nil) : Env (Term α) := do
     if actual != want then
       throwUser
         s!"argument {idx} of constructor `{← c.getName}` should have sort `{want}`, got `{actual}`"
-  T.applyConstructor c.term terms
+  T.applyCtor c.term terms
 
 @[inherit_doc apply]
 def apply1 [ToTyp β₁] (fst : Term β₁) : Env (Term α) := c.apply (.cons fst .nil)
@@ -226,7 +226,7 @@ def caseErased (vars : Untyped.BVars) (body : Term β) : Env (Case α β) := do
       throwUser
         s!"variable {idx} bound by constructor `{← c.getName}` should have sort `{want}`, \
           got `{actual}`"
-  let pattern ← T.applyConstructor c.term (vars.map Untyped.BVar.toTerm)
+  let pattern ← T.applyCtor c.term (vars.map Untyped.BVar.toTerm)
   -- a constructor with no field binds nothing, and cvc5 wants the unbound form there
   let term ←
     if vars.isEmpty

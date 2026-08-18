@@ -71,7 +71,7 @@ starN : (let ((_let_1 (pto x v))) (sep _let_1 sep.emp _let_1))
 /-! ## What the handle checks
 
 Both of these build without complaint in cvc5 and fail only at check-sat, as
-`Operator set.union expects two sets of comparable type` — see [Cvc5Issues.md](Cvc5Issues.md).
+`Operator set.union expects two sets of comparable type`.
 -/
 
 /-- info:

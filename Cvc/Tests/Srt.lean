@@ -253,12 +253,18 @@ Option Int             → (Nullable Int)                 ✓
 Int × Bool × String    → (Tuple Int Bool String)        ✓
 Int × (Bool × String)  → (Tuple Int (Tuple Bool String)) ✓
 Int → Bool → Real      → (-> Int Bool Real)             ✓
-Int → Bool → Real      → (-> (-> Int Bool) Real)        ✓
+(Int → Bool) → Real    → (-> (-> Int Bool) Real)        ✓
 Set (Int → Bool)       → (Set (-> Int Bool))            ✓
-Abstract BitVec _      → ?BITVECTOR_TYPE                ✓
-Abstract Float _ _     → ?FLOATINGPOINT_TYPE            ✓
-Abstract FiniteField _ → ?FINITE_FIELD_TYPE             ✓
-Abstract _ → _         → ?->                            ✓
+Set ?                  → (Set ?)                        ✓
+Bag ?                  → (Bag ?)                        ✓
+Seq ?                  → (Seq ?)                        ✓
+Array ? ?              → (Array ? ?)                    ✓
+Set (Abstract BitVec _) → (Set ?BITVECTOR_TYPE)          ✓
+Seq (Abstract _ → _)   → (Seq ?->)                      ✓
+Array Int ?            → (Array Int ?)                  ✓
+Array ? Int            → (Array ? Int)                  ✓
+Int → ?                → (-> Int ?)                     ✓
+Int → Abstract BitVec _ → (-> Int ?BITVECTOR_TYPE)       ✓
 -/
 #guard_msgs in #eval Env.runIO do
   let cases : List Typ := [
@@ -268,7 +274,12 @@ Abstract _ → _         → ?->                            ✓
     .prod [.int, .bool, .string], .prod [.int, .prod [.bool, .string]],
     .function .int (.function .bool .real), .function (.function .int .bool) .real,
     .set (.function .int .bool),
-    .abstract .bitVec, .abstract .float, .abstract .finiteField, .abstract .function,
+    -- the abstract sorts, which live in `Typ?` and so only occur where cvc5 accepts them
+    .set .any, .bag .any, .seq .any, .arrayTo .any .any,
+    .set (.abstract .bitVec), .seq (.abstract .function),
+    -- and the mixed sorts, which had no spelling before the split
+    .arrayTo .int .any, .arrayTo .any .int, .function .int .any,
+    .function .int (.abstract .bitVec),
   ]
   let pad (s : String) (n : Nat) : String := s ++ "".pushn ' ' (n - s.length)
   for typ in cases do
@@ -286,10 +297,10 @@ datatype      : Pair → Pair ✓
 uninterpreted : Loc → Uninterpreted `Loc` ✓
 -/
 #guard_msgs in #eval Env.runIO do
-  let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
   let mk ← mk.addSelector "fst" (← Srt.int)
   let decl ← Cvc.Datatype.Decl.mk "Pair"
-  let pair ← Srt.datatype (← decl.addConstructor mk)
+  let pair ← Srt.datatype (← decl.addCtor mk)
   let loc ← Srt.uninterpreted "Loc"
 
   let pairTyp ← pair.toTyp
@@ -299,39 +310,166 @@ uninterpreted : Loc → Uninterpreted `Loc` ✓
   println! "uninterpreted : {loc} → {locTyp} \
 {if locTyp == Typ.uninterpreted "Loc" then "✓" else "✗"}"
 
-/-! What no `Typ` case describes is refused, rather than approximated.
-
-The **abstract container** sorts are the surprising entry: cvc5 keeps only a bit-vector, float,
-finite-field or function abstraction as an abstract sort. An abstract array, bag, set or sequence
-becomes that container over the fully abstract sort `?` — `Srt.abstract .set` *is* `(Set ?)`, of
-sort kind `SET_SORT` — and `Typ` has no case for `?`. So those four are the one place where
-`Typ.toSrt` produces a sort `Srt.toTyp` cannot read back.
--/
+/-! An abstract sort has a `Typ?` but no `Typ`, that being cvc5's first-class rule: `toTyp?`
+accepts one, `toTyp` refuses it. So the split is visible in which conversion answers. -/
 
 /-- info:
-abstract array : `Typ` has no case for `?`, the fully abstract sort
-abstract set   : `Typ` has no case for `?`, the fully abstract sort
-abstract bag   : `Typ` has no case for `?`, the fully abstract sort
-abstract seq   : `Typ` has no case for `?`, the fully abstract sort
-record         : `Typ` has no case for the record sort `__cvc5_record_fst_Int`
-sort ctor      : `Typ` has no case for `U`, an uninterpreted sort constructor: it names a sort of arity greater than zero, which `Typ.uninterpreted` cannot describe
-instantiated   : `Typ` has no case for `(U Int)`, an instantiated sort: `Typ.datatype` and `Typ.uninterpreted` carry a name and nothing else
+?: toTyp? = ? | toTyp = `?` is an abstract sort, which cvc5 does not accept where a first-class one is wanted; it has a `Typ?` but no `Typ`
+?BITVECTOR_TYPE: toTyp? = Abstract BitVec _ | toTyp = `?BITVECTOR_TYPE` is an abstract sort, which cvc5 does not accept where a first-class one is wanted; it has a `Typ?` but no `Typ`
+-/
+#guard_msgs in #eval Env.runIO do
+  let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
+  for srt in [← Srt.any, ← Srt.abstract .bitVec] do
+    println! "{srt}: toTyp? = {← srt.toTyp?} | toTyp = {← caught do pure s!"{← srt.toTyp}"}"
+
+/-! What no `Typ` case describes at all is refused by both. -/
+
+/-- info:
+sort ctor    : `Typ` has no case for `U`, an uninterpreted sort constructor: it names a sort of arity greater than zero, which `Typ.uninterpreted` cannot describe
+instantiated : `Typ` has no case for `(U Int)`, an instantiated sort: `Typ.datatype` and `Typ.uninterpreted` carry a name and nothing else
 -/
 #guard_msgs in #eval Env.runIO do
   let caught (code : Env Typ) : Env String := try pure s!"{← code}" catch e => pure s!"{e}"
-  for (name, a) in
-    [("array ", Srt.Abstract.array), ("set   ", .set), ("bag   ", .bag), ("seq   ", .seq)]
-  do
-    println! "abstract {name}: {← caught do (← Srt.abstract a).toTyp}"
-
-  println! "record         : {← caught do (← Srt.record #[("fst", ← Srt.int)]).toTyp}"
   let ctor ← Srt.uninterpretedConstructor 1 "U"
-  println! "sort ctor      : {← caught ctor.toTyp}"
-  println! "instantiated   : {← caught do (← ctor.instantiate #[← Srt.int]).toTyp}"
+  println! "sort ctor    : {← caught ctor.toTyp}"
+  println! "instantiated : {← caught do (← ctor.instantiate #[← Srt.int]).toTyp}"
 
 
 
-/-! ## `Kind`, `SortKind` and `Op` are re-exported
+/-! ## Records
+
+Structural, unlike a datatype: cvc5 builds the same sort from the same fields, so `toSrt` rebuilds
+one rather than looking it up. **The order is part of the sort** — `{a : Int, b : Bool}` and
+`{b : Bool, a : Int}` are different — which is why `Typ.record` takes a list and not a map.
+
+Fields are `Typ`s, cvc5 refusing a field that is not first-class; a field may still *contain* an
+abstract sort deeper down, as `{s : Set ?}` does.
+-/
+
+/-- info:
+{a : Int}  →  __cvc5_record_a_Int  ✓
+{a : Int, b : Bool}  →  __cvc5_record_a_Int_b_Bool  ✓
+{b : Bool, a : Int}  →  __cvc5_record_b_Bool_a_Int  ✓
+{r : {a : Int}}  →  __cvc5_record_r___cvc5_record_a_Int  ✓
+{s : Set ?}  →  |__cvc5_record_s_(Set ?)|  ✓
+Set ({a : Int})  →  (Set __cvc5_record_a_Int)  ✓
+field order matters : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let cases : List Typ := [
+    .record [("a", .int)],
+    .record [("a", .int), ("b", .bool)],
+    .record [("b", .bool), ("a", .int)],
+    .record [("r", .record [("a", .int)])],
+    .record [("s", .set .any)],
+    .set (.record [("a", .int)]),
+  ]
+  for typ in cases do
+    let srt ← typ.toSrt
+    let back ← srt.toTyp
+    println! "{typ}  →  {srt}  {if back == typ then "✓" else s!"✗ came back as {back}"}"
+
+  let r₁ ← (Typ.record [("a", .int), ("b", .bool)]).toSrt
+  let r₂ ← (Typ.record [("b", .bool), ("a", .int)]).toSrt
+  println! "field order matters : {r₁ != r₂}"
+
+/-! Distinct field names are **our** check, not cvc5's: it accepts `{a : Int, a : Bool}` and builds
+a datatype with two selectors named `a`, which nothing can then select unambiguously. The check
+sits on `Srt.record`, so both paths to a record sort get it. -/
+
+/-- info:
+via Srt.record : record sort has more than one field named `a`
+via Typ.toSrt  : record sort has more than one field named `a`
+-/
+#guard_msgs in #eval Env.runIO do
+  let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
+  println! "via Srt.record : {← caught do
+    pure s!"{← Srt.record #[("a", ← Srt.int), ("a", ← Srt.bool)]}"}"
+  println! "via Typ.toSrt  : {← caught do
+    pure s!"{← (Typ.record [("a", .int), ("a", .bool)]).toSrt}"}"
+
+
+
+/-! ## `Record`, the index a record sort is named by
+
+`Record fields` is the Lean type that denotes a record sort. Since the sort is *structural*, the
+index is canonical in both directions: `ToTyp` maps it to a `Typ.record`, and `Srt.toTyp` maps a
+record sort back to exactly the field list that names it.
+-/
+
+/-- info:
+{a : Int, b : Bool}  →  __cvc5_record_a_Int_b_Bool
+round trip  : true
+nested      : __cvc5_record_r___cvc5_record_a_Int
+in a set    : (Set __cvc5_record_a_Int)
+in an array : (Array Int __cvc5_record_a_Int)
+of a set    : |__cvc5_record_s_(Set Int)|
+-/
+#guard_msgs in #eval Env.runIO do
+  let srt ← Srt.of (Record [("a", Int), ("b", Bool)])
+  println! "{← srt.toTyp}  →  {srt}"
+  println! "round trip  : {(← srt.toTyp) == Typ.record [("a", .int), ("b", .bool)]}"
+  println! "nested      : {← Srt.of (Record [("r", Record [("a", Int)])])}"
+  println! "in a set    : {← Srt.of (Set (Record [("a", Int)]))}"
+  println! "in an array : {← Srt.of (TotalMap Int (Record [("a", Int)]))}"
+  println! "of a set    : {← Srt.of (Record [("s", Set Int)])}"
+
+/-! Neither uniqueness of field names nor non-emptiness is something the index can state; both are
+`Srt.record`'s checks, and that is where they are caught. An empty record denotes what the empty
+tuple already denotes, so it is refused rather than left as a second spelling of it. -/
+
+/-- info:
+duplicate : record sort has more than one field named `a`
+empty     : a record sort must have at least one field
+via Typ   : a record sort must have at least one field
+-/
+#guard_msgs in #eval Env.runIO do
+  let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
+  println! "duplicate : {← caught do pure s!"{← Srt.of (Record [("a", Int), ("a", Bool)])}"}"
+  println! "empty     : {← caught do pure s!"{← Srt.of (Record [])}"}"
+  println! "via Typ   : {← caught do pure s!"{← (Typ.record []).toSrt}"}"
+
+/-! ### `FieldOf` resolves a name to its type
+
+This is what lets a typed field access be written as a name and still answer a term at the field's
+own type: the class walks the list and the head match wins.
+-/
+
+/-- The type `FieldOf` answers for a field, so that *inference* is pinned rather than checking. -/
+abbrev fieldType (fields : List (String × Type)) (name : String) {gamma : Type}
+  [FieldOf fields name gamma] : Type := gamma
+
+example : fieldType [("a", Int), ("b", Bool)] "a" = Int := rfl
+example : fieldType [("a", Int), ("b", Bool)] "b" = Bool := rfl
+example : fieldType [("r", Record [("a", Int)])] "r" = Record [("a", Int)] := rfl
+
+/-- A duplicated name resolves to the first, matching what `Srt.record` reports — though such an
+index has no sort at all. -/
+example : fieldType [("a", Int), ("a", Bool)] "a" = Int := rfl
+
+/-! A name that is not a field has no instance, so it does not compile — and neither does a field
+asked for at the wrong type. These are stated at an explicit type rather than through `fieldType`,
+so that the message names the field list instead of a metavariable. -/
+
+/--
+error: failed to synthesize instance of type class
+  FieldOf [("a", Int), ("b", Bool)] "c" Int
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example : FieldOf [("a", Int), ("b", Bool)] "c" Int := inferInstance
+
+/--
+error: failed to synthesize instance of type class
+  FieldOf [("a", Int), ("b", Bool)] "a" Bool
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example : FieldOf [("a", Int), ("b", Bool)] "a" Bool := inferInstance
+
+ /-! ## `Kind`, `SortKind` and `Op` are re-exported
 
 Three lean-cvc5 types are used raw rather than wrapped, and re-exported so that naming one does not
 mean reaching into `cvc5`. Constructors come from dot notation on the expected type, as everywhere

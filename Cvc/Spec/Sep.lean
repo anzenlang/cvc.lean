@@ -19,9 +19,8 @@ Only the three kinds that mention **no heap sort** are specified here, and they 
 `SEP_PTO` and `SEP_NIL` are deliberately absent. Both are only meaningful against the heap that
 `Solver.declareSepHeap` declares — a `pto` whose operands are not the heap's location and data
 sorts is accepted by cvc5 at construction and rejected at check-sat, with an error naming
-`set.union` rather than `pto` (see [Cvc5Issues.md](Cvc5Issues.md)). So they hang off the handle
-`declareSepHeap` answers instead, in `Cvc/{Untyped,Typed}/Term/Sep.lean`, where the sorts are known
-and can be checked.
+`set.union` rather than `pto`. So they hang off the handle `declareSepHeap` answers instead, in
+`Cvc.{Untyped,Typed}.Theory.Sep`, where the sorts are known and can be checked.
 -/
 namespace Cvc public section
 

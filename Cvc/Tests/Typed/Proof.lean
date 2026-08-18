@@ -185,8 +185,8 @@ format and, with it, the obligation that the format is `.no` or the component is
 re-typed here — no term appears in either signature — but both are restated so the obligation is
 stated against *this* layer's `Proof`, and the two `example`s below pin it.
 
-cvc5 answers a **segfault** rather than an exception when that pairing is violated, which is why it
-is worth a type at all. It is logged as a cvc5 bug in [Cvc5Issues.md](Cvc5Issues.md).
+cvc5 answers a **segfault** rather than an exception when that pairing is violated — a cvc5 bug,
+and why the pairing is worth a type at all.
 -/
 
 /-- info:

@@ -24,7 +24,7 @@ public import Cvc.Spec.Sep
 /-! # Separation logic, typed
 
 The sort-erased module holds the reasoning; this one states it in types. Read
-[Cvc/Untyped/Term/Sep.lean](Cvc/Untyped/Term/Sep.lean) first.
+`Cvc.Untyped.Theory.Sep` first.
 
 `Heap` is where the layer earns its keep. Sort-erased it carries the two `Srt`s and checks them at
 construction; here it carries the two **Lean types**, so

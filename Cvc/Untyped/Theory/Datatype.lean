@@ -34,10 +34,16 @@ sorts that print identically, and cvc5 rejects any term mixing them:
 Subexpressions must have the same type: Type 1: Pair, Type 2: Pair
 ```
 
-So a datatype sort has to be created once and kept, exactly like the `Srt` a `Solver.declareSrt`
-answers — it cannot be recovered from a name later. This is also why `ToTyp` has no datatype case:
-that class maps a Lean type to a `Typ` which `toSrt` *rebuilds* on demand, and rebuilding is
-precisely what a datatype sort does not survive.
+So a datatype sort cannot be *rebuilt*, only kept — which is exactly what `Typ` would have to do,
+mapping a Lean type to a description `Typ.toSrt` reconstructs on demand. `Typ.datatype` therefore
+carries the datatype's **name** and nothing else, and `toSrt` looks the sort up in the scope's
+registry, which `Srt.datatype`, `Srt.datatypes` and `Solver.declareDatatype` all write to. A second
+declaration under a name already taken is rejected, so the name identifies one sort.
+
+A **record** sort is the other way round, and is the exception worth knowing here: cvc5 builds the
+same record sort from the same fields, so it is structural and `Typ.record` rebuilds it rather than
+looking it up. Records are still datatypes underneath, which is why `Cvc.Untyped.Theory.Record`
+reaches for everything below.
 
 Recursion goes through `addSelectorSelf` for a datatype referring to itself, and
 `addSelectorUnresolved` with `Srt.datatypes` for a mutually recursive group.
@@ -54,28 +60,28 @@ open cvc5 renaming
 
 /-! ## Declaring -/
 
-namespace Datatype.Constructor.Decl
+namespace Datatype.Ctor.Decl
 
 @[inherit_doc cvc5.TermManager.mkDatatypeConstructorDecl]
-def mk (name : String) : Env Datatype.Constructor.Decl :=
+def mk (name : String) : Env Datatype.Ctor.Decl :=
   runUnsafe fun tm => tm.mkDatatypeConstructorDecl name
 
-variable (d : Datatype.Constructor.Decl)
+variable (d : Datatype.Ctor.Decl)
 
 @[inherit_doc DtCD.addSelector]
-def addSelector (name : String) (srt : Srt) : Env Datatype.Constructor.Decl :=
+def addSelector (name : String) (srt : Srt) : Env Datatype.Ctor.Decl :=
   runUnsafe' do d.toUnsafe.addSelector name srt.toUnsafe
 
 /-- Adds a selector whose codomain is the datatype being declared. -/
-def addSelectorSelf (name : String) : Env Datatype.Constructor.Decl :=
+def addSelectorSelf (name : String) : Env Datatype.Ctor.Decl :=
   runUnsafe' do d.toUnsafe.addSelectorSelf name
 
 /-- Adds a selector whose codomain is another datatype of the same mutually recursive group. -/
 def addSelectorUnresolved (name : String) (unresDatatypeName : String)
-: Env Datatype.Constructor.Decl :=
+: Env Datatype.Ctor.Decl :=
   runUnsafe' do d.toUnsafe.addSelectorUnresolved name unresDatatypeName
 
-end Datatype.Constructor.Decl
+end Datatype.Ctor.Decl
 
 namespace Datatype.Decl
 
@@ -86,11 +92,11 @@ def mk (name : String) (params : Srts := #[]) (isCoDatatype : Bool := false) : E
 variable (d : Datatype.Decl)
 
 @[inherit_doc DtD.addConstructor]
-def addConstructor (ctor : Datatype.Constructor.Decl) : Env Datatype.Decl :=
+def addCtor (ctor : Datatype.Ctor.Decl) : Env Datatype.Decl :=
   runUnsafe' do d.toUnsafe.addConstructor ctor.toUnsafe
 
 @[inherit_doc DtD.getNumConstructors]
-def countConstructors : Nat := d.toUnsafe.getNumConstructors
+def countCtors : Nat := d.toUnsafe.getNumConstructors
 
 @[inherit_doc DtD.isParametric]
 def isParametric : Bool := d.toUnsafe.isParametric
@@ -109,10 +115,10 @@ namespace Untyped.Solver
 
 The short path: no parameters and no mutual recursion. `Srt.datatype` is the general one.
 -/
-def declareDatatype (s : Untyped.Solver) (symbol : String) (ctors : Array Datatype.Constructor.Decl)
+def declareDatatype (s : Untyped.Solver) (symbol : String) (ctors : Array Datatype.Ctor.Decl)
 : Env Srt := do
   let srt : Srt ←
-    runUnsafe' do s.toUnsafe.declareDatatype symbol (ctors.map Datatype.Constructor.Decl.toUnsafe)
+    runUnsafe' do s.toUnsafe.declareDatatype symbol (ctors.map Datatype.Ctor.Decl.toUnsafe)
   -- registered so that `ToTyp` can name it: see `Srt.ofName`
   registerSort symbol srt.toUnsafe
   return srt
@@ -142,12 +148,12 @@ def getCodomainSort : Env Srt := runUnsafe' do s.toUnsafe.getCodomainSort
 
 end Datatype.Selector
 
-namespace Datatype.Constructor variable (c : Datatype.Constructor)
+namespace Datatype.Ctor variable (c : Datatype.Ctor)
 
 @[inherit_doc DtC.getName]
 def getName : Res String := c.toUnsafe.getName
 
-/-- The constructor term, the first argument of an `applyConstructor`. -/
+/-- The constructor term, the first argument of an `applyCtor`. -/
 def getTerm : Env Term := runUnsafe' do c.toUnsafe.getTerm
 
 /-- The constructor term of a *parametric* datatype, at the given instance of it. -/
@@ -167,13 +173,13 @@ def getSelector (name : String) : Env Datatype.Selector :=
 @[inherit_doc DtC.getSelectorAt]
 def getSelectorAt (idx : Fin c.countSelectors) : Datatype.Selector := c.toUnsafe.getSelectorAt idx
 
-instance : GetElem Datatype.Constructor Nat Datatype.Selector fun c idx => idx < c.countSelectors :=
+instance : GetElem Datatype.Ctor Nat Datatype.Selector fun c idx => idx < c.countSelectors :=
   inferInstanceAs (GetElem DtC Nat DtS fun c idx => idx < c.getNumSelectors)
 
-instance [Monad m] : ForIn m Datatype.Constructor Datatype.Selector :=
+instance [Monad m] : ForIn m Datatype.Ctor Datatype.Selector :=
   inferInstanceAs (ForIn m DtC DtS)
 
-end Datatype.Constructor
+end Datatype.Ctor
 
 namespace Datatype variable (dt : Datatype)
 
@@ -181,20 +187,30 @@ namespace Datatype variable (dt : Datatype)
 def getName : Res String := dt.toUnsafe.getName
 
 @[inherit_doc Dt.getConstructor]
-def getConstructor (name : String) : Env Datatype.Constructor :=
+def getCtorNamed (name : String) : Env Datatype.Ctor :=
   runUnsafe' do dt.toUnsafe.getConstructor name
 
 @[inherit_doc Dt.getNumConstructors]
-def countConstructors : Nat := dt.toUnsafe.getNumConstructors
+def countCtors : Nat := dt.toUnsafe.getNumConstructors
 
 @[inherit_doc Dt.getConstructorAt]
-def getConstructorAt (idx : Fin dt.countConstructors) : Datatype.Constructor :=
+def getCtorAt (idx : Fin dt.countCtors) : Datatype.Ctor :=
   dt.toUnsafe.getConstructorAt idx
 
-instance : GetElem Datatype Nat Datatype.Constructor fun dt idx => idx < dt.countConstructors :=
+@[inherit_doc getCtorAt]
+def getCtorAt? (idx : Nat) : Option Datatype.Ctor :=
+  if h : idx < dt.countCtors then dt.getCtorAt ⟨idx, h⟩ else none
+
+@[inherit_doc getCtorAt]
+def getCtor (idx : Nat) : Res Datatype.Ctor := do
+  let ub := dt.countCtors
+  if h : idx < ub then return dt.getCtorAt ⟨idx, h⟩
+  else throwUser s!"cannot retrieve constructor {idx}\n{dt} only has {ub} constructor(s)"
+
+instance : GetElem Datatype Nat Datatype.Ctor fun dt idx => idx < dt.countCtors :=
   inferInstanceAs (GetElem Dt Nat DtC fun dt idx => idx < dt.getNumConstructors)
 
-instance [Monad m] : ForIn m Datatype Datatype.Constructor := inferInstanceAs (ForIn m Dt DtC)
+instance [Monad m] : ForIn m Datatype Datatype.Ctor := inferInstanceAs (ForIn m Dt DtC)
 
 /-- Looks a selector up by name, across every constructor. -/
 def getSelector (name : String) : Env Datatype.Selector :=
@@ -222,14 +238,14 @@ end Datatype
 
 /-! ## Building and taking apart values
 
-Each of these takes the relevant term off a `Constructor` or `Selector` as its first argument,
+Each of these takes the relevant term off a `Ctor` or `Selector` as its first argument,
 which is how cvc5 spells datatype application.
 -/
 
 namespace Untyped.Term
 
 /-- Applies a constructor to its arguments. -/
-def applyConstructor (ctor : Term) (args : Terms := #[]) : Env Term :=
+def applyCtor (ctor : Term) (args : Terms := #[]) : Env Term :=
   runUnsafe fun tm => tm.mkTerm .APPLY_CONSTRUCTOR (#[ctor] ++ args)
 
 /-- Reads a field out of a datatype value.
@@ -249,6 +265,20 @@ def applyUpdater (updater : Term) (dt : Term) (newValue : Term) : Env Term :=
   runUnsafe fun tm => tm.mkTerm .APPLY_UPDATER #[updater, dt, newValue]
 
 end Untyped.Term
+
+@[inherit_doc Untyped.Term.applyCtor]
+abbrev Datatype.Ctor.apply (ctor : Datatype.Ctor) (args : Terms := #[])
+: Env Term := do
+  (← ctor.getTerm).applyCtor args
+
+@[inherit_doc Untyped.Term.applySelector]
+abbrev Datatype.Selector.apply (sel : Datatype.Selector) (dt : Term) : Env Term := do
+  (← sel.getTerm).applySelector dt
+
+@[inherit_doc Untyped.Term.applyUpdater]
+abbrev Datatype.Selector.applyUpdate (sel : Datatype.Selector) (dt : Term) (newValue : Term)
+: Env Term := do
+  (← sel.getUpdaterTerm).applyUpdater dt newValue
 
 
 
@@ -276,15 +306,15 @@ ordinary functions, so hand-written matches can use them too.
 namespace Untyped.Term
 
 /-- The constructor of the given name, of the datatype this term's sort denotes. -/
-def ctorOf (t : Term) (name : String) : Env Datatype.Constructor := do
+def ctorOf (t : Term) (name : String) : Env Datatype.Ctor := do
   let srt ← t.getSort
   if !srt.isDatatype then
     throwUser s!"cannot match on a term of sort `{srt}`, which is not a datatype"
-  (← srt.getDatatype).getConstructor name
+  (← srt.getDatatype).getCtorNamed name
 
 end Untyped.Term
 
-namespace Datatype.Constructor variable (c : Datatype.Constructor)
+namespace Datatype.Ctor variable (c : Datatype.Ctor)
 
 /-- Fails unless the constructor takes exactly `count` fields.
 
@@ -302,7 +332,7 @@ def mkBVarAt (idx : Nat) (name : String) : Env BVar := do
   else
     throwUser s!"constructor `{← c.getName}` has no field at index {idx}"
 
-end Datatype.Constructor
+end Datatype.Ctor
 
 namespace Untyped.Term
 

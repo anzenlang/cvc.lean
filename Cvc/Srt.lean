@@ -102,6 +102,14 @@ def function (dom : Array Srt) (cod : Srt)
 
 def abstract (a : Abstract) : Env Srt := lift% mkAbstractSort a.toKind
 
+/-- cvc5's fully abstract sort, `?`.
+
+Not *first*-class: cvc5 accepts it as a container element, an array parameter or a function
+codomain, and rejects it as a nullable element, a tuple component or a function domain. That rule
+is what `Typ`/`Typ?` encode.
+-/
+def any : Env Srt := runUnsafe fun tm => tm.mkAbstractSort .ABSTRACT_SORT
+
 def Abstract.toSrt (a : Abstract) : Env Srt := abstract a
 
 /-! ## Further constructors
@@ -119,8 +127,32 @@ def predicate (doms : Srts) : Env Srt := lift% mkPredicateSort doms
 @[inherit_doc Tm.mkNullableSort]
 def nullable (elm : Srt) : Env Srt := lift% mkNullableSort elm
 
-@[inherit_doc Tm.mkRecordSort]
-def record (fields : Array (String × Srt)) : Env Srt := lift% mkRecordSort fields
+/-- The first name occurring twice in a list, if any. -/
+private def firstDuplicate : List String → Option String
+  | [] => none
+  | hd :: tl => if tl.contains hd then some hd else firstDuplicate tl
+
+/-- A record sort, of named and ordered fields.
+
+**A record must have at least one field.** cvc5 builds the empty record sort happily, but it
+denotes what the empty tuple already denotes and nothing in SMT-LIB has a use for it, so it is
+refused here rather than left as a second spelling of the same thing.
+
+**Field names must be distinct, and this is our check, not cvc5's.** cvc5 accepts
+`{a : Int, a : Bool}` and builds a datatype carrying two selectors both named `a`, which nothing
+can then select unambiguously.
+
+The order is part of the sort: `{a : Int, b : Bool}` and `{b : Bool, a : Int}` are different.
+
+Both checks sit here rather than on the callers, so every path to a record sort inherits them —
+`Typ.toSrt` reaches cvc5 only through this function.
+-/
+def record (fields : Array (String × Srt)) : Env Srt := do
+  if fields.isEmpty then
+    throwUser "a record sort must have at least one field"
+  if let some name := firstDuplicate (fields.toList.map Prod.fst) then
+    throwUser s!"record sort has more than one field named `{name}`"
+  lift% mkRecordSort fields
 
 @[inherit_doc Tm.mkParamSort]
 def param (symbol : String) : Env Srt := lift% mkParamSort symbol
@@ -325,8 +357,8 @@ abbrev isArith : Typ → Bool
 | int | real => true
 | bool | string | regex | roundingMode
 | bitVec _ | float _ _ | finiteField _ | arrayTo _ _
-| bag _ | set _ | seq _ | prod _ | nullable _
-| datatype _ | abstract _ | function _ _ | uninterpreted _ => false
+| bag _ | set _ | seq _ | prod _ | nullable _ | record _
+| datatype _ | function _ _ | uninterpreted _ => false
 
 omit [Ω] in
 theorem typs_of_isArith {typ : Typ} : typ.isArith → typ = int ∨ typ = real := by grind
@@ -336,62 +368,72 @@ abbrev hasConcat : Typ → Bool
 | int | real
 | bool | regex | roundingMode
 | bitVec _ | float _ _ | finiteField _ | arrayTo _ _
-| bag _ | set _ | prod _ | nullable _
-| datatype _ | abstract _ | function _ _ | uninterpreted _ => false
+| bag _ | set _ | prod _ | nullable _ | record _
+| datatype _ | function _ _ | uninterpreted _ => false
 
 omit [Ω] in
 theorem typs_of_hasConcat {typ : Typ} : typ.hasConcat → typ = string ∨ ∃ t, typ = seq t := by grind
 
-/-- Helper for `toSrt`. -/
-def foldFunctionCod [Monad m] (srt' : Typ)
-  (acc : α) (f : α → (s : Typ) → (sizeOf s < sizeOf srt') → m α)
-: m (α × (cod : Typ) ×' sizeOf cod ≤ sizeOf srt') :=
-  match h : srt' with
-  | function dom cod => do
-    let acc ← f acc dom (by grind only [= function.sizeOf_spec])
-    let (acc, ⟨cod, h⟩) ← cod.foldFunctionCod acc fun acc s h =>
-      f acc s (by grind only [= function.sizeOf_spec])
-    return (acc, ⟨cod, by grind only [= function.sizeOf_spec]⟩)
-  | cod => return (acc, ⟨cod, by grind only⟩)
+end Typ
+
+
+/-! ## Conversions between `Typ` and `Srt`
+
+Each direction is a mutual pair, `Typ`/`Typ?` being mutual. `Typ.toSrt` is **total**: the split is
+exactly cvc5's first-class rule, so every `Typ` denotes a sort it accepts.
+-/
+
+mutual
 
 /-- Conversion to `Srt`. -/
-public def toSrt [Ω] : Typ → Env Srt
-| bool => Srt.bool | int => Srt.int | real => Srt.real
-| regex => Srt.regex | string => Srt.string
-| roundingMode => Srt.roundingMode
-| bitVec size => Srt.bitVec size.toUInt32
-| float exp sig => Srt.float exp.toUInt32 sig.toUInt32
-| finiteField size => Srt.finiteField size
-| arrayTo idx elm => do elm.toSrt >>= (← idx.toSrt).arrayTo
-| bag elm => elm.toSrt >>= Srt.bag
-| set elm => elm.toSrt >>= Srt.set
-| seq elm => elm.toSrt >>= Srt.seq
-| nullable elm => elm.toSrt >>= Srt.nullable
-| abstract a => Srt.abstract a
-| prod args => foldProdArgs args >>= Srt.tuple
-| datatype name => Srt.ofName name
-| function dom cod => do
-  let dom ← dom.toSrt
-  /- non-empty array, required for `Srt.function` -/
-  let acc : {a : Array Srt // 0 < a.size} := ⟨#[dom], by grind⟩
-  let (dom, ⟨cod, h⟩) ← cod.foldFunctionCod acc fun acc s h =>
-    /- push and update proof that array (`acc`) is non-empty -/
-    return ⟨acc.val.push (← s.toSrt), by grind⟩
-  let cod ← cod.toSrt
-  Srt.function dom cod
-| uninterpreted name => do
+public def Typ.toSrt [Ω] : Typ → Env Srt
+| .bool => Srt.bool | .int => Srt.int | .real => Srt.real
+| .regex => Srt.regex | .string => Srt.string
+| .roundingMode => Srt.roundingMode
+| .bitVec size => Srt.bitVec size.toUInt32
+| .float exp sig => Srt.float exp.toUInt32 sig.toUInt32
+| .finiteField size => Srt.finiteField size
+| .arrayTo idx elm => do (← Cvc.Typ?.toSrt elm) |> (← Cvc.Typ?.toSrt idx).arrayTo
+| .bag elm => Cvc.Typ?.toSrt elm >>= Srt.bag
+| .set elm => Cvc.Typ?.toSrt elm >>= Srt.set
+| .seq elm => Cvc.Typ?.toSrt elm >>= Srt.seq
+| .nullable elm => Cvc.Typ.toSrt elm >>= Srt.nullable
+| .prod args => Cvc.Typ.toSrtList args >>= Srt.tuple
+| .record fields => Cvc.Typ.toSrtFields fields >>= Srt.record
+| .datatype name => Srt.ofName name
+-- the spine is flattened on the `Srt` side rather than the `Typ` side: both operands are
+-- structurally smaller, where walking the curried spine first is not, and cvc5 does not flatten
+-- on its own. A function in *domain* position stays nested, which is what keeps it higher-order
+| .function dom cod => do
+  let dom ← Cvc.Typ.toSrt dom
+  let cod ← Cvc.Typ?.toSrt cod
+  if cod.isFunction then
+    Srt.function (#[dom] ++ (← cod.getFunctionDomainSorts)) (← cod.getFunctionCodomainSort)
+  else Srt.function #[dom] cod
+| .uninterpreted name => do
   let some (srt : Srt) ← getRegisteredSort? name
     | throwUser s!"unknown uninterpreted sort `{name}`"
   if srt.isUninterpreted then return srt
   else throwUser s!"sort `{name}` is not an uninterpreted sort"
-where
-  foldProdArgs : (l : List Typ) → (acc : Array Srt := #[]) → Env (Array Srt)
-    | [], args => return args
-    | hd::tl, args => do
-      let hd ← hd.toSrt
-      foldProdArgs tl <| args.push hd
 
-end Typ
+@[inherit_doc Typ.toSrt]
+public def Typ.toSrtList [Ω] : List Typ → Env (Array Srt)
+| [] => return #[]
+| hd :: tl => return #[← Cvc.Typ.toSrt hd] ++ (← Cvc.Typ.toSrtList tl)
+
+@[inherit_doc Typ.toSrt]
+public def Typ.toSrtFields [Ω] : List (String × Typ) → Env (Array (String × Srt))
+| [] => return #[]
+| (name, ty) :: tl => return #[(name, ← Cvc.Typ.toSrt ty)] ++ (← Cvc.Typ.toSrtFields tl)
+
+@[inherit_doc Typ.toSrt]
+public def Typ?.toSrt [Ω] : Typ? → Env Srt
+| .typ t => Cvc.Typ.toSrt t
+| .any => Srt.any
+| .abstract a => Srt.abstract a
+
+end
+
 
 
 
@@ -414,6 +456,13 @@ private def checkDeclared (srt : Srt) (name : String) : Env String := do
       cannot convert the declared sort `{name}` to a `Typ`: the name is registered to a different \
       sort in this scope"
   return name
+
+/-- Curries a cvc5 domain array back into the right-nested spine `Typ` uses. -/
+private def curryTo : List Typ → Typ? → Typ?
+  | [], cod => cod
+  | hd :: tl, cod => .typ (.function hd (curryTo tl cod))
+
+mutual
 
 /-- Conversion to `Typ`, the inverse of `Typ.toSrt` wherever a `Typ` can describe the sort.
 
@@ -443,28 +492,29 @@ public partial def toTyp (srt : Srt) : Env Typ := do
   else if srt.isFloat then
     return .float (← srt.getFloatExponentSize).toNat (← srt.getFloatSignificandSize).toNat
   else if srt.isFiniteField then return .finiteField (← srt.getFiniteFieldSize)
+  -- an abstract sort is not first-class, so it is a `Typ?` and never a `Typ`
   else if srt.isAbstract then
-    -- cvc5 keeps only *some* abstractions as abstract sorts: an abstract array, bag, set or
-    -- sequence comes back as that container over the fully abstract sort `?`, so it never reaches
-    -- here. What does reach here is `?` itself, which no `Typ` case describes.
-    let kind ← srt.getAbstractedKind
-    if kind matches .ABSTRACT_SORT then
-      throwUser s!"`Typ` has no case for `{srt}`, the fully abstract sort"
-    return .abstract (← Srt.Abstract.ofKind kind)
+    throwUser s!"\
+      `{srt}` is an abstract sort, which cvc5 does not accept where a first-class one is wanted; \
+      it has a `Typ?` but no `Typ`"
   else if srt.isArray then
-    return .arrayTo (← (← srt.getArrayIndexSort).toTyp) (← (← srt.getArrayElementSort).toTyp)
-  else if srt.isSet then return .set (← (← srt.getSetElementSort).toTyp)
-  else if srt.isBag then return .bag (← (← srt.getBagElementSort).toTyp)
-  else if srt.isSeq then return .seq (← (← srt.getSeqElementSort).toTyp)
+    return .arrayTo
+      (← Cvc.Srt.toTyp? (← srt.getArrayIndexSort)) (← Cvc.Srt.toTyp? (← srt.getArrayElementSort))
+  else if srt.isSet then return .set (← Cvc.Srt.toTyp? (← srt.getSetElementSort))
+  else if srt.isBag then return .bag (← Cvc.Srt.toTyp? (← srt.getBagElementSort))
+  else if srt.isSeq then return .seq (← Cvc.Srt.toTyp? (← srt.getSeqElementSort))
   -- before `isDatatype`: cvc5 implements a nullable as a mono-morphized datatype
-  else if srt.isNullable then return .nullable (← (← srt.getNullableElementSort).toTyp)
+  else if srt.isNullable then
+    return .nullable (← Cvc.Srt.toTyp (← srt.getNullableElementSort))
   -- likewise a tuple
   else if srt.isTuple then
-    return .prod (← (← srt.getTupleSorts).toList.mapM toTyp)
+    return .prod (← (← srt.getTupleSorts).toList.mapM Cvc.Srt.toTyp)
   else if srt.isFunction then
-    let dom ← (← srt.getFunctionDomainSorts).toList.mapM toTyp
-    let cod ← (← srt.getFunctionCodomainSort).toTyp
-    return dom.foldr .function cod
+    let doms ← (← srt.getFunctionDomainSorts).toList.mapM Cvc.Srt.toTyp
+    let cod ← Cvc.Srt.toTyp? (← srt.getFunctionCodomainSort)
+    match doms with
+    | [] => throwInternal s!"function sort `{srt}` has an empty domain"
+    | hd :: tl => return .function hd (Srt.curryTo tl cod)
   -- an *instantiated* sort — a parametric datatype or an uninterpreted sort constructor applied to
   -- arguments — has a name but no `Typ`: the named cases carry a name and nothing else. This comes
   -- before them because cvc5 reports `(U Int)` as an uninterpreted sort, and because
@@ -478,8 +528,20 @@ public partial def toTyp (srt : Srt) : Env Typ := do
     let some symbol := srt.getSymbol?
       | throwUser s!"cannot convert the uninterpreted sort `{srt}` to a `Typ`: it has no name"
     return .uninterpreted (← srt.checkDeclared symbol)
+  -- a record is a datatype with one constructor and one selector per field, so the fields are
+  -- read off that constructor — in order, the order being part of the sort
   else if srt.isRecord then
-    throwUser s!"`Typ` has no case for the record sort `{srt}`"
+    -- the raw cvc5 accessors, this module sitting below the datatype API
+    let dt := (← srt.getDatatype).toUnsafe
+    if h : 0 < dt.getNumConstructors then
+      let ctor := dt[0]'h
+      let mut fields := #[]
+      for hIdx : idx in [0 : ctor.getNumSelectors] do
+        let sel := ctor[idx]
+        let srt' : Srt ← Env.lift5 sel.getCodomainSort
+        fields := fields.push (← sel.getName, ← Cvc.Srt.toTyp srt')
+      return .record fields.toList
+    else throwInternal s!"record sort `{srt}` has no constructor"
   else if srt.isUninterpretedSortConstructor then
     throwUser s!"\
       `Typ` has no case for `{srt}`, an uninterpreted sort constructor: it names a sort of arity \
@@ -488,6 +550,21 @@ public partial def toTyp (srt : Srt) : Env Typ := do
     -- a datatype sort has no *symbol*; its name is the declaration's
     return .datatype (← srt.checkDeclared (← (← srt.getDatatype).getName))
   else throwUser s!"`Typ` has no case for the sort `{srt}` (sort kind `{← srt.getKind}`)"
+
+/-- Conversion to `Typ?`, which unlike `toTyp` accepts the abstract sorts.
+
+Only reached where cvc5 permits a non-first-class sort — a container element, an array parameter,
+a function codomain — so `.any` and `.abstract` land exactly where they are legal.
+-/
+public partial def toTyp? (srt : Srt) : Env Typ? := do
+  if srt.isAbstract then
+    let kind ← srt.getAbstractedKind
+    -- `?` reports its own kind as its abstracted one; every other abstract sort names a family
+    if kind matches .ABSTRACT_SORT then return .any
+    else return .abstract (← Srt.Abstract.ofKind kind)
+  else return .typ (← Cvc.Srt.toTyp srt)
+
+end
 
 end Srt
 

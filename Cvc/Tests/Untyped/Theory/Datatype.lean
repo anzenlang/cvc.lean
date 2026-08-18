@@ -20,9 +20,7 @@ public meta import Cvc.Untyped.Theory
 /-! # Datatypes, sort-erased -/
 namespace Cvc.Tests.Untyped.Datatype
 
-open Cvc
-open Cvc
-open Cvc.Untyped
+open Cvc Untyped
 
 
 
@@ -48,21 +46,21 @@ model fst : 7
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
   let mk ← mk.addSelector "fst" (← Srt.int)
   let mk ← mk.addSelector "snd" (← Srt.bool)
   let pair ← s.declareDatatype "Pair" #[mk]
   println! "sort      : {pair}, isDatatype {pair.isDatatype}"
 
   let dt ← pair.getDatatype
-  println! "name      : {← dt.getName}, ctors {dt.countConstructors}"
-  let ctor ← dt.getConstructor "mk"
+  println! "name      : {← dt.getName}, ctors {dt.countCtors}"
+  let ctor ← dt.getCtorNamed "mk"
   println! "ctor      : {← ctor.getName}, selectors {ctor.countSelectors}"
   -- a constructor iterates over its selectors
   for sel in ctor do
     println! "  sel     : {← sel.getName} : {← sel.getCodomainSort}"
 
-  let p ← Term.applyConstructor (← ctor.getTerm) #[← Term.mkInt 7, ← Term.mkTrue]
+  let p ← Term.applyCtor (← ctor.getTerm) #[← Term.mkInt 7, ← Term.mkTrue]
   println! "value     : {p}"
   let fst ← ctor.getSelector "fst"
   println! "fst       : {← Term.applySelector (← fst.getTerm) p}"
@@ -97,7 +95,7 @@ missing    : caught
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   let declare : Env Srt := do
-    let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+    let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
     let mk ← mk.addSelector "fst" (← Srt.int)
     s.declareDatatype "Pair" #[mk]
 
@@ -138,25 +136,25 @@ head   : (head (cons 1 (cons 2 nil)))
 is nil : ((_ is nil) (cons 1 (cons 2 nil)))
 -/
 #guard_msgs in #eval Env.runIO do
-  let nil ← Cvc.Datatype.Constructor.Decl.mk "nil"
-  let cons ← Cvc.Datatype.Constructor.Decl.mk "cons"
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
   let cons ← cons.addSelector "head" (← Srt.int)
   let cons ← cons.addSelectorSelf "tail"
 
   let decl ← Cvc.Datatype.Decl.mk "Lst"
-  let decl ← decl.addConstructor nil
-  let decl ← decl.addConstructor cons
+  let decl ← decl.addCtor nil
+  let decl ← decl.addCtor cons
   let lst ← Srt.datatype decl
   println! "sort   : {lst}"
 
   let dt ← lst.getDatatype
-  println! "ctors  : {dt.countConstructors}"
-  let nilC ← dt.getConstructor "nil"
-  let consC ← dt.getConstructor "cons"
+  println! "ctors  : {dt.countCtors}"
+  let nilC ← dt.getCtorNamed "nil"
+  let consC ← dt.getCtorNamed "cons"
 
-  let nilT ← Term.applyConstructor (← nilC.getTerm)
-  let one ← Term.applyConstructor (← consC.getTerm) #[← Term.mkInt 2, nilT]
-  let two ← Term.applyConstructor (← consC.getTerm) #[← Term.mkInt 1, one]
+  let nilT ← Term.applyCtor (← nilC.getTerm)
+  let one ← Term.applyCtor (← consC.getTerm) #[← Term.mkInt 2, nilT]
+  let two ← Term.applyCtor (← consC.getTerm) #[← Term.mkInt 1, one]
   println! "value  : {two}"
   println! "head   : {← Term.applySelector (← (← consC.getSelector "head").getTerm) two}"
   println! "is nil : {← Term.applyTester (← nilC.getTesterTerm) two}"
@@ -176,17 +174,17 @@ B     : ctors 2
 value : (mkA (mkB (mkA stop)))
 -/
 #guard_msgs in #eval Env.runIO do
-  let mkA ← Cvc.Datatype.Constructor.Decl.mk "mkA"
+  let mkA ← Cvc.Datatype.Ctor.Decl.mk "mkA"
   let mkA ← mkA.addSelectorUnresolved "toB" "B"
   let declA ← Cvc.Datatype.Decl.mk "A"
-  let declA ← declA.addConstructor mkA
+  let declA ← declA.addCtor mkA
 
-  let mkB ← Cvc.Datatype.Constructor.Decl.mk "mkB"
+  let mkB ← Cvc.Datatype.Ctor.Decl.mk "mkB"
   let mkB ← mkB.addSelectorUnresolved "toA" "A"
-  let stop ← Cvc.Datatype.Constructor.Decl.mk "stop"
+  let stop ← Cvc.Datatype.Ctor.Decl.mk "stop"
   let declB ← Cvc.Datatype.Decl.mk "B"
-  let declB ← declB.addConstructor mkB
-  let declB ← declB.addConstructor stop
+  let declB ← declB.addCtor mkB
+  let declB ← declB.addCtor stop
 
   let srts ← Srt.datatypes #[declA, declB]
   println! "sorts : {srts.map toString}"
@@ -195,13 +193,13 @@ value : (mkA (mkB (mkA stop)))
   let some srtB := srts[1]? | throwUser "no second sort"
   let dtA ← srtA.getDatatype
   let dtB ← srtB.getDatatype
-  println! "A     : ctors {dtA.countConstructors}, isWellFounded {dtA.isWellFounded}"
-  println! "B     : ctors {dtB.countConstructors}"
+  println! "A     : ctors {dtA.countCtors}, isWellFounded {dtA.isWellFounded}"
+  println! "B     : ctors {dtB.countCtors}"
 
-  let stopT ← Term.applyConstructor (← (← dtB.getConstructor "stop").getTerm)
-  let a ← Term.applyConstructor (← (← dtA.getConstructor "mkA").getTerm) #[stopT]
-  let b ← Term.applyConstructor (← (← dtB.getConstructor "mkB").getTerm) #[a]
-  let a2 ← Term.applyConstructor (← (← dtA.getConstructor "mkA").getTerm) #[b]
+  let stopT ← Term.applyCtor (← (← dtB.getCtorNamed "stop").getTerm)
+  let a ← Term.applyCtor (← (← dtA.getCtorNamed "mkA").getTerm) #[stopT]
+  let b ← Term.applyCtor (← (← dtB.getCtorNamed "mkB").getTerm) #[a]
+  let a2 ← Term.applyCtor (← (← dtA.getCtorNamed "mkA").getTerm) #[b]
   println! "value : {a2}"
 
 
@@ -221,7 +219,7 @@ finite              : true
 isRecord {tupDt.isRecord}"
 
   let s ← Solver.new
-  let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
   let mk ← mk.addSelector "b" (← Srt.bool)
   let dt ← (← s.declareDatatype "Wrap" #[mk]).getDatatype
   println! "plain datatype      : isTuple {dt.isTuple} / isParametric {dt.isParametric} / \
@@ -245,30 +243,30 @@ head of l : 7
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let nil ← Cvc.Datatype.Constructor.Decl.mk "nil"
-  let cons ← Cvc.Datatype.Constructor.Decl.mk "cons"
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
   let cons ← (← cons.addSelector "head" (← Srt.int)).addSelectorSelf "tail"
   let decl ← Cvc.Datatype.Decl.mk "Lst"
-  let lst ← Srt.datatype (← (← decl.addConstructor nil).addConstructor cons)
+  let lst ← Srt.datatype (← (← decl.addCtor nil).addCtor cons)
   let dt ← lst.getDatatype
-  let nilC ← dt.getConstructor "nil"
-  let consC ← dt.getConstructor "cons"
+  let nilC ← dt.getCtorNamed "nil"
+  let consC ← dt.getCtorNamed "cons"
 
   -- the head of `l`, or zero if it has none
   let l ← s.declareConst "l" lst
   let h ← BVar.mk (← Srt.int) "h"
   let t ← BVar.mk lst "t"
   let consCase ←
-    Term.matchBindCase #[h, t] (← Term.applyConstructor (← consC.getTerm) #[h, t]) h
+    Term.matchBindCase #[h, t] (← Term.applyCtor (← consC.getTerm) #[h, t]) h
   let nilCase ←
-    Term.matchCase (← Term.applyConstructor (← nilC.getTerm)) (← Term.mkInt 0)
+    Term.matchCase (← Term.applyCtor (← nilC.getTerm)) (← Term.mkInt 0)
   let m ← Term.mkMatch l #[consCase, nilCase]
   println! "match     : {m}"
   println! "sort      : {← m.getSort}"
 
   -- `l` is a one-element list, so the match takes the `cons` branch
-  let nilT ← Term.applyConstructor (← nilC.getTerm)
-  let seven ← Term.applyConstructor (← consC.getTerm) #[← Term.mkInt 7, nilT]
+  let nilT ← Term.applyCtor (← nilC.getTerm)
+  let seven ← Term.applyCtor (← consC.getTerm) #[← Term.mkInt 7, nilT]
   (do Term.equal l seven) >>= s.assert
   s.checkSat (ifSat := do println! "head of l : {← s.getValueAs Int m}")
 
@@ -286,19 +284,19 @@ expected: Int
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let nil ← Cvc.Datatype.Constructor.Decl.mk "nil"
-  let cons ← Cvc.Datatype.Constructor.Decl.mk "cons"
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
   let cons ← (← cons.addSelector "head" (← Srt.int)).addSelectorSelf "tail"
   let decl ← Cvc.Datatype.Decl.mk "Lst"
-  let lst ← Srt.datatype (← (← decl.addConstructor nil).addConstructor cons)
+  let lst ← Srt.datatype (← (← decl.addCtor nil).addCtor cons)
   let dt ← lst.getDatatype
-  let consC ← dt.getConstructor "cons"
+  let consC ← dt.getCtorNamed "cons"
   let l ← s.declareConst "l" lst
 
   let h ← BVar.mk (← Srt.int) "h"
   let t ← BVar.mk lst "t"
   let consCase ←
-    Term.matchBindCase #[h, t] (← Term.applyConstructor (← consC.getTerm) #[h, t]) h
+    Term.matchBindCase #[h, t] (← Term.applyCtor (← consC.getTerm) #[h, t]) h
 
   let x ← BVar.mk lst "x"
   let anyCase ← Term.matchBindCase #[x] x (← Term.mkInt 0)
@@ -307,6 +305,6 @@ expected: Int
   let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
   println! "partial   : {← caught do pure s!"{← Term.mkMatch l #[consCase]}"}"
   let boolCase ←
-    Term.matchCase (← Term.applyConstructor (← (← dt.getConstructor "nil").getTerm))
+    Term.matchCase (← Term.applyCtor (← (← dt.getCtorNamed "nil").getTerm))
       (← Term.mkTrue)
   println! "mixed     : {← caught do pure s!"{← Term.mkMatch l #[consCase, boolCase]}"}"

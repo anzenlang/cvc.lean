@@ -16,6 +16,7 @@ public import Cvc.Typed.Theory.Float
 public import Cvc.Typed.Theory.Fun
 public import Cvc.Typed.Theory.Grammar
 public import Cvc.Typed.Theory.Nullable
+public import Cvc.Typed.Theory.Record
 public import Cvc.Typed.Theory.Regex
 public import Cvc.Typed.Theory.Relation
 public import Cvc.Typed.Theory.Sep

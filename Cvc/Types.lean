@@ -12,6 +12,7 @@ public import Cvc.Types.Bag
 public import Cvc.Types.Array
 public import Cvc.Types.Tuple
 public import Cvc.Types.Relation
+public import Cvc.Types.Record
 public import Cvc.Types.Float
 public import Cvc.Types.FiniteField
 

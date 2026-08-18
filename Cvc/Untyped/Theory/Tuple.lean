@@ -63,8 +63,8 @@ def tupleSelect (idx : Nat) (tuple : Term) : Env Term := do
   unless srt.isTuple do
     throwUser s!"cannot select a component of a term of sort `{srt}`, which is not a tuple"
   let dt ← srt.getDatatype
-  if h₀ : 0 < dt.countConstructors then
-    let ctor := dt.getConstructorAt ⟨0, h₀⟩
+  if h₀ : 0 < dt.countCtors then
+    let ctor := dt.getCtorAt ⟨0, h₀⟩
     if h : idx < ctor.countSelectors then
       applySelector (← (ctor.getSelectorAt ⟨idx, h⟩).getTerm) tuple
     else

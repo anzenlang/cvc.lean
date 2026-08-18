@@ -204,10 +204,9 @@ A component other than `full` answers a proof of that component alone, and which
 travels in the proof's type. That is what turns the pairing cvc5 requires into a *type* obligation:
 printing a non-`full` proof in anything but `Proof.Format.no` does not compile.
 
-It is worth a type because the alternative is not an exception but a **segfault** — see
-[Cvc5Issues.md](Cvc5Issues.md), where that is logged as a cvc5 bug. Nothing below can call it
-wrongly, which is the point; what the two `example`s pin instead is the obligation itself, so that
-weakening it would show up here rather than in a crash.
+It is worth a type because the alternative is not an exception but a **segfault**, a cvc5 bug.
+Nothing below can call it wrongly, which is the point; what the two `example`s pin instead is the
+obligation itself, so that weakening it would show up here rather than in a crash.
 -/
 
 /-- The obligation `toStringFmt` carries, supplied by hand rather than by `grind`. -/

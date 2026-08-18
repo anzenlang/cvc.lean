@@ -46,7 +46,7 @@ instance : ToTyp Pair := ⟨.datatype "Pair"⟩
 
 /-- Declares the datatype the `Pair` index names. -/
 def declarePair [Ω] (s : Solver) : Env Srt := do
-  let mk ← Cvc.Datatype.Constructor.Decl.mk "mk"
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
   let mk ← mk.addSelector "fst" (← Srt.int)
   let mk ← mk.addSelector "snd" (← Srt.bool)
   Untyped.Solver.declareDatatype s "Pair" #[mk]
@@ -163,7 +163,9 @@ example : Env (Term Int) := fst.get p
 /-- info: @Datatype.Field.get : {α β : Type} → [inst : Ω] → Datatype.Field α β → Term α → Env (Term β) -/
 #guard_msgs in #check @Cvc.Typed.Datatype.Field.get
 
-/-- info: @Datatype.Ctor.is : {α : Type} → [inst : Ω] → Datatype.Ctor α → Term α → Env (Term Bool) -/
+/--
+info: @Datatype.Ctor.is : {α : Type} → [inst : Ω] → Typed.Datatype.Ctor α → Term α → Env (Term Bool)
+-/
 #guard_msgs in #check @Cvc.Typed.Datatype.Ctor.is
 
 end discipline
@@ -187,11 +189,11 @@ instance : ToTyp Lst := ⟨.datatype "Lst"⟩
 
 /-- Declares the datatype the `Lst` index names. -/
 def declareLst [Ω] : Env Srt := do
-  let nil ← Cvc.Datatype.Constructor.Decl.mk "nil"
-  let cons ← Cvc.Datatype.Constructor.Decl.mk "cons"
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
   let cons ← (← cons.addSelector "head" (← Srt.int)).addSelectorSelf "tail"
   let decl ← Cvc.Datatype.Decl.mk "Lst"
-  Srt.datatype (← (← decl.addConstructor nil).addConstructor cons)
+  Srt.datatype (← (← decl.addCtor nil).addCtor cons)
 
 /-- info:
 match     : (match l (((cons h t) h) (nil 0)))

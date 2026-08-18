@@ -39,7 +39,7 @@ protected def default [Inhabited β] : TotalMap α β := mkConst default
 instance [B : Nonempty β] : Nonempty (TotalMap α β) := B.elim (⟨· , Std.TreeMap.empty⟩)
 instance [Inhabited β] : Inhabited (TotalMap α β) := ⟨TotalMap.default⟩
 
-instance [ToTyp α] [ToTyp β] : ToTyp (TotalMap α β) := ⟨Typ.of α |>.arrayTo (Typ.of β)⟩
+instance [ToTyp α] [ToTyp β] : ToTyp (TotalMap α β) := ⟨.arrayTo (Typ.of α) (Typ.of β)⟩
 
 /-! #### Basic operations -/
 section variable [Ord α] (map : TotalMap α β) (key : α)

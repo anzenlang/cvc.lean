@@ -122,6 +122,63 @@ syntax (name := smtAlt) " | " ident (ppSpace smtPatArg)* " => " smtTerm : smtMat
 /-- The catch-all alternative, taken when no earlier one matches. -/
 syntax (name := smtAltAny) " | " "_" " => " smtTerm : smtMatchAlt
 
+/-! ### Records
+
+`{a : intSrt := 7, b : boolSrt := tru}` builds a record, and is Lean's own structure-instance
+syntax with one difference that has to be stated loudly: **the order of the fields is part of the
+sort**. `{a : … , b : …}` and `{b : … , a : …}` denote *different* record sorts, whose terms cvc5
+refuses to mix, where Lean's structure instances are order-insensitive.
+
+A field's sort may be **stated or left out**, per field, in either layer. Left out it is inferred:
+sort-erased from the field term's own sort, typed from the index its term carries. Stated it is
+*checked* against that same thing before the record is built, so an annotation can only confirm
+what is there, never change it. The sort is an ordinary Lean term of type `Srt`, so the idiom is to
+bind the sorts first and name them here.
+
+There is **no syntax for the empty record**: `Srt.record` refuses one, the empty record denoting
+what the empty tuple already denotes.
+-/
+
+/-- One field of a record literal: its name, its term, and optionally its sort. -/
+declare_syntax_cat smtRecField (behavior := symbol)
+/-- A field at a stated sort, `a : intSrt := 7`. -/
+syntax (name := smtRecFieldOf) ident " : " term " := " smtTerm : smtRecField
+/-- A field whose sort is inferred, `a := 7`. -/
+syntax (name := smtRecField) ident " := " smtTerm : smtRecField
+
+/-- A record literal, `{a := 7, b : boolSrt := tru}`. -/
+syntax:max (name := smtRecord) "{" smtRecField,+ "}" : smtTerm
+
+/-- A record update, `{r with a := 7}`.
+
+Every field named must be one the record has, and no field may be named twice — checked as the
+literal is expanded, so a repeated field is reported where it is written rather than silently
+overwriting.
+-/
+syntax:max (name := smtWith) "{" smtTerm " with " smtRecField,+ "}" : smtTerm
+
+/-- A field read off a term that is not an identifier, `(f x).a`.
+
+An *identifier* head cannot come here: `r.a` is one token to the lexer, so it arrives as an
+identifier and is taken apart by `smtProjU%`/`smtProjT%` instead. `smt! r .a`, with a space, is
+neither and does not parse.
+-/
+syntax:max (name := smtProj) smtTerm:max noWs "." noWs ident : smtTerm
+
+/-- A field read off whatever is to the left, `f x |>.a`.
+
+Lean's `pipeProj`, at Lean's precedence — **minimum**, so it takes everything to its left:
+`a + b |>.c` is `(a + b).c`, not `a + (b.c)`. That reading is nearly always a mistake here, an
+arithmetic term having no fields, but it is a loud one and matching the language is worth more than
+optimising for it.
+-/
+syntax:min (name := smtPipeProj) smtTerm " |>." noWs ident : smtTerm
+
+/-- Resolves a dotted identifier of the sort-erased layer into a head and the fields read off it. -/
+syntax (name := smtProjU) "smtProjU% " ident : term
+/-- Resolves a dotted identifier of the typed layer into a head and the fields read off it. -/
+syntax (name := smtProjT) "smtProjT% " ident : term
+
 /-- Matches a datatype term against its constructors. -/
 syntax (name := smtMatch)
   withPosition("match " smtTerm " with" (ppLine colGe smtMatchAlt)+)
@@ -182,12 +239,15 @@ def naryIdOf (id : Name) : Name := id.appendAfter "N"
 Expansion goes through `>>=` rather than `do`-notation because an antiquotation in `doElem`
 head position does not elaborate: `` `(do $fn (← $a) (← $b)) `` is rejected, whereas the bind
 chain below is fine. Binder names are macro-scoped, so they cannot capture user identifiers.
+
+Two calls in one expansion produce the *same* binder names, macro scopes and all, so a nested one
+shadows what the outer bound. `binder` is what tells them apart where that matters.
 -/
 def bindArgs (args : Array (TSyntax `term)) (mk : Array Ident → MacroM (TSyntax `term))
-: MacroM (TSyntax `term) := do
+(binder : String := "smtArg") : MacroM (TSyntax `term) := do
   let mut ids := #[]
   for i in [0:args.size] do
-    ids := ids.push (mkIdent (← MonadQuotation.addMacroScope (Name.mkSimple s!"smtArg{i}")))
+    ids := ids.push (mkIdent (← MonadQuotation.addMacroScope (Name.mkSimple s!"{binder}{i}")))
   let mut body ← mk ids
   for i in [0:args.size] do
     let j := args.size - 1 - i
@@ -197,6 +257,17 @@ def bindArgs (args : Array (TSyntax `term)) (mk : Array Ident → MacroM (TSynta
 /-- A macro-scoped identifier, for a name the expansion binds but the writer never sees. -/
 def freshId (base : String) : MacroM Ident := do
   return mkIdent (← MonadQuotation.addMacroScope (Name.mkSimple base))
+
+/-- A record field's name. -/
+def recFieldName (field : Syntax) : String := field[0].getId.toString
+
+/-- A record field's stated sort, if it states one. -/
+def recFieldSrt? (field : Syntax) : Option (TSyntax `term) :=
+  if field.getKind == ``smtRecFieldOf then some ⟨field[2]⟩ else Option.none
+
+/-- A record field's term. -/
+def recFieldTerm (field : Syntax) : Syntax :=
+  if field.getKind == ``smtRecFieldOf then field[4] else field[2]
 
 /-- The name a pattern variable binds. -/
 def patBinderName (arg : Syntax) : Name :=
@@ -278,7 +349,66 @@ partial def expandSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) :=
     match id.getId with
     | `true => `($(layer.op `mkTrue))
     | `false => `($(layer.op `mkFalse))
-    | _ => `(pure $id)
+    | _ =>
+      -- `r.a` is one token, so whether this is a name or a name with fields read off it is a
+      -- question about what is in scope — which a macro cannot ask. The elaborator below can.
+      if layer == Layer.untyped then `(smtProjU% $id) else `(smtProjT% $id)
+  | ``smtRecord =>
+    let fields := stx[1].getSepArgs
+    let names := fields.map fun field => Syntax.mkStrLit (recFieldName field)
+    let terms ← fields.mapM fun field => expandSmt layer (recFieldTerm field)
+    if layer == Layer.untyped then
+      -- a field's sort is the one stated, or the one its term turns out to have
+      bindArgs terms fun ids => do
+        let mut args := #[]
+        for i in [0 : fields.size] do
+          let srt ← match recFieldSrt? fields[i]! with
+            | some srt => `(some ($srt : $(mkIdent `Cvc.Srt)))
+            | Option.none => `(Option.none)
+          args := args.push (← `(($(names[i]!), $srt, $(ids[i]!))))
+        `($(layer.op `mkRecordFrom) #[$args,*])
+    else
+      -- typed, the index carries every field's sort, so a stated one is checked against it and
+      -- the spine is what says which record this is
+      let checked ← fields.mapIdxM fun i field =>
+        match recFieldSrt? field with
+        | some srt =>
+          `($(terms[i]!) >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+        | Option.none => pure terms[i]!
+      bindArgs checked fun ids => do
+        let last := ids.size - 1
+        let mut spine ← `($(layer.name `Fields.last) $(names[last]!) $(ids[last]!))
+        for i in [0 : last] do
+          let j := last - 1 - i
+          spine ← `($(layer.name `Fields.cons) $(names[j]!) $(ids[j]!) $spine)
+        `($(layer.op `mkRecord) $spine)
+  | ``smtProj | ``smtPipeProj =>
+    let head ← expandSmt layer stx[0]
+    let field := Syntax.mkStrLit stx[2].getId.toString
+    bindArgs #[head] fun ids => `($(layer.op `recordGet) $(ids[0]!) $field)
+  | ``smtWith =>
+    let fields := stx[3].getSepArgs
+    -- a field named twice would silently overwrite, so it is reported where it is written
+    let mut seen : Array String := #[]
+    for field in fields do
+      let name := recFieldName field
+      if seen.contains name then
+        Macro.throwErrorAt field s!"record update names field `{name}` more than once"
+      seen := seen.push name
+    let names := fields.map fun field => Syntax.mkStrLit (recFieldName field)
+    let record ← expandSmt layer stx[1]
+    let values ← fields.mapIdxM fun i field => do
+      let value ← expandSmt layer (recFieldTerm field)
+      match recFieldSrt? field with
+      | some srt =>
+        `($value >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+      | Option.none => pure value
+    bindArgs (#[record] ++ values) fun ids => do
+      let mut body ← `($(layer.op `recordSet) $(ids[0]!) $(names[0]!) $(ids[1]!))
+      for i in [1 : fields.size] do
+        let acc ← freshId "smtRecAcc"
+        body ← `($body >>= fun $acc => $(layer.op `recordSet) $acc $(names[i]!) $(ids[i + 1]!))
+      return body
   | ``smtIte =>
     let fn := layer.op `ite
     let args ← #[stx[1], stx[3], stx[5]].mapM (expandSmt layer)
@@ -404,7 +534,7 @@ partial def expandMatchAlt (layer : Layer) (scrutId : Ident) (alt : Syntax)
         if pats.isEmpty
         then `($body >>= fun $bodyId => $acc)
         else `((fun $binders* => $body) $bvTerms* >>= fun $bodyId => $acc)
-      acc ← `($(layer.op `applyConstructor) $ctorTermId #[ $bvTerms,* ] >>= fun $patId => $acc)
+      acc ← `($(layer.op `applyCtor) $ctorTermId #[ $bvTerms,* ] >>= fun $patId => $acc)
       acc ← `(($ctorId).getTerm >>= fun $ctorTermId => $acc)
       for idx in [0 : pats.size] do
         let jdx := pats.size - 1 - idx
@@ -420,3 +550,69 @@ end
 macro_rules
   | `(smtU! $t:smtTerm) => expandSmt .untyped t
   | `(smtT! $t:smtTerm) => expandSmt .typed t
+
+
+
+/-! ## Reading fields off an identifier
+
+`r.a` reaches the expander as a *single* identifier token, so whether it names something or reads
+field `a` off `r` is a question about what is in scope. A macro cannot ask it — `MacroM` can resolve
+global names but cannot see the local context — so the identifier leaf expands to a node with the
+elaborator below, and everything else in the DSL stays a macro.
+
+Resolution follows Lean's own order: a **local** head wins first, then the longest prefix that
+resolves as a name, and what is left over are fields. So `r.a` reads a field off a local `r` even
+where a constant `r.a` exists, and `Foo.bar.a` reads one off the constant `Foo.bar`.
+
+An identifier carrying macro scopes is never taken apart: it stands for one binding a macro
+introduced, and its components are not a path a user wrote.
+-/
+
+/-- The head and the fields read off it, following Lean's resolution order. -/
+private def splitProj (id : Ident) : Lean.Elab.TermElabM (Name × List Name) := do
+  let name := id.getId
+  if name.hasMacroScopes then
+    return (name, [])
+  let comps := name.components
+  -- a local head wins, as in Lean
+  if let some head := comps.head? then
+    if ((← getLCtx).findFromUserName? head).isSome then
+      return (head, comps.drop 1)
+  -- otherwise the longest prefix that resolves
+  for drop in [0 : comps.length] do
+    let keep := comps.length - drop
+    let head := (comps.take keep).foldl (· ++ ·) Name.anonymous
+    if (← Lean.Elab.Term.resolveId? (mkIdentFrom id head)).isSome then
+      return (head, comps.drop keep)
+  Lean.throwErrorAt id s!"unknown identifier `{name}`"
+
+/-- Elaborates an identifier of `layer`, reading off whatever fields it names. -/
+private def elabSmtProj (layer : Layer) (id : Ident) (expected? : Option Lean.Expr)
+: Lean.Elab.TermElabM Lean.Expr := do
+  let (head, fields) ← splitProj id
+  -- with no fields this *is* the identifier as written, and passing it through unchanged is what
+  -- keeps its use visible: a rebuilt identifier is not one the unused-variable linter counts
+  if fields.isEmpty then
+    return ← Lean.Elab.Term.elabTerm (← `(pure $id)) expected?
+  -- `identComponents` splits the identifier at its own source ranges, which is what Lean's dot
+  -- notation uses and what keeps the head a *reference* the unused-variable linter can see. A
+  -- rebuilt identifier spanning the whole path is not one
+  let headStx : Ident :=
+    match id.raw.identComponents (nFields? := some fields.length) with
+    | head :: _ => ⟨head⟩
+    | [] => mkIdentFrom id head (canonical := true)
+  let mut body ← `(pure $headStx)
+  for field in fields do
+    -- the binder is hygienic, quotations in `TermElabM` adding macro scopes of their own
+    body ← `($body >>= fun arg => $(layer.op `recordGet) arg $(Syntax.mkStrLit field.toString))
+  Lean.Elab.Term.elabTerm body expected?
+
+/-- Elaborates a sort-erased identifier, reading off whatever fields it names. -/
+@[term_elab smtProjU] def elabSmtProjU : Lean.Elab.Term.TermElab := fun stx expected? => do
+  let `(smtProjU% $id) := stx | Lean.Elab.throwUnsupportedSyntax
+  elabSmtProj .untyped id expected?
+
+/-- Elaborates a typed identifier, reading off whatever fields it names. -/
+@[term_elab smtProjT] def elabSmtProjT : Lean.Elab.Term.TermElab := fun stx expected? => do
+  let `(smtProjT% $id) := stx | Lean.Elab.throwUnsupportedSyntax
+  elabSmtProj .typed id expected?
