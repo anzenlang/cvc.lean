@@ -19,7 +19,7 @@ public import Cvc.Srt
 public import Cvc.Logic
 public import Cvc.Untyped.Core.Value
 public import Cvc.Untyped.BVar
-public import Cvc.Untyped.Mode
+public import Cvc.Gen.SolverMode
 
 
 
@@ -63,31 +63,31 @@ sat-only block cannot smuggle in a query that would invalidate the very answer i
 `env_gen%` comes from `Cvc/Untyped/Mode.lean`; the private lift it generates is private to
 *this* module, which is what lets `checkSat` below enter these monads and nothing else.
 -/
-section variable [Ω] [Monad m]
+namespace Solver variable [Ω] [Monad m]
 
 
 /-- Code running where the solver last answered sat. -/
-structure EnvSatT [Ω] (m : Type → Type) (α : Type) where
+structure EnvSatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvSatT / EnvSat
 
 /-- Code running where the solver last answered unsat. -/
-structure EnvUnsatT (m : Type → Type) (α : Type) where
+structure EnvUnsatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvUnsatT / EnvUnsat
 
 /-- Code running where the solver last answered unknown. -/
-structure EnvUnknownT (m : Type → Type) (α : Type) where
+structure EnvUnknownT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvUnknownT / EnvUnknown
 
-end
+end Solver
 
 
 
@@ -241,14 +241,14 @@ private def unexpectedResult (badResDesc : String) (dumpAssertions : Bool)
       msg := msg ++ "\n```"
   throwUser msg
 
-variable (e : Unknown.Explanation) (dumpAssertions : Bool := false)
+variable {s : Solver} (e : Unknown.Explanation) (dumpAssertions : Bool := false)
 
 /-- Fails because sat was unexpected, showing the assertions if `dumpAssertions`. -/
-def unexpectedSat : EnvSat α := s.unexpectedResult "sat" dumpAssertions
+def unexpectedSat : s.EnvSat α := s.unexpectedResult "sat" dumpAssertions
 /-- Fails because unsat was unexpected, showing the assertions if `dumpAssertions`. -/
-def unexpectedUnsat : EnvUnsat α := s.unexpectedResult "unsat" dumpAssertions
+def unexpectedUnsat : s.EnvUnsat α := s.unexpectedResult "unsat" dumpAssertions
 /-- Fails because unknown was unexpected, showing the assertions if `dumpAssertions`. -/
-def unexpectedUnknown : EnvUnknown α :=
+def unexpectedUnknown : s.EnvUnknown α :=
   s.unexpectedResult "unknown" dumpAssertions (explanation := toString e)
 
 end unexpected
@@ -363,9 +363,9 @@ def checkIsSat : Env Bool := do (← s.checkSatResult assuming).isSat
 
 @[inherit_doc checkSatResult]
 def checkSat
-  (ifSat : EnvSatT m α := s.unexpectedSat)
-  (ifUnsat : EnvUnsatT m α := s.unexpectedUnsat)
-  (ifUnknown : Unknown.Explanation → EnvUnknownT m α := liftM ∘ s.unexpectedUnknown)
+  (ifSat : s.EnvSatT m α := s.unexpectedSat)
+  (ifUnsat : s.EnvUnsatT m α := s.unexpectedUnsat)
+  (ifUnknown : Unknown.Explanation → s.EnvUnknownT m α := liftM ∘ s.unexpectedUnknown)
 : EnvT m α := do
   match ← s.checkIsSat? (assuming := assuming) with
   | .inl true => ifSat.toEnv
@@ -374,9 +374,9 @@ def checkSat
 
 @[inherit_doc checkSatResult]
 def checkSat? {α : Type} (s : Solver) (assuming : Option Terms := none)
-  (ifSat : EnvSatT m (Option α) := return none)
-  (ifUnsat : EnvUnsatT m (Option α) := return none)
-  (ifUnknown : Unknown.Explanation → EnvUnknownT m (Option α) := liftM ∘ s.unexpectedUnknown)
+  (ifSat : s.EnvSatT m (Option α) := return none)
+  (ifUnsat : s.EnvUnsatT m (Option α) := return none)
+  (ifUnknown : Unknown.Explanation → s.EnvUnknownT m (Option α) := liftM ∘ s.unexpectedUnknown)
 : EnvT m (Option α) :=
   s.checkSat assuming ifSat ifUnsat ifUnknown
 
@@ -387,37 +387,37 @@ end check_sat
 /-! ### Where the answer was sat -/
 
 @[inherit_doc S.getValue]
-def getValue (term : Term) : EnvSat Term := runUnsafe' do s.toUnsafe.getValue term
+def getValue (term : Term) : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValue term
 
 @[inherit_doc S.getValues]
-def getValues (terms : Terms) : EnvSat Terms := runUnsafe' do s.toUnsafe.getValues terms
+def getValues (terms : Terms) : s.EnvSat Terms := runUnsafe' do s.toUnsafe.getValues terms
 
 /-- The value the model gives a term, as the Lean value `α` denotes. -/
-def getValueAs (α : Type) [TermToValue α] (term : Term) : EnvSat α := do
+def getValueAs (α : Type) [TermToValue α] (term : Term) : s.EnvSat α := do
   Term.getValue (α := α) (← s.getValue term)
 
 /-- The values the model gives some terms, as the Lean values `α` denotes. -/
-def getValuesAs (α : Type) [TermToValue α] (terms : Terms) : EnvSat (Array α) := do
-  (← s.getValues terms).mapM fun value => (Term.getValue value : EnvSat α)
+def getValuesAs (α : Type) [TermToValue α] (terms : Terms) : s.EnvSat (Array α) := do
+  (← s.getValues terms).mapM fun value => (Term.getValue value : s.EnvSat α)
 
 @[inherit_doc S.getModelDomainElements]
-def getModelDomainElements (sort : Srt) : EnvSat Terms :=
+def getModelDomainElements (sort : Srt) : s.EnvSat Terms :=
   runUnsafe' do s.toUnsafe.getModelDomainElements sort
 
 @[inherit_doc S.isModelCoreSymbol]
-def isModelCoreSymbol (term : Term) : EnvSat Bool :=
+def isModelCoreSymbol (term : Term) : s.EnvSat Bool :=
   runUnsafe' do s.toUnsafe.isModelCoreSymbol term
 
 @[inherit_doc S.getModel]
-def getModelAsString (sorts : Srts) (consts : Terms) : EnvSat String :=
+def getModelAsString (sorts : Srts) (consts : Terms) : s.EnvSat String :=
   runUnsafe' do s.toUnsafe.getModel sorts consts
 
 @[inherit_doc S.blockModel]
-def blockModel (mode : Model.BlockMode) : EnvSat Unit :=
+def blockModel (mode : Model.BlockMode) : s.EnvSat Unit :=
   runUnsafe' do s.toUnsafe.blockModel mode.toUnsafe
 
 @[inherit_doc S.blockModelValues]
-def blockModelValues (terms : Terms) : EnvSat Unit :=
+def blockModelValues (terms : Terms) : s.EnvSat Unit :=
   runUnsafe' do s.toUnsafe.blockModelValues terms
 
 
@@ -425,16 +425,16 @@ def blockModelValues (terms : Terms) : EnvSat Unit :=
 /-! ### Where the answer was unsat -/
 
 @[inherit_doc S.getUnsatAssumptions]
-def getUnsatAssumptions : EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatAssumptions
+def getUnsatAssumptions : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatAssumptions
 
 @[inherit_doc S.getUnsatCore]
-def getUnsatCore : EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCore
+def getUnsatCore : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCore
 
 @[inherit_doc S.getUnsatCoreLemmas]
-def getUnsatCoreLemmas : EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCoreLemmas
+def getUnsatCoreLemmas : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCoreLemmas
 
 @[inherit_doc S.getProof]
-def getUnsatProof (pc : Proof.Component := .full) : EnvUnsat (s.Proofs pc) :=
+def getUnsatProof (pc : Proof.Component := .full) : s.EnvUnsat (s.Proofs pc) :=
   runUnsafe' do s.toUnsafe.getProof pc.toUnsafe
 
 
@@ -442,12 +442,12 @@ def getUnsatProof (pc : Proof.Component := .full) : EnvUnsat (s.Proofs pc) :=
 /-! ### Where the answer was unknown -/
 
 @[inherit_doc S.getTimeoutCore]
-def getTimeoutCore : EnvUnknown (Result × Terms) := runUnsafe' do
+def getTimeoutCore : s.EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCore
   return (Result.ofUnsafe res, terms)
 
 @[inherit_doc S.getTimeoutCoreAssuming]
-def getTimeoutCoreAssuming (assumptions : Terms) : EnvUnknown (Result × Terms) := runUnsafe' do
+def getTimeoutCoreAssuming (assumptions : Terms) : s.EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCoreAssuming assumptions
   return (Result.ofUnsafe res, terms)
 

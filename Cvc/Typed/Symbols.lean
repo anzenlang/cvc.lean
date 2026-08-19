@@ -56,7 +56,7 @@ def Idents.declareIn (idents : S.Idents) (solver : Solver) : Env S.Terms :=
 def Idents.declare (idents : S.Idents) : Env S.Terms :=
   S.mapM idents Term.mkSymbol
 
-def Terms.getValues (terms : S.Terms) (solver : Solver) : EnvSat S.Values :=
+def Terms.getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values :=
   S.mapM terms solver.getValue
 
 end Sig

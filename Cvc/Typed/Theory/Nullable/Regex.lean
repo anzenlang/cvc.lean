@@ -14,7 +14,6 @@ import all Cvc.Typed.Core.Defs
 public import Cvc.Untyped.Theory.Nullable.Regex
 public import Cvc.Typed.Theory.Regex
 public import Cvc.Typed.Theory.Nullable.Defs
-public import Cvc.Gen
 public import Cvc.Spec.Regex
 
 

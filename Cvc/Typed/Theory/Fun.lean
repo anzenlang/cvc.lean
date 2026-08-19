@@ -14,7 +14,6 @@ import all Cvc.Typed.Core.Defs
 public import Cvc.Untyped.Theory.Fun
 public import Cvc.Typed.Core.Defs
 public import Cvc.Ext
-public import Cvc.Gen
 public import Cvc.Spec.Fun
 
 

@@ -13,7 +13,7 @@ import all Cvc.Typed.Core.Defs
 
 public import Cvc.Untyped.Theory.Seq
 public import Cvc.Typed.Core.Value
-public import Cvc.Gen
+public import Cvc.Gen.Term
 public import Cvc.Spec.Seq
 
 

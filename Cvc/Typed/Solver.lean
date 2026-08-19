@@ -53,9 +53,20 @@ abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (S
 /-- What a check-sat answered. -/
 abbrev Result := Cvc.Untyped.Solver.Result
 
-export Cvc.Untyped (EnvSatT EnvSat EnvUnsatT EnvUnsat EnvUnknownT EnvUnknown)
-
 namespace Solver variable [Ω]
+
+section variable (s : Solver) open Cvc.Untyped renaming Solver → S
+
+@[inherit_doc S.EnvSatT] abbrev EnvSatT := S.EnvSatT s
+@[inherit_doc S.EnvSat] abbrev EnvSat := S.EnvSat s
+@[inherit_doc S.EnvUnsatT] abbrev EnvUnsatT := S.EnvUnsatT s
+@[inherit_doc S.EnvUnsat] abbrev EnvUnsat := S.EnvUnsat s
+@[inherit_doc S.EnvUnknownT] abbrev EnvUnknownT := S.EnvUnknownT s
+@[inherit_doc S.EnvUnknown] abbrev EnvUnknown := S.EnvUnknown s
+
+export Cvc.Untyped.Solver (EnvSatT EnvSat EnvUnsatT EnvUnsat EnvUnknownT EnvUnknown)
+
+
 
 /-- Creates a new solver. -/
 def new : Env Solver := Cvc.Untyped.Solver.new
@@ -177,18 +188,18 @@ def checkIsSat : Env Bool := U.checkIsSat s assuming
 
 @[inherit_doc U.checkSat]
 def checkSat
-  (ifSat : EnvSatT m α := s.unexpectedSat)
-  (ifUnsat : EnvUnsatT m α := s.unexpectedUnsat)
-  (ifUnknown : Unknown.Explanation → EnvUnknownT m α := liftM ∘ s.unexpectedUnknown)
+  (ifSat : s.EnvSatT m α := s.unexpectedSat)
+  (ifUnsat : s.EnvUnsatT m α := s.unexpectedUnsat)
+  (ifUnknown : Unknown.Explanation → s.EnvUnknownT m α := liftM ∘ s.unexpectedUnknown)
 : EnvT m α :=
   U.checkSat s assuming ifSat ifUnsat ifUnknown
 
 @[inherit_doc U.checkSat]
 def checkSat? {α : Type} (s : Solver)
   (assuming : Option (Terms Bool) := none)
-  (ifSat : EnvSatT m (Option α) := return none)
-  (ifUnsat : EnvUnsatT m (Option α) := return none)
-  (ifUnknown : Unknown.Explanation → EnvUnknownT m (Option α) := liftM ∘ s.unexpectedUnknown)
+  (ifSat : s.EnvSatT m (Option α) := return none)
+  (ifUnsat : s.EnvUnsatT m (Option α) := return none)
+  (ifUnknown : Unknown.Explanation → s.EnvUnknownT m (Option α) := liftM ∘ s.unexpectedUnknown)
 : EnvT m (Option α) :=
   U.checkSat? s assuming ifSat ifUnsat ifUnknown
 
@@ -202,23 +213,23 @@ Reading a value comes in two flavours: as a term still, or converted to the Lean
 describes.
 -/
 
-def% getValueTerm : (s : Solver) → (term : Term α) → EnvSat (Term α) ← getValue
-def% getValueTerms : (s : Solver) → (terms : Terms α) → EnvSat (Terms α) ← getValues
-def% isModelCoreSymbol : (s : Solver) → (term : Term α) → EnvSat Bool ← isModelCoreSymbol
-def% blockModelValues : (s : Solver) → (terms : Terms α) → EnvSat Unit ← blockModelValues
+def% getValueTerm : (s : Solver) → (term : Term α) → s.EnvSat (Term α) ← getValue
+def% getValueTerms : (s : Solver) → (terms : Terms α) → s.EnvSat (Terms α) ← getValues
+def% isModelCoreSymbol : (s : Solver) → (term : Term α) → s.EnvSat Bool ← isModelCoreSymbol
+def% blockModelValues : (s : Solver) → (terms : Terms α) → s.EnvSat Unit ← blockModelValues
 
 /-- The value the model gives a term, as the Lean value its index describes. -/
-def getValue [TermToValue α] (term : Term α) : EnvSat α := do
+def getValue [TermToValue α] (term : Term α) : s.EnvSat α := do
   let value ← s.getValueTerm term
   Term.getValue value
 
 /-- The values the model gives some terms, as the Lean values their index describes. -/
-def getValues [TermToValue α] (terms : Terms α) : EnvSat (Array α) := do
+def getValues [TermToValue α] (terms : Terms α) : s.EnvSat (Array α) := do
   let values ← s.getValueTerms terms
-  values.mapM fun value => (Term.getValue value : EnvSat α)
+  values.mapM fun value => (Term.getValue value : s.EnvSat α)
 
 /-- The elements the model gives an uninterpreted sort. -/
-def getModelDomainElements (α : Type) [ToTyp α] : EnvSat (Terms α) := do
+def getModelDomainElements (α : Type) [ToTyp α] : s.EnvSat (Terms α) := do
   let srt ← (Srt.of α : Env Srt)
   U.getModelDomainElements s srt
 
@@ -226,9 +237,9 @@ def getModelDomainElements (α : Type) [ToTyp α] : EnvSat (Terms α) := do
 
 /-! ## Where the answer was unsat -/
 
-def% getUnsatAssumptions : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatAssumptions
-def% getUnsatCore : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatCore
-def% getUnsatCoreLemmas : (s : Solver) → EnvUnsat (Terms Bool) ← getUnsatCoreLemmas
+def% getUnsatAssumptions : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsatAssumptions
+def% getUnsatCore : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsatCore
+def% getUnsatCoreLemmas : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsatCoreLemmas
 
 /-- Written out rather than stated with `def%`, twice over: the component argument has a default,
 which eta-expansion would collapse, and the result has to be spelled at *this* layer's `Proofs`.
@@ -238,16 +249,16 @@ sort-erased one, so the body is the sort-erased function unchanged — but the t
 what dot notation resolves against, so a proof obtained here answers `Term Bool` from `getResult`
 where an inherited one would answer a sort-erased term.
 -/
-def getUnsatProof (pc : Proof.Component := Proof.Component.full) : EnvUnsat (s.Proofs pc) :=
+def getUnsatProof (pc : Proof.Component := Proof.Component.full) : s.EnvUnsat (s.Proofs pc) :=
   U.getUnsatProof s pc
 
 
 
 /-! ## Where the answer was unknown -/
 
-def% getTimeoutCore : (s : Solver) → EnvUnknown (Result × Terms Bool) ← getTimeoutCore
+def% getTimeoutCore : (s : Solver) → s.EnvUnknown (Result × Terms Bool) ← getTimeoutCore
 def% getTimeoutCoreAssuming :
-  (s : Solver) → (assumptions : Terms Bool) → EnvUnknown (Result × Terms Bool)
+  (s : Solver) → (assumptions : Terms Bool) → s.EnvUnknown (Result × Terms Bool)
 ← getTimeoutCoreAssuming
 
 end
@@ -282,5 +293,7 @@ def toStringFmt (fmt : Proof.Format := default) (valid : fmt = .no ∨ pc = .ful
   Untyped.Solver.Proof.toStringFmt p fmt valid
 
 end Proof
+
+end
 
 end Solver

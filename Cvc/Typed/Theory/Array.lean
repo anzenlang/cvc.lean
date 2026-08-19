@@ -14,7 +14,7 @@ import all Cvc.Typed.Core.Defs
 public import Cvc.Types.Array
 public import Cvc.Untyped.Theory.Array
 public import Cvc.Typed.Core.Value
-public import Cvc.Gen
+public import Cvc.Gen.Term
 public import Cvc.Spec.Array
 
 

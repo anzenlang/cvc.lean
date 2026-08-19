@@ -14,7 +14,7 @@ import all Cvc.Untyped.Core.Defs
 public import Cvc.Ext
 public meta import Cvc.Ext
 public import Cvc.Untyped.Core.Value
-public import Cvc.Gen
+public import Cvc.Gen.Term
 public import Cvc.Spec.Arith
 
 

@@ -15,7 +15,7 @@ public import Cvc.Ext
 public import Cvc.Untyped.Core.Value
 public import Cvc.Types.FiniteField
 public import Cvc.Srt
-public import Cvc.Gen
+public import Cvc.Gen.Term
 public import Cvc.Spec.FiniteField
 
 

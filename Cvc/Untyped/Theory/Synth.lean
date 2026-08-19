@@ -16,7 +16,7 @@ import all Cvc.Untyped.Solver
 
 public import Cvc.Basic
 public import Cvc.Basic.Env
-public import Cvc.Untyped.Mode
+public import Cvc.Gen.SolverMode
 public import Cvc.Untyped.Theory.Grammar
 
 
@@ -47,30 +47,30 @@ They are separate from the sat monads on purpose. `EnvUnknown` gates a *timeout 
 nothing to do with a synthesis check giving up, so reusing it would let one be asked for where it
 does not exist.
 -/
-section variable [Ω] [Monad m]
+namespace Solver variable [Ω] [Monad m]
 
 /-- Code running where the solver last found a synthesis solution. -/
-structure EnvSolvedT [Ω] (m : Type → Type) (α : Type) where
+structure EnvSolvedT [Ω] (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvSolvedT / EnvSolved
 
 /-- Code running where the solver last showed the synthesis conjecture has no solution. -/
-structure EnvUnsolvableT (m : Type → Type) (α : Type) where
+structure EnvUnsolvableT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvUnsolvableT / EnvUnsolvable
 
 /-- Code running where the solver last gave up on a synthesis conjecture. -/
-structure EnvSynthUnknownT (m : Type → Type) (α : Type) where
+structure EnvSynthUnknownT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvSynthUnknownT / EnvSynthUnknown
 
-end
+end Solver
 
 
 
@@ -190,11 +190,11 @@ private def unexpectedSynth (badResDesc : String) (dumpConstraints : Bool) : Env
 variable (dumpConstraints : Bool := false)
 
 /-- Fails because a solution was unexpected. -/
-def unexpectedSolved : EnvSolved α := s.unexpectedSynth "solved" dumpConstraints
+def unexpectedSolved : s.EnvSolved α := s.unexpectedSynth "solved" dumpConstraints
 /-- Fails because having no solution was unexpected. -/
-def unexpectedUnsolvable : EnvUnsolvable α := s.unexpectedSynth "unsolvable" dumpConstraints
+def unexpectedUnsolvable : s.EnvUnsolvable α := s.unexpectedSynth "unsolvable" dumpConstraints
 /-- Fails because the solver giving up was unexpected. -/
-def unexpectedSynthUnknown : EnvSynthUnknown α := s.unexpectedSynth "unknown" dumpConstraints
+def unexpectedSynthUnknown : s.EnvSynthUnknown α := s.unexpectedSynth "unknown" dumpConstraints
 
 end unexpected
 
@@ -216,9 +216,9 @@ def checkSynthNextResult : Env SynthResult :=
 
 @[inherit_doc checkSynthResult]
 def checkSynth
-  (ifSolved : EnvSolvedT m α := s.unexpectedSolved)
-  (ifUnsolvable : EnvUnsolvableT m α := s.unexpectedUnsolvable)
-  (ifUnknown : EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
+  (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
+  (ifUnsolvable : s.EnvUnsolvableT m α := s.unexpectedUnsolvable)
+  (ifUnknown : s.EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
 : EnvT m α := do
   match ← (← s.checkSynthResult).isSolved? with
   | some true => ifSolved.toEnv
@@ -231,10 +231,10 @@ Only where one was already found, which is what `EnvSolved` records; the answer 
 world, so this takes the same three branches `checkSynth` does.
 -/
 def checkSynthNext
-  (ifSolved : EnvSolvedT m α := s.unexpectedSolved)
-  (ifUnsolvable : EnvUnsolvableT m α := s.unexpectedUnsolvable)
-  (ifUnknown : EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
-: EnvSolvedT m α := .wrap do
+  (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
+  (ifUnsolvable : s.EnvUnsolvableT m α := s.unexpectedUnsolvable)
+  (ifUnknown : s.EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
+: s.EnvSolvedT m α := .wrap do
   match ← (← s.checkSynthNextResult).isSolved? with
   | some true => ifSolved.toEnv
   | some false => ifUnsolvable.toEnv
@@ -242,9 +242,9 @@ def checkSynthNext
 
 @[inherit_doc checkSynthResult]
 def checkSynth? {α : Type} (s : Solver)
-  (ifSolved : EnvSolvedT m (Option α) := return none)
-  (ifUnsolvable : EnvUnsolvableT m (Option α) := return none)
-  (ifUnknown : EnvSynthUnknownT m (Option α) := return none)
+  (ifSolved : s.EnvSolvedT m (Option α) := return none)
+  (ifUnsolvable : s.EnvUnsolvableT m (Option α) := return none)
+  (ifUnknown : s.EnvSynthUnknownT m (Option α) := return none)
 : EnvT m (Option α) :=
   s.checkSynth ifSolved ifUnsolvable ifUnknown
 
@@ -253,11 +253,11 @@ def checkSynth? {α : Type} (s : Solver)
 /-! ### Where a solution was found -/
 
 /-- The solution found for a synthesized function. -/
-def getSynthSolution (fn : Term) : EnvSolved Term :=
+def getSynthSolution (fn : Term) : s.EnvSolved Term :=
   runUnsafe' do s.toUnsafe.getSynthSolution fn
 
 @[inherit_doc getSynthSolution]
-def getSynthSolutions (fns : Terms) : EnvSolved Terms :=
+def getSynthSolutions (fns : Terms) : s.EnvSolved Terms :=
   runUnsafe' do s.toUnsafe.getSynthSolutions fns
 
 /-- Enumerates a term of interest, rather than solving a conjecture.

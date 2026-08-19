@@ -191,7 +191,7 @@ outside a solved branch does not typecheck.
 /-- error: Type mismatch
   s.getSynthSolution f
 has type
-  EnvSolved Term
+  s.EnvSolved Term
 but is expected to have type
   Env Term -/
 #guard_msgs in

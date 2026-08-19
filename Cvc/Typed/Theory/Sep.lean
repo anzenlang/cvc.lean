@@ -16,7 +16,6 @@ import all Cvc.Typed.Solver
 public import Cvc.Untyped.Theory.Sep
 public import Cvc.Typed.Solver
 public import Cvc.Ext
-public import Cvc.Gen
 public import Cvc.Spec.Sep
 
 
@@ -105,9 +104,9 @@ are `Term Bool` whatever the heap's indices — see the sort-erased module.
 -/
 
 @[inherit_doc U.getValueSepHeap]
-def getValueSepHeap : EnvSat (Term Bool) := U.getValueSepHeap s
+def getValueSepHeap : s.EnvSat (Term Bool) := U.getValueSepHeap s
 
 @[inherit_doc U.getValueSepNil]
-def getValueSepNil : EnvSat (Term Bool) := U.getValueSepNil s
+def getValueSepNil : s.EnvSat (Term Bool) := U.getValueSepNil s
 
 end Solver

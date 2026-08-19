@@ -84,7 +84,7 @@ section reaching
 variable (s : Solver) (ps : s.Proofs pc)
 
 /-- What `getUnsatProof` answers is this layer's array of proofs. -/
-example : EnvUnsat (s.Proofs .full) := s.getUnsatProof
+example : s.EnvUnsat (s.Proofs .full) := s.getUnsatProof
 /-- Taking one out of it keeps this layer's index — `for`, `map` and `getElem` all unfold the
 array, and an element type that named the sort-erased proof would surface there. -/
 example : Array (Term Bool) := ps.map (·.getResult)

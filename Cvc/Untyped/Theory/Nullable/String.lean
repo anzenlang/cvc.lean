@@ -14,7 +14,6 @@ import all Cvc.Untyped.Core.Defs
 -- wraps one, since a lifted operator's unit is nullable too
 public import Cvc.Untyped.Theory.String
 public import Cvc.Untyped.Theory.Nullable.Defs
-public import Cvc.Gen
 public import Cvc.Spec.String
 
 

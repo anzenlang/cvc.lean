@@ -15,7 +15,7 @@ public import Cvc.Untyped.Core.Bool
 public meta import Cvc.Ext
 public import Cvc.Typed.Core.Defs
 public import Cvc.Typed.Core.Value
-public import Cvc.Gen
+public import Cvc.Gen.Term
 public import Cvc.Spec.Bool
 
 

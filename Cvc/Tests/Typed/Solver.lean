@@ -165,7 +165,7 @@ variable [Ω]
 /-- info: @Untyped.Solver.assert : [inst : Ω] → Untyped.Solver → Untyped.Term → Env Unit -/
 #guard_msgs in #check @Cvc.Untyped.Solver.assert
 
-/-- info: @Solver.getUnsatCore : [inst : Ω] → Solver → EnvUnsat (Terms Bool) -/
+/-- info: @Solver.getUnsatCore : [inst : Ω] → (s : Solver) → s.EnvUnsat (Terms Bool) -/
 #guard_msgs in #check @Cvc.Typed.Solver.getUnsatCore
 
 end signatures

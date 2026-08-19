@@ -13,7 +13,6 @@ import all Cvc.Typed.Core.Defs
 
 public import Cvc.Untyped.Theory.BitVec
 public import Cvc.Typed.Core.Value
-public import Cvc.Gen
 public import Cvc.Spec.BitVec
 
 

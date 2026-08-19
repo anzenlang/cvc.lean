@@ -39,10 +39,14 @@ open Cvc renaming Untyped.Solver → U
 /-- The outcome of a synthesis check. -/
 abbrev SynthResult := Cvc.Untyped.SynthResult
 
--- the mode monads have to be *spelled* in the signatures below, so they are re-exported rather
--- than restated, exactly as the sat ones are
-export Cvc.Untyped
-  (EnvSolvedT EnvSolved EnvUnsolvableT EnvUnsolvable EnvSynthUnknownT EnvSynthUnknown)
+namespace Solver open Cvc.Untyped renaming Solver → S variable (s : Solver)
+@[inherit_doc S.EnvSolvedT] abbrev EnvSolvedT := S.EnvSolvedT s
+@[inherit_doc S.EnvSolved] abbrev EnvSolved := S.EnvSolved s
+@[inherit_doc S.EnvUnsolvableT] abbrev EnvUnsolvableT := S.EnvUnsolvableT s
+@[inherit_doc S.EnvUnsolvable] abbrev EnvUnsolvable := S.EnvUnsolvable s
+@[inherit_doc S.EnvSynthUnknownT] abbrev EnvSynthUnknownT := S.EnvSynthUnknownT s
+@[inherit_doc S.EnvSynthUnknown] abbrev EnvSynthUnknown := S.EnvSynthUnknown s
+end Solver
 
 namespace Solver variable [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 
@@ -107,25 +111,25 @@ def checkSynthNextResult : Env SynthResult := U.checkSynthNextResult s
 
 @[inherit_doc checkSynthResult]
 def checkSynth
-  (ifSolved : EnvSolvedT m α := s.unexpectedSolved)
-  (ifUnsolvable : EnvUnsolvableT m α := s.unexpectedUnsolvable)
-  (ifUnknown : EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
+  (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
+  (ifUnsolvable : s.EnvUnsolvableT m α := s.unexpectedUnsolvable)
+  (ifUnknown : s.EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
 : EnvT m α :=
   U.checkSynth s ifSolved ifUnsolvable ifUnknown
 
 @[inherit_doc U.checkSynthNext]
 def checkSynthNext
-  (ifSolved : EnvSolvedT m α := s.unexpectedSolved)
-  (ifUnsolvable : EnvUnsolvableT m α := s.unexpectedUnsolvable)
-  (ifUnknown : EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
-: EnvSolvedT m α :=
+  (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
+  (ifUnsolvable : s.EnvUnsolvableT m α := s.unexpectedUnsolvable)
+  (ifUnknown : s.EnvSynthUnknownT m α := s.unexpectedSynthUnknown)
+: s.EnvSolvedT m α :=
   U.checkSynthNext s ifSolved ifUnsolvable ifUnknown
 
 @[inherit_doc checkSynthResult]
 def checkSynth? {α : Type} (s : Solver)
-  (ifSolved : EnvSolvedT m (Option α) := return none)
-  (ifUnsolvable : EnvUnsolvableT m (Option α) := return none)
-  (ifUnknown : EnvSynthUnknownT m (Option α) := return none)
+  (ifSolved : s.EnvSolvedT m (Option α) := return none)
+  (ifUnsolvable : s.EnvUnsolvableT m (Option α) := return none)
+  (ifUnknown : s.EnvSynthUnknownT m (Option α) := return none)
 : EnvT m (Option α) :=
   U.checkSynth? s ifSolved ifUnsolvable ifUnknown
 
@@ -133,10 +137,10 @@ def checkSynth? {α : Type} (s : Solver)
 
 A solution has the signature of the function it solves for, so the index carries across.
 -/
-def getSynthSolution (fn : Term σ) : EnvSolved (Term σ) := U.getSynthSolution s fn
+def getSynthSolution (fn : Term σ) : s.EnvSolved (Term σ) := U.getSynthSolution s fn
 
 @[inherit_doc getSynthSolution]
-def getSynthSolutions (fns : Terms σ) : EnvSolved (Terms σ) := U.getSynthSolutions s fns
+def getSynthSolutions (fns : Terms σ) : s.EnvSolved (Terms σ) := U.getSynthSolutions s fns
 
 /-- Enumerates a term of interest, rather than solving a conjecture.
 

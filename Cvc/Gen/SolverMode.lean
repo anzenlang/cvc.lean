@@ -10,7 +10,7 @@ module
 public meta import Lean.Elab.Command
 
 public import Cvc.Basic
-public import Cvc.Basic.Env
+public import Cvc.Gen.Term
 
 
 
@@ -47,47 +47,51 @@ macro "env_gen% " envT:ident " / " env:ident : command =>
   let throwId := Lean.mkIdent `throw
   let tryCatchId := Lean.mkIdent `tryCatch
   let baseIOIdent := Lean.mkIdent ``BaseIO
+  let solverIdent := Lean.mkIdent `Solver
+  let envDocString := s!"Non-transformer `{envT}`."
+  let envDoc := Cvc.mkDocComment envDocString
   `(
-abbrev $env := $envT $baseIOIdent
+$envDoc:docComment
+abbrev $env (s : $solverIdent) := $envT s $baseIOIdent
 
-namespace $envT variable {α β : Type} {m : Type → Type} [Monad m]
+namespace $envT variable {α β : Type} {m : Type → Type} [Monad m] {s : $solverIdent}
 
-protected def $pureId (a : α) : $envT m α := ⟨return a⟩
-protected def $bindId (a : $envT m α) (f : α → $envT m β) : $envT m β :=
+protected def $pureId (a : α) : $envT s m α := ⟨return a⟩
+protected def $bindId (a : $envT s m α) (f : α → $envT s m β) : $envT s m β :=
   ⟨a.toEnv.bind (fun a => f a |>.toEnv)⟩
 
-instance [Monad m] : Monad ($envT m) where
+instance [Monad m] : Monad ($envT s m) where
   pure := .$pureId
   bind := .$bindId
 
-protected def $throwId (e : Error) : $envT m α := ⟨throw e⟩
-protected def $tryCatchId (code : $envT m α) (errorDo : Error → $envT m α) : $envT m α :=
+protected def $throwId (e : Error) : $envT s m α := ⟨throw e⟩
+protected def $tryCatchId (code : $envT s m α) (errorDo : Error → $envT s m α) : $envT s m α :=
   ⟨code.toEnv.tryCatch fun e => errorDo e |>.toEnv⟩
 
-instance : MonadExcept Error ($envT m) where
+instance : MonadExcept Error ($envT s m) where
   throw := .$throwId
   tryCatch := .$tryCatchId
 
-def transformLift (code : m α) : $envT m α := ⟨code⟩
+def transformLift (code : m α) : $envT s m α := ⟨code⟩
 
-instance : MonadLift m ($envT m) := ⟨transformLift⟩
+instance : MonadLift m ($envT s m) := ⟨transformLift⟩
 
-def liftIO [MonadLiftT BaseIO m] (ioCode : IO α) : $envT m α := .wrap ioCode
+def liftIO [MonadLiftT BaseIO m] (ioCode : IO α) : $envT s m α := .wrap ioCode
 
-instance [MonadLiftT BaseIO m] : MonadLift IO ($envT m) := ⟨liftIO⟩
+instance [MonadLiftT BaseIO m] : MonadLift IO ($envT s m) := ⟨liftIO⟩
 
 /-- Lifts `EnvT` code.
 
 Private on purpose: it would let a check-sat run inside a block that only holds because of an
 earlier answer.
 -/
-private def lift : EnvT m α → $envT m α := .wrap
+private def lift : EnvT m α → $envT s m α := .wrap
 
-private instance : MonadLift (EnvT m) ($envT m) := ⟨lift⟩
+private instance : MonadLift (EnvT m) ($envT s m) := ⟨lift⟩
 
-def liftMonadVersion [Monad m] [MonadLiftT BaseIO m] (code : $env α) : $envT m α :=
+def liftMonadVersion [Monad m] [MonadLiftT BaseIO m] (code : $env s α) : $envT s m α :=
   ⟨liftM code.toEnv⟩
-instance [Monad m] [MonadLiftT BaseIO m] : MonadLift $env ($envT m) := ⟨liftMonadVersion⟩
+instance [Monad m] [MonadLiftT BaseIO m] : MonadLift ($env s) ($envT s m) := ⟨liftMonadVersion⟩
 end $envT
   )
 

@@ -7,8 +7,8 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Core
 public import Cvc.Untyped.BVar
-public import Cvc.Untyped.Mode
+public import Cvc.Untyped.Core
 public import Cvc.Untyped.Solver
+public import Cvc.Untyped.Symbols
 public import Cvc.Untyped.Theory

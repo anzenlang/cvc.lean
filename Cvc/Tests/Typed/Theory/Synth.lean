@@ -102,7 +102,7 @@ variable [Ω] (s : Solver) (i : BVar Int) (b : BVar Bool) (nt : NT Int)
 
 example : Env (Term (Int → Int)) := s.synthFun "f" g
 -- and a solution can only be read where one was found, which is what `EnvSolved` records
-example : EnvSolved (Term (Int → Int)) := s.getSynthSolution f
+example : s.EnvSolved (Term (Int → Int)) := s.getSynthSolution f
 
 example : Env (Term Int) := s.synthAnyFun' "f" [] Int
 example : Env (Term (Int → Int)) := s.synthAnyFun' "f" (BVars.push i []) Int
@@ -111,7 +111,7 @@ example : Env (Term (Int → Bool → Int)) := s.synthAnyFun' "f" (BVars.push b 
 /-- info: @Solver.synthFun : [inst : Ω] → Solver → {σ : Type} → String → Typed.Grammar σ → Env (Term σ) -/
 #guard_msgs in #check @Cvc.Typed.Solver.synthFun
 
-/-- info: @Solver.getSynthSolution : [inst : Ω] → Solver → {σ : Type} → Term σ → EnvSolved (Term σ) -/
+/-- info: @Solver.getSynthSolution : [inst : Ω] → (s : Solver) → {σ : Type} → Term σ → s.EnvSolved (Term σ) -/
 #guard_msgs in #check @Cvc.Typed.Solver.getSynthSolution
 
 -- a constraint is a formula, so it takes `Term Bool` and nothing else

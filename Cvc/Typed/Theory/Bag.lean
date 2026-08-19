@@ -14,7 +14,6 @@ import all Cvc.Typed.Core.Defs
 public import Cvc.Types.Bag
 public import Cvc.Untyped.Theory.Bag
 public import Cvc.Typed.Core.Value
-public import Cvc.Gen
 public import Cvc.Spec.Bag
 
 

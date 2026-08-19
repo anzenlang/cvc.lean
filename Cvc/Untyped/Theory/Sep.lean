@@ -16,7 +16,6 @@ public import Cvc.Srt
 public import Cvc.Untyped.Core.Value
 public import Cvc.Untyped.Solver
 public import Cvc.Ext
-public import Cvc.Gen
 public import Cvc.Spec.Sep
 
 
@@ -63,7 +62,7 @@ end Term
 
 
 
-namespace Solver variable [Ω] open cvc5 renaming Solver → S
+namespace Solver variable [Ω] open cvc5 renaming Solver → S variable (s : Solver)
 
 /-- The heap of a solver, and the sorts it was declared at.
 
@@ -77,8 +76,6 @@ structure Heap (solver : Solver) where private mk ::
   /-- Sort of the data a location points to. -/
   data : Srt
 deriving BEq
-
-variable (s : Solver)
 
 /-- Declares the heap's location and data sorts, and answers the handle they are reached through.
 
@@ -130,9 +127,9 @@ otherwise. On a model of `(pto x v)` they give something like `(pto (as @Loc_1 L
 -/
 
 @[inherit_doc S.getValueSepHeap]
-def getValueSepHeap : EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepHeap
+def getValueSepHeap : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepHeap
 
 @[inherit_doc S.getValueSepNil]
-def getValueSepNil : EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepNil
+def getValueSepNil : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepNil
 
 end Solver
