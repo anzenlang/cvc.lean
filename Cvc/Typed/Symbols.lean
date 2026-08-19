@@ -7,7 +7,7 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.Core.Arith
+public import Cvc.Typed.Theory.Arith
 public import Cvc.Typed.Solver
 
 import all Cvc.Typed.Core.Defs

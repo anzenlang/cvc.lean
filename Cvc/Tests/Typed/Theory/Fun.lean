@@ -8,13 +8,11 @@ Authors: Adrien Champion
 module
 
 import Cvc.Typed.Theory.Fun
-import Cvc.Typed.Core.Arith
-import Cvc.Typed.Core.Bool
+import Cvc.Typed.Theory.Arith
 import Cvc.Typed.Solver
 
 public meta import Cvc.Typed.Theory.Fun
-public meta import Cvc.Typed.Core.Arith
-public meta import Cvc.Typed.Core.Bool
+public meta import Cvc.Typed.Theory.Arith
 public meta import Cvc.Typed.Solver
 
 

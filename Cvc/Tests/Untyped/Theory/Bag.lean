@@ -92,3 +92,25 @@ empty    : (as bag.empty (Bag Int))
 #guard_msgs in #eval Env.runIO do
   -- the *element* sort, as every constructor of a polymorphic sort takes
   println! "empty    : {← Srt.of Int >>= bagEmpty}"
+
+
+/-! # The `smt!` DSL, bag notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+bag union : (bag.union_disjoint s t)
+bag nary  : (bag.union_disjoint (bag.union_disjoint s t) s)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← mkSymbolAs (Cvc.Bag Int) "s"
+  let t ← mkSymbolAs (Cvc.Bag Int) "t"
+
+  -- `⊎` is multiset union, which is what `bagUnionDisjoint` is, and the only one of these with a
+  -- bracket form, its `op%` entry being the only `nary` one
+  println! "bag union : {← smt! s ⊎ t}"
+  println! "bag nary  : {← smt! ⊎[s, t, s]}"

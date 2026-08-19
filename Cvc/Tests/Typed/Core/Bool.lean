@@ -79,3 +79,58 @@ in `Tests/{Untyped,Typed}/BVar.lean`.
 /-- info: mkSymbol : x -/
 #guard_msgs in #eval Env.runIO do
   println! "mkSymbol : {← (mkSymbol "x" : Env (Cvc.Typed.Term Int))}"
+
+
+/-! # The `smt!` DSL, boolean notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+and      : (and a b)
+or       : (or a b)
+xor      : (xor a b)
+implies  : (=> a b)
+not      : (not a)
+equal    : (= i j)
+distinct : (distinct i j)
+nary and : (and a b a)
+nary eq  : (and (= i j) (= j i))
+bool lit : (and a true)
+ite      : (ite a i j)
+right-assoc ∧ : (and a (and b a))
+-/
+#guard_msgs in #eval Env.runIO do
+  let a ← mkSymbolAs Bool "a"
+  let b ← mkSymbolAs Bool "b"
+  let i ← mkSymbolAs Int "i"
+  let j ← mkSymbolAs Int "j"
+
+  println! "and      : {← smt! a ∧ b}"
+  println! "or       : {← smt! a ∨ b}"
+  println! "xor      : {← smt! a ⊻ b}"
+  println! "implies  : {← smt! a → b}"
+  println! "not      : {← smt! ¬ a}"
+  println! "equal    : {← smt! i = j}"
+  println! "distinct : {← smt! i ≠ j}"
+  println! "nary and : {← smt! ∧[a, b, a]}"
+  println! "nary eq  : {← smt! =[i, j, i]}"
+  println! "bool lit : {← smt! a ∧ true}"
+  println! "ite      : {← smt! if a then i else j}"
+  println! "right-assoc ∧ : {← smt! a ∧ b ∧ a}"
+
+section indices
+open Cvc.Typed
+variable [Ω] (a b : Term Bool) (i j : Term Int)
+
+/-- A connective stays at `Bool`. -/
+example : Env (Term Bool) := smt! a ∧ b
+/-- `ite` takes its index from its branches. -/
+example : Env (Term Int) := smt! if a then i else j
+/-- An n-ary equality over `Int` still lands in `Bool`. -/
+example : Env (Term Bool) := smt! =[i, j, i]
+
+end indices

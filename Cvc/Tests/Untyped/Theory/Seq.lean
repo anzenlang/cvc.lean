@@ -69,3 +69,23 @@ index and the sort-erased one is given directly.
 /-- info: mkEmptySeq : (as seq.empty (Seq Int)) -/
 #guard_msgs in #eval Env.runIO do
   println! "mkEmptySeq : {← Srt.of Int >>= mkEmptySeq}"
+
+
+/-! # The `smt!` DSL, sequence notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+seq concat: (seq.++ q r)
+concatN   : (seq.++ q r q)
+-/
+#guard_msgs in #eval Env.runIO do
+  let q ← mkSymbolAs (Array Int) "q"
+  let r ← mkSymbolAs (Array Int) "r"
+
+  println! "seq concat: {← smt! q ++ r}"
+  println! "concatN   : {← smt! ++[q, r, q]}"

@@ -10,4 +10,3 @@ module
 public import Cvc.Typed.Core.Defs
 public import Cvc.Typed.Core.Value
 public import Cvc.Typed.Core.Bool
-public import Cvc.Typed.Core.Arith

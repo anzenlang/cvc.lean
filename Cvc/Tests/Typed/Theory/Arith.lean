@@ -7,19 +7,19 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Core.Arith
-import Cvc.Untyped.Core.Bool
+import Cvc.Typed.Theory.Arith
+import Cvc.Typed.Core.Bool
 
-public meta import Cvc.Untyped.Core.Arith
-public meta import Cvc.Untyped.Core.Bool
+public meta import Cvc.Typed.Theory.Arith
+public meta import Cvc.Typed.Core.Bool
 
 
 
-/-! # Generated arithmetic constructors, sort-erased -/
-namespace Cvc.Tests.Untyped.Term.Arith
+/-! # Generated arithmetic constructors, typed -/
+namespace Cvc.Tests.Typed.Term.Arith
 
 open Cvc
-open Cvc.Untyped.Term
+open Cvc.Typed.Term
 
 /-! ## Arithmetic -/
 
@@ -40,9 +40,9 @@ toInt       : (to_int r)
 piand       : (piand i i j)
 -/
 #guard_msgs in #eval Env.runIO do
-  let i ← Cvc.Untyped.Term.mkSymbolAs (Int) "i"
-  let j ← Cvc.Untyped.Term.mkSymbolAs (Int) "j"
-  let r ← Cvc.Untyped.Term.mkSymbolAs (Rat) "r"
+  let i ← Cvc.Typed.Term.mkSymbolAs (Int) "i"
+  let j ← Cvc.Typed.Term.mkSymbolAs (Int) "j"
+  let r ← Cvc.Typed.Term.mkSymbolAs (Rat) "r"
 
   println! "realDiv     : {← realDiv r r}"
   println! "realDivTotal: {← realDivTotal r r}"
@@ -76,7 +76,7 @@ arcsecant   : (arcsec r)
 arccotangent: (arccot r)
 -/
 #guard_msgs in #eval Env.runIO do
-  let r ← Cvc.Untyped.Term.mkSymbolAs (Rat) "r"
+  let r ← Cvc.Typed.Term.mkSymbolAs (Rat) "r"
 
   println! "sine        : {← sine r}"
   println! "cosine      : {← cosine r}"
@@ -98,7 +98,7 @@ divisible   : ((_ divisible 3) i)
 iand        : ((_ iand 8) i i)
 -/
 #guard_msgs in #eval Env.runIO do
-  let i ← Cvc.Untyped.Term.mkSymbolAs (Int) "i"
+  let i ← Cvc.Typed.Term.mkSymbolAs (Int) "i"
 
   println! "divisible   : {← divisible 3 i}"
   println! "iand        : {← iand 8 i i}"
@@ -107,26 +107,16 @@ iand        : ((_ iand 8) i i)
 
 /-- info:
 add      : (+ i j)
-sub      : (- i j)
 mul      : (* i j)
-neg      : (- i)
-abs      : (abs i)
 lt       : (< i j)
-ge       : (>= i j)
-addN'    : (+ i j i)
 -/
 #guard_msgs in #eval Env.runIO do
-  let i ← Cvc.Untyped.Term.mkSymbolAs Int "i"
-  let j ← Cvc.Untyped.Term.mkSymbolAs Int "j"
+  let i ← Cvc.Typed.Term.mkSymbolAs Int "i"
+  let j ← Cvc.Typed.Term.mkSymbolAs Int "j"
 
   println! "add      : {← add i j}"
-  println! "sub      : {← sub i j}"
   println! "mul      : {← mul i j}"
-  println! "neg      : {← neg i}"
-  println! "abs      : {← abs i}"
   println! "lt       : {← lt i j}"
-  println! "ge       : {← ge i j}"
-  println! "addN'    : {← addN' #[i, j, i]}"
 
 
 /-! ## Predicates -/
@@ -136,10 +126,38 @@ isInt int : (is_int i)
 isInt rat : (is_int r)
 -/
 #guard_msgs in #eval Env.runIO do
-  let i ← Cvc.Untyped.Term.mkSymbolAs Int "i"
-  let r ← Cvc.Untyped.Term.mkSymbolAs Rat "r"
+  let i ← Cvc.Typed.Term.mkSymbolAs Int "i"
+  let r ← Cvc.Typed.Term.mkSymbolAs Rat "r"
   println! "isInt int : {← isInt i}"
   println! "isInt rat : {← isInt r}"
+
+/-! ## Operators shared with the connectives' block -/
+
+/-- info:
+neg int  : (- i)
+neg rat  : (- r)
+leN      : (and (<= i j) (<= j i))
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← Cvc.Typed.Term.mkSymbolAs Int "i"
+  let j ← Cvc.Typed.Term.mkSymbolAs Int "j"
+  let r ← Cvc.Typed.Term.mkSymbolAs Rat "r"
+
+  println! "neg int  : {← neg i}"
+  println! "neg rat  : {← neg r}"
+  println! "leN      : {← leN #[i, j, i]}"
+
+
+/-! ## Index discipline -/
+
+section indices
+open Cvc.Typed (Term)
+variable [Ω] (i j : Term Int)
+
+/-- A comparison lands in `Term Bool` whatever its arguments' index. -/
+example : Env (Term Bool) := lt i j
+
+end indices
 
 /-! ## Constants -/
 
@@ -160,3 +178,57 @@ mkRealOfStr  : (/ 1 2)
   println! "mkIntOfString: {← mkIntOfString "42"}"
   println! "mkReal       : {← mkReal (2/3 : Rat)}"
   println! "mkRealOfStr  : {← mkRealOfString "1/2"}"
+
+
+/-! # The `smt!` DSL, arithmetic notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+add      : (+ i j)
+prec     : (+ i (* j i))
+paren    : (* (+ i j) i)
+unary -  : (- i)
+literals : (+ 3 i)
+mod      : (mod i j)
+left-assoc - : (- (- i j) i)
+real     : (/ 3 2)
+exponent : (/ 3 2000)
+in expr  : (+ (/ 3 2) (/ 5 2))
+with sym : (< r (/ 3 2))
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← mkSymbolAs Int "i"
+  let j ← mkSymbolAs Int "j"
+  let r ← mkSymbolAs Rat "r"
+
+  println! "add      : {← smt! i + j}"
+  println! "prec     : {← smt! i + j * i}"
+  println! "paren    : {← smt! (i + j) * i}"
+  println! "unary -  : {← smt! - i}"
+  println! "literals : {← smt! 3 + i}"
+  println! "mod      : {← smt! i % j}"
+  println! "left-assoc - : {← smt! i - j - i}"
+  println! "real     : {← smt! 1.5}"
+  println! "exponent : {← smt! 1.5e-3}"
+  println! "in expr  : {← smt! 1.5 + 2.5}"
+  println! "with sym : {← smt! r < 1.5}"
+
+section indices
+open Cvc.Typed
+variable [Ω] (i j : Term Int) (r : Term Rat)
+
+/-- A comparison drops from `Int` to `Bool`. -/
+example : Env (Term Bool) := smt! i < j
+/-- Arithmetic stays at its operands' index. -/
+example : Env (Term Int) := smt! i + j * i
+/-- …including over the reals. -/
+example : Env (Term Rat) := smt! - r
+/-- A real literal lands at `Rat`, not at `Int`. -/
+example : Env (Term Rat) := smt! 1.5 + 2.5
+
+end indices

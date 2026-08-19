@@ -8,14 +8,12 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped.Theory.Fun
-import Cvc.Untyped.Core.Arith
-import Cvc.Untyped.Core.Bool
+import Cvc.Untyped.Theory.Arith
 import Cvc.Untyped.Solver
 
-public meta import Cvc.Untyped.Theory.Fun
-public meta import Cvc.Untyped.Core.Arith
-public meta import Cvc.Untyped.Core.Bool
-public meta import Cvc.Untyped.Solver
+meta import Cvc.Untyped.Theory.Fun
+meta import Cvc.Untyped.Theory.Arith
+meta import Cvc.Untyped.Solver
 
 
 

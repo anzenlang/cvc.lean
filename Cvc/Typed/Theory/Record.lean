@@ -15,6 +15,7 @@ import all Cvc.Typed.Core.Defs
 public import Cvc.Srt
 public import Cvc.Types.Record
 public import Cvc.Untyped.Theory.Record
+public meta import Cvc.Ext
 public import Cvc.Typed.Core.Value
 
 
@@ -209,3 +210,82 @@ instance [R : TermToValues fields] : TermToValue (Record fields) where
 
 instance [ToTypFields fields] [R : ValuesToTerm fields] : ValueToTerm (Record fields) where
   valueToTerm record := do mkRecordOfTerms (← R.toTerms record.values)
+
+
+
+public meta section
+
+open Lean
+
+/-! ## The DSL's record forms, typed
+
+The *syntax* is declared once, beside the sort-erased constructors, exactly as an operator's
+notation is — this layer imports it and adds only what its expansion differs in. Being the later
+module, these alternatives are tried first, and they decline anything that is not this layer.
+-/
+
+/-- Resolves a dotted identifier of the typed layer into a head and the fields read off it. -/
+syntax (name := smtProjT) "smtProjT% " ident : term
+
+/-! The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
+with the API a user opens.
+-/
+namespace Ext
+
+open Cvc.Ext
+
+/-- Elaborates a typed identifier, reading off whatever fields it names. -/
+@[term_elab smtProjT] def elabSmtProjT : Lean.Elab.Term.TermElab := fun stx expected? => do
+  let `(smtProjT% $id) := stx | Lean.Elab.throwUnsupportedSyntax
+  elabSmtProj .typed id expected?
+
+@[inherit_doc Cvc.Ext.expandSmt]
+macro_rules
+  | `(smtExpand% $l $t:smtTerm) => do
+    let layer := Layer.ofIdent l
+    unless layer == Layer.typed do Macro.throwUnsupported
+    let stx := t.raw
+    match stx.getKind with
+    | ``smtIdent =>
+      let id : Ident := ⟨stx[0]⟩
+      if id.getId == `true || id.getId == `false then Macro.throwUnsupported
+      `(smtProjT% $id)
+    | ``smtProj | ``smtPipeProj =>
+      let head ← deferSmt layer stx[0]
+      let field := Syntax.mkStrLit stx[2].getId.toString
+      bindArgs #[head] fun ids => `($(layer.op `recordGet) $(ids[0]!) $field)
+    | ``smtRecord =>
+      let fields := stx[1].getSepArgs
+      let names := fields.map fun field => Syntax.mkStrLit (recFieldName field)
+      let terms ← fields.mapM fun field => deferSmt layer (recFieldTerm field)
+      -- the index carries every field's sort, so a stated one is checked against it and the spine
+      -- is what says which record this is
+      let checked ← fields.mapIdxM fun i field =>
+        match recFieldSrt? field with
+        | some srt =>
+          `($(terms[i]!) >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+        | Option.none => pure terms[i]!
+      bindArgs checked fun ids => do
+        let last := ids.size - 1
+        let mut spine ← `($(layer.name `Fields.last) $(names[last]!) $(ids[last]!))
+        for i in [0 : last] do
+          let j := last - 1 - i
+          spine ← `($(layer.name `Fields.cons) $(names[j]!) $(ids[j]!) $spine)
+        `($(layer.op `mkRecord) $spine)
+    | ``smtWith =>
+      let fields := stx[3].getSepArgs
+      recCheckDistinct fields
+      let names := fields.map fun field => Syntax.mkStrLit (recFieldName field)
+      let record ← deferSmt layer stx[1]
+      let values ← fields.mapIdxM fun i field => do
+        let value ← deferSmt layer (recFieldTerm field)
+        match recFieldSrt? field with
+        | some srt =>
+          `($value >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+        | Option.none => pure value
+      recUpdate layer names values record
+    | _ => Macro.throwUnsupported
+
+end Ext
+
+end

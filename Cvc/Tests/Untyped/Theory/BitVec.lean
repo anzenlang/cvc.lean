@@ -154,3 +154,34 @@ three   : (@from_bools a b c)
   println! "one bit : {← bvFromBool a}"
   println! "two     : {← bvFromBools #[a, b]}"
   println! "three   : {← bvFromBools #[a, b, c]}"
+
+
+/-! # The `smt!` DSL, bit-vector notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+bv and      : (bvand u v)
+bv or       : (bvor u v)
+bv xor      : (bvxor u v)
+bv shl      : (bvshl u v)
+bv lshr     : (bvlshr u v)
+||| under &&&: (bvor u (bvand v u))
+&&& under <<<: (bvand u (bvshl v u))
+-/
+#guard_msgs in #eval Env.runIO do
+  let u ← mkSymbolAs (BitVec 4) "u"
+  let v ← mkSymbolAs (BitVec 4) "v"
+
+  -- the five carry the symbols Lean gives the same operations, at Lean's own precedences
+  println! "bv and      : {← smt! u &&& v}"
+  println! "bv or       : {← smt! u ||| v}"
+  println! "bv xor      : {← smt! u ^^^ v}"
+  println! "bv shl      : {← smt! u <<< v}"
+  println! "bv lshr     : {← smt! u >>> v}"
+  println! "||| under &&&: {← smt! u ||| v &&& u}"
+  println! "&&& under <<<: {← smt! u &&& v <<< u}"

@@ -9,11 +9,11 @@ module
 
 import Cvc.Typed.Theory.Array
 import Cvc.Typed.Core.Bool
-import Cvc.Typed.Core.Arith
+import Cvc.Typed.Theory.Arith
 
-public meta import Cvc.Typed.Theory.Array
-public meta import Cvc.Typed.Core.Bool
-public meta import Cvc.Typed.Core.Arith
+meta import Cvc.Typed.Theory.Array
+meta import Cvc.Typed.Core.Bool
+meta import Cvc.Typed.Theory.Arith
 
 
 

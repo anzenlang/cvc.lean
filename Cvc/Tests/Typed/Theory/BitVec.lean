@@ -172,3 +172,42 @@ example : Env (Term (BitVec 3)) := bvFromBools #[a, b, c]
 example : Env (Term (BitVec 2)) := bvFromBools #[a, b]
 
 end arity
+
+
+/-! # The `smt!` DSL, bit-vector notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+bv and      : (bvand u v)
+bv or       : (bvor u v)
+bv xor      : (bvxor u v)
+bv shl      : (bvshl u v)
+bv lshr     : (bvlshr u v)
+||| under &&&: (bvor u (bvand v u))
+-/
+#guard_msgs in #eval Env.runIO do
+  let u ← mkSymbolAs (BitVec 4) "u"
+  let v ← mkSymbolAs (BitVec 4) "v"
+
+  println! "bv and      : {← smt! u &&& v}"
+  println! "bv or       : {← smt! u ||| v}"
+  println! "bv xor      : {← smt! u ^^^ v}"
+  println! "bv shl      : {← smt! u <<< v}"
+  println! "bv lshr     : {← smt! u >>> v}"
+  println! "||| under &&&: {← smt! u ||| v &&& u}"
+
+section indices
+open Cvc.Typed
+variable [Ω] (u v : Term (BitVec 4))
+
+/-- The bit-vector notations keep the width. -/
+example : Env (Term (BitVec 4)) := smt! u &&& v <<< u
+/-- Escaping keeps whatever index the Lean term has. -/
+example : Env (Term (BitVec 4)) := smt! ![Cvc.Typed.Term.bvAdd u v]
+
+end indices

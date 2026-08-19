@@ -89,3 +89,34 @@ universe : (as set.universe (Set Int))
 #guard_msgs in #eval Env.runIO do
   println! "empty    : {← (setEmpty : Env (Cvc.Typed.Term (Cvc.Set Int)))}"
   println! "universe : {← (setUniverse : Env (Cvc.Typed.Term (Cvc.Set Int)))}"
+
+
+/-! # The `smt!` DSL, set notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+member    : (set.member i s)
+subset    : (set.subset s t)
+union     : (set.union s t)
+inter     : (set.inter s t)
+minus     : (set.minus s t)
+unionN    : (set.union (set.union s t) s)
+mixed     : (and (set.member i s) (set.subset s t))
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← mkSymbolAs Int "i"
+  let s ← mkSymbolAs (Cvc.Set Int) "s"
+  let t ← mkSymbolAs (Cvc.Set Int) "t"
+
+  println! "member    : {← smt! i ∈ s}"
+  println! "subset    : {← smt! s ⊆ t}"
+  println! "union     : {← smt! s ∪ t}"
+  println! "inter     : {← smt! s ∩ t}"
+  println! "minus     : {← smt! s ∖ t}"
+  println! "unionN    : {← smt! ∪[s, t, s]}"
+  println! "mixed     : {← smt! (i ∈ s) ∧ (s ⊆ t)}"

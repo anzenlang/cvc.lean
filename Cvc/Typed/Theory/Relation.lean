@@ -17,7 +17,7 @@ import all Cvc.Types.Relation
 public import Cvc.Types.Relation
 public import Cvc.Untyped.Theory.Relation
 public import Cvc.Typed.Theory.Set
-public import Cvc.Typed.Core.Arith
+public import Cvc.Typed.Theory.Arith
 
 
 

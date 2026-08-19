@@ -289,3 +289,270 @@ bad name : caught: record sort `__cvc5_record_a_Int_b_Bool` has no field named `
   let srt ← srt
   let r ← Term.mkRecord srt #[("a", ← Term.mkInt 7), ("b", ← Term.mkBool true)]
   println! "bad name : {← caught do pure s!"{← r.recordFields ["a", "c"]}"}"
+
+
+/-! # The `smt!` DSL's record forms
+
+`{a := t}`, `{r with a := t}`, `r.a` and `e |>.a` are declared and expanded in this theory's own
+module, so they exist exactly where records do — importing another theory alone leaves them out of
+the grammar. Their tests belong here for the same reason.
+-/
+
+/-! ## Records
+
+`{a := 7, b := tru}` is Lean's structure-instance syntax. A field may state its sort or leave it
+out: left out it is the sort the field's term turns out to have, stated it is *checked* against
+that, so an annotation can only confirm what is there.
+-/
+
+/-- info:
+record : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+sort   : __cvc5_record_a_Int_b_Bool
+a      : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+b      : (b (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  let r ← smt! {a : int := 7, b : bool := true}
+  println! "record : {r}"
+  println! "sort   : {← r.getSort}"
+  println! "a      : {← r.recordGet "a"}"
+  println! "b      : {← r.recordGet "b"}"
+
+/-! **Field order is part of the sort**, unlike Lean's structure instances: the same fields written
+the other way round denote a different sort, and cvc5 refuses to mix their terms. -/
+
+/-- info:
+in order : __cvc5_record_a_Int_b_Bool
+swapped  : __cvc5_record_b_Bool_a_Int
+same     : false
+mixed    : rejected
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  let r ← smt! {a : int := 7, b : bool := true}
+  let r' ← smt! {b : bool := true, a : int := 7}
+  println! "in order : {← r.getSort}"
+  println! "swapped  : {← r'.getSort}"
+  println! "same     : {(← r.getSort) == (← r'.getSort)}"
+  println! "mixed    : {← (try (do let _ ← smt! ![pure r] = ![pure r']; pure "accepted")
+    catch _ => pure "rejected")}"
+
+/-! A field's term is an ordinary `smtTerm`, so it may be any expression the DSL can write, and a
+record may be a field of a record. -/
+
+/-- info:
+computed : (__cvc5_record_a_Int_b_Bool_ctor (+ 1 2) (not true))
+nested   : (__cvc5_record_inner___cvc5_record_a_Int_tag_Int_ctor (__cvc5_record_a_Int_ctor 7) 1)
+inner a  : (a (inner (__cvc5_record_inner___cvc5_record_a_Int_tag_Int_ctor (__cvc5_record_a_Int_ctor 7) 1)))
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  println! "computed : {← smt! {a : int := 1 + 2, b : bool := ¬ true}}"
+
+  let inner ← smt! {a : int := 7}
+  let innerSrt ← inner.getSort
+  let outer ← smt! {inner : innerSrt := ![pure inner], tag : int := 1}
+  println! "nested   : {outer}"
+  println! "inner a  : {← (← outer.recordGet "inner").recordGet "a"}"
+
+/-! A record literal is at maximum precedence, so it is an argument of an operator or an
+application with no parentheses. -/
+
+/-- info:
+as operand : (= (__cvc5_record_a_Int_ctor 7) (__cvc5_record_a_Int_ctor 8))
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  println! "as operand : {← smt! {a : int := 7} = {a : int := 8}}"
+
+/-! There is no syntax for the empty record: `{}` fails to parse, with `expected smtRecField`. That
+cannot be pinned here — a parse error aborts before `#guard_msgs` can see any message — but
+`Srt.record` refuses an empty record whatever path reaches it, which the sort tests do pin.
+-/
+
+
+/-! A field's sort may be stated, inferred, or some of each, and all three build the same record. -/
+
+/-- info:
+annotated : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+inferred  : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+mixed     : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+same sort : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  let annotated ← smt! {a : int := 7, b : bool := true}
+  let inferred ← smt! {a := 7, b := true}
+  println! "annotated : {annotated}"
+  println! "inferred  : {inferred}"
+  println! "mixed     : {← smt! {a := 7, b : bool := true}}"
+  println! "same sort : {(← annotated.getSort) == (← inferred.getSort)}"
+
+/-! A stated sort that disagrees with its term is caught before the record is built, naming the
+field — this is `Term.mkRecord`'s own check, the record's sort having been built from what was
+stated. -/
+
+/-- info:
+wrong sort : caught: field `a` of record `__cvc5_record_a_Bool` has sort `Bool`, but `7` has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let bool ← Srt.bool
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+  println! "wrong sort : {← caught do pure s!"{← smt! {a : bool := 7}}"}"
+
+
+
+/-! ## Projection
+
+`r.a` reads field `a` off `r`. It arrives as one identifier token, so whether it names something or
+reads a field off something is settled by *resolution*, in Lean's own order: a local head first,
+then the longest prefix that resolves.
+-/
+
+/-- info:
+local    : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+nested   : (a (inner (__cvc5_record_inner___cvc5_record_a_Int_b_Bool_tag_Int_ctor (__cvc5_record_a_Int_b_Bool_ctor 7 true) 1)))
+operand  : (+ (a (__cvc5_record_a_Int_b_Bool_ctor 7 true)) 1)
+plain    : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+-/
+#guard_msgs in #eval Env.runIO do
+  let r ← smt! {a := 7, b := true}
+  println! "local    : {← smt! r.a}"
+  let n ← smt! {inner := ![pure r], tag := 1}
+  println! "nested   : {← smt! n.inner.a}"
+  println! "operand  : {← smt! r.a + 1}"
+  -- an identifier naming no field is still just an identifier
+  println! "plain    : {← smt! r}"
+
+/-! A head that is not an identifier gets there by a different route — the lexer fuses `r.a` into
+one token but cannot fuse `).a`, so those are an ordinary grammar rule. `smt! r .a`, with a space,
+is neither and does not parse. -/
+
+/-- info:
+paren    : (a (__cvc5_record_a_Int_ctor 1))
+escape   : (b (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+literal  : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+-/
+#guard_msgs in #eval Env.runIO do
+  let r ← smt! {a := 7, b := true}
+  println! "paren    : {← smt! ({a := 1}).a}"
+  println! "escape   : {← smt! ![pure r].b}"
+  println! "literal  : {← smt! {a := 7, b := true}.a}"
+
+/-! Resolution order is Lean's. A **local** head wins even where a constant of the whole name
+exists, so `r.a` below reads a field rather than naming `Cvc.Tests.Untyped.Ext.r.a`. -/
+
+/-- A constant whose name is a local's name plus a field's. -/
+def r.a : Nat := 0
+
+/-- info: local wins : (a (__cvc5_record_a_Int_ctor 7)) -/
+#guard_msgs in #eval Env.runIO do
+  let r ← smt! {a := 7}
+  println! "local wins : {← smt! r.a}"
+
+/-! With no local in the way, the whole name resolves — this one is a `Nat`, so it fails as a
+*term* rather than as an unknown identifier, which is what shows it was not taken apart. -/
+
+/--
+error: Application type mismatch: The argument
+  r.a
+has type
+  Nat
+but is expected to have type
+  Term
+in the application
+  pure r.a
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Term ↦ 3
+-/
+#guard_msgs in
+example [Ω] : Env Term := smt! r.a
+
+/-! A field that is not there is a runtime error here, naming the record's fields — sort-erased
+there is nothing to catch it earlier. -/
+
+/-- info: no field : caught: record sort `__cvc5_record_a_Int` has no field named `zzz`, its fields are `a` -/
+#guard_msgs in #eval Env.runIO do
+  let rec' ← smt! {a := 7}
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+  println! "no field : {← caught do pure s!"{← smt! rec'.zzz}"}"
+
+
+
+/-! ## Updates
+
+`{r with a := 9}` replaces a field, and chains for several. A field may state its sort here too,
+though the record already fixes it, and naming a field twice is refused as the literal is expanded.
+-/
+
+/-- info:
+one       : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
+two       : ((_ update b) ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9) false)
+annotated : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
+sort kept : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let r ← smt! {a := 7, b := true}
+  println! "one       : {← smt! {r with a := 9}}"
+  println! "two       : {← smt! {r with a := 9, b := false}}"
+  println! "annotated : {← smt! {r with a : int := 9}}"
+  println! "sort kept : {(← (← smt! {r with a := 9}).getSort) == (← r.getSort)}"
+
+/-- info:
+wrong sort : caught: field `a` is stated at sort `Bool`, but its term has sort `Int`
+no field   : caught: record sort `__cvc5_record_a_Int_b_Bool` has no field named `zzz`, its fields are `a`, `b`
+-/
+#guard_msgs in #eval Env.runIO do
+  let bool ← Srt.bool
+  let r ← smt! {a := 7, b := true}
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+  println! "wrong sort : {← caught do pure s!"{← smt! {r with a : bool := 9}}"}"
+  println! "no field   : {← caught do pure s!"{← smt! {r with zzz := 9}}"}"
+
+/-! Naming a field twice would silently overwrite, so it is refused where it is written. -/
+
+/--
+error: record update names field `a` more than once
+-/
+#guard_msgs in
+example [Ω] (r : Term) : Env Term := smt! {r with a := 9, a := 8}
+
+
+
+/-! ### `|>.`, Lean's pipeline projection
+
+`e |>.a` is `(e).a`, and it is Lean's `pipeProj` at Lean's own precedence: **minimum**, so it takes
+everything to its left. That is what the form is for — an application head needs no parentheses.
+-/
+
+/-- info:
+application : (a (f 1))
+literal     : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+chained     : (a (inner (__cvc5_record_inner___cvc5_record_a_Int_b_Bool_tag_Int_ctor (__cvc5_record_a_Int_b_Bool_ctor 7 true) 1)))
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let r ← smt! {a := 7, b := true}
+  let s ← Solver.new
+  let f ← s.declareFun "f" #[int] (← r.getSort)
+  println! "application : {← smt! f 1 |>.a}"
+  println! "literal     : {← smt! {a := 7, b := true} |>.a}"
+  let n ← smt! {inner := ![pure r], tag := 1}
+  println! "chained     : {← smt! ![pure n] |>.inner |>.a}"
+
+/-! Taking everything to the left is Lean's reading and not always the wanted one: `r.a + 1 |>.b`
+is `(r.a + 1).b`. It is nearly always a mistake here, an arithmetic term having no fields — but a
+loud one, which is why matching Lean is worth more than optimising for it. -/
+
+/-- info: minPrec : caught: expected a record sort, got `Int` -/
+#guard_msgs in #eval Env.runIO do
+  let r ← smt! {a := 7, b := true}
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+  println! "minPrec : {← caught do pure s!"{← smt! r.a + 1 |>.b}"}"

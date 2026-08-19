@@ -264,3 +264,132 @@ in the application
 #guard_msgs in example : Env (Term Int) := Term.mkMatch l #[intCase, boolCase]
 
 end discipline
+
+
+/-! # The `smt!` DSL's `match`
+
+`match … with` is declared and expanded in this theory's own module, so it exists exactly where
+datatypes do — importing another theory alone leaves it out of the grammar, and `smt! match …`
+does not parse. Its tests belong here for the same reason.
+-/
+
+/-! ## Matching
+
+The same notation as the sort-erased layer, expanding to `Datatype.Ctor.caseErased`, which checks
+the arity and the variables' sorts. Each variable's **index is inferred from the body**, so a match
+reads exactly as it does sort-erased while every bound variable carries its Lean type.
+
+Every field is bound sort-erased, at the sort the declaration gives it, and only the ones the body
+mentions are re-typed. So a field the body ignores — the tail of a list, most of the time —
+costs nothing, though it has no index to infer one from.
+
+A variable may state its sort, `| cons (h : Int) t => …`, which then becomes a check against the
+declaration. That is what a variable the body mentions in a position that does not pin its index
+down needs.
+-/
+
+/-- info:
+match     : (match l (((cons h t) (+ (* h 2) 1)) (nil 0)))
+head of l : 15
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let _ ← declareLst
+  let l ← s.declareConst Lst "l"
+
+  -- `h` is a `Term Int` in the body, so the arithmetic operators apply and the match is `Term Int`;
+  -- `t` is never mentioned and needs no index
+  let m ← smt!
+    match l with
+    | cons h t => h * 2 + 1
+    | nil => 0
+  println! "match     : {m.erase}"
+
+  let consC ← Datatype.ctor Lst "cons"
+  let seven ← consC.apply2 (← Term.mkInt 7) (← (← Datatype.ctor Lst "nil").apply)
+  (do Term.equal l seven) >>= s.assert
+  s.checkSat (ifSat := do println! "head of l : {← s.getValue m}")
+
+/-- info:
+catch-all : (match l (((cons h t) h) (_ 0)))
+nested    : (match l (((cons h t) (match t (((cons h t) h) (_ 0)))) (_ 0)))
+ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let _ ← declareLst
+  let l ← s.declareConst Lst "l"
+
+  -- the index is stated here because nothing else says what it should be: the body is just `h`,
+  -- so it takes the match's own expected type to pin it down
+  let anyCase : Term Int ← smt!
+    match l with
+    | cons h t => h
+    | _ => 0
+  println! "catch-all : {anyCase.erase}"
+
+  -- `t` states its index because the only thing mentioning it is the match that wants it; the
+  -- inner `h` states its own because its index reaches it only through the outer match's expected
+  -- type, which does not survive the nesting. The outer `h` states nothing and needs nothing: the
+  -- inner pattern shadows it, so it is never referenced
+  let nested : Term Int ← smt!
+    match l with
+    | cons h (t : Lst) =>
+      match t with
+      | cons (h : Int) t => h
+      | _ => 0
+    | _ => 0
+  println! "nested    : {nested.erase}"
+
+  -- an ascription is a check against the declaration
+  println! "ascribed  : {(← smt!
+    match l with
+    | cons (h : Int) t => h + 1
+    | _ => 0).erase}"
+
+/-! The index a match carries, and what it rejects. -/
+
+section indices
+variable [Ω] (l : Term Lst) (b : Term Bool)
+
+/-- A match answers at the index its bodies share. -/
+example : Env (Term Int) := smt! match l with | cons h t => h | _ => 0
+/-- …including at `Bool`. -/
+example : Env (Term Bool) := smt! match l with | cons h t => ![pure b] | _ => true
+
+-- a variable the body mentions is re-typed, so using it at the wrong index is a type error
+/-- error: Application type mismatch: The argument
+  smtArg0✝
+has type
+  Datatype.Case Lst Bool
+but is expected to have type
+  Datatype.Case Lst Int
+in the application
+  List.cons smtArg0✝
+-/
+#guard_msgs in
+example : Env (Term Int) := smt! match l with | cons (h : Bool) t => h | _ => 0
+
+end indices
+
+/-- info:
+wrong sort : caught: cannot type the following term as `Lst`, term has sort `Int`:
+h
+wrong width: caught: constructor `cons` takes 2 field(s), bound 1
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let _ ← declareLst
+  let l ← s.declareConst Lst "l"
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+
+  -- an ascription disagreeing with the declaration is caught where the variable is re-typed
+  println! "wrong sort : {← caught do pure s!"{(← smt!
+    match l with
+    | cons (h : Lst) t => 0
+    | _ => 0).erase}"}"
+  println! "wrong width: {← caught do pure s!"{(← smt!
+    match l with
+    | cons h => h
+    | _ => 0).erase}"}"

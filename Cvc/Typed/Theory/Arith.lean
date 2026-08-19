@@ -11,7 +11,8 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 
-public import Cvc.Untyped.Core.Arith
+public import Cvc.Untyped.Theory.Arith
+public meta import Cvc.Ext
 public import Cvc.Typed.Core.Defs
 public import Cvc.Typed.Core.Value
 public import Cvc.Gen
@@ -122,3 +123,37 @@ instance : SrtLike Int where
 instance : SrtLike Rat where
   valueToTerm := mkReal
   termToValue t := getRatValue t
+
+
+
+/-! ## The DSL's literals for this theory
+
+Expanded here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
+theories they imported: without this module, `smt!` does not accept them at all. The expander's own
+machinery lives in `Cvc.Ext`, never in `Cvc`.
+-/
+
+public meta section
+
+open Lean
+
+namespace Ext open Cvc.Ext
+
+@[inherit_doc Cvc.Ext.expandSmt]
+macro_rules
+  | `(smtExpand% $l $t:smtTerm) => do
+    let layer := Layer.ofIdent l
+    unless layer == Layer.typed do Macro.throwUnsupported
+    let stx := t.raw
+    match stx.getKind with
+    | ``Cvc.Untyped.Term.smtNum => do
+      let n : TSyntax `term := ⟨stx[0]⟩
+      `($(layer.op `mkInt) ($n : Int))
+    | ``Cvc.Untyped.Term.smtSci => do
+      let r : TSyntax `term := ⟨stx[0]⟩
+      `($(layer.op `mkReal) $r)
+    | _ => Macro.throwUnsupported
+
+end Ext
+
+end

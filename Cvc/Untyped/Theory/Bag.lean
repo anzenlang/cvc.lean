@@ -16,7 +16,7 @@ import all Cvc.Untyped.Core.Defs
 
 public import Cvc.Ext
 public import Cvc.Types.Bag
-public import Cvc.Untyped.Core.Arith
+public import Cvc.Untyped.Theory.Arith
 public import Cvc.Gen
 public import Cvc.Spec.Bag
 

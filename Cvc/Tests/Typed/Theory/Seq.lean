@@ -69,3 +69,23 @@ index and the sort-erased one is given directly.
 /-- info: mkEmptySeq : (as seq.empty (Seq Int)) -/
 #guard_msgs in #eval Env.runIO do
   println! "mkEmptySeq : {← (mkEmptySeq : Env (Cvc.Typed.Term (Array Int)))}"
+
+
+/-! # The `smt!` DSL, sequence notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+seq concat: (seq.++ q r)
+concatN   : (seq.++ q r q)
+-/
+#guard_msgs in #eval Env.runIO do
+  let q ← mkSymbolAs (Array Int) "q"
+  let r ← mkSymbolAs (Array Int) "r"
+
+  println! "seq concat: {← smt! q ++ r}"
+  println! "concatN   : {← smt! ++[q, r, q]}"

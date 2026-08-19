@@ -11,6 +11,7 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 
 public import Cvc.Ext
+public meta import Cvc.Ext
 public import Cvc.Untyped.Core.Value
 public import Cvc.Gen
 public import Cvc.Spec.String
@@ -49,3 +50,34 @@ def getStringValue? (term : Term) : Option String := term.getStringValue.toOptio
 instance : SrtLike String where
   valueToTerm s := mkString s false
   termToValue t := t.getStringValue
+
+
+
+/-! ## The DSL's literals for this theory
+
+Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
+theories they imported: without this module, `smt!` does not accept them at all. The expander's own
+machinery lives in `Cvc.Ext`, never in `Cvc`.
+-/
+
+public meta section
+
+open Lean
+
+/-- String literal. -/
+syntax:max (name := smtStr) str : smtTerm
+
+namespace Ext open Cvc.Ext
+
+@[inherit_doc Cvc.Ext.expandSmt]
+macro_rules
+  | `(smtExpand% $l $t:smtTerm) => do
+    let layer := Layer.ofIdent l
+    unless layer == Layer.untyped do Macro.throwUnsupported
+    unless t.raw.getKind == ``smtStr do Macro.throwUnsupported
+    let s : TSyntax `term := ⟨t.raw[0]⟩
+    `($(layer.op `mkString) $s false)
+
+end Ext
+
+end

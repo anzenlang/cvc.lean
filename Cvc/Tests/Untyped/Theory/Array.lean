@@ -7,15 +7,9 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Theory.Array
-import Cvc.Untyped.Core.Bool
-import Cvc.Untyped.Core.Arith
-import Cvc.Types.Array
-
-public meta import Cvc.Untyped.Theory.Array
-public meta import Cvc.Untyped.Core.Bool
-public meta import Cvc.Untyped.Core.Arith
-public meta import Cvc.Types.Array
+meta import Cvc.Untyped.Core.Bool
+meta import Cvc.Untyped.Theory.Arith
+meta import Cvc.Untyped.Theory.Array
 
 
 

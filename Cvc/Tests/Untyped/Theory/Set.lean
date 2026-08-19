@@ -92,3 +92,39 @@ universe : (as set.universe (Set Int))
   -- the *element* sort, as every constructor of a polymorphic sort takes
   println! "empty    : {← Srt.of Int >>= setEmpty}"
   println! "universe : {← Srt.of Int >>= setUniverse}"
+
+
+/-! # The `smt!` DSL, set notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+member    : (set.member i s)
+subset    : (set.subset s t)
+union     : (set.union s t)
+inter     : (set.inter s t)
+minus     : (set.minus s t)
+union prec: (set.union s (set.inter t s))
+unionN    : (set.union (set.union s t) s)
+interN    : (set.inter (set.inter s t) s)
+mixed     : (and (set.member i s) (set.subset s t))
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← mkSymbolAs Int "i"
+  let s ← mkSymbolAs (Cvc.Set Int) "s"
+  let t ← mkSymbolAs (Cvc.Set Int) "t"
+
+  println! "member    : {← smt! i ∈ s}"
+  println! "subset    : {← smt! s ⊆ t}"
+  println! "union     : {← smt! s ∪ t}"
+  println! "inter     : {← smt! s ∩ t}"
+  println! "minus     : {← smt! s ∖ t}"
+  println! "union prec: {← smt! s ∪ t ∩ s}"
+  println! "unionN    : {← smt! ∪[s, t, s]}"
+  println! "interN    : {← smt! ∩[s, t, s]}"
+  -- and they mix with another theory's notation, the grammar being one category
+  println! "mixed     : {← smt! (i ∈ s) ∧ (s ⊆ t)}"

@@ -15,6 +15,7 @@ import all Cvc.Typed.Core.Defs
 import all Cvc.Untyped.Theory.Datatype
 
 public import Cvc.Untyped.Theory.Datatype
+public meta import Cvc.Ext
 public import Cvc.Typed.Solver
 
 
@@ -319,3 +320,95 @@ def update (t : Term α) (v : Term β) : Env (Term α) :=
   T.applyUpdater sel.updater t.erase v.erase
 
 end Datatype.Field
+
+
+
+public meta section
+
+open Lean
+
+/-! ## The DSL's `match`, typed
+
+The *syntax* is declared once, beside the sort-erased constructors; this layer adds only what its
+expansion differs in. Being the later module, this alternative is tried first and declines whatever
+is not its layer.
+
+The difference is worth the separate arm: sort-erased, a bound variable is made at the field's
+declared sort and the pattern applied by hand, where `Datatype.Ctor.case` builds the pattern here
+and checks both the arity and the sorts. And every field is bound **sort-erased** first, only the
+ones the body can name being re-typed — a field the body ignores offers no index to infer.
+-/
+
+/-! The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
+with the API a user opens.
+-/
+namespace Ext
+
+open Cvc.Ext
+
+/-- Expands one alternative of a typed `match` into a term building that case. -/
+def expandMatchAltT (layer : Layer) (scrutId : Ident) (alt : Syntax)
+: MacroM (TSyntax `term) := do
+  match alt.getKind with
+  | ``smtAltAny =>
+    let body ← deferSmt layer alt[3]
+    let bvId ← freshId "smtAnyVar"
+    let bodyId ← freshId "smtBody"
+    -- the index comes from `caseAny`, which shares it with the scrutinee
+    `($(layer.name `BVar.mk) "_" >>= fun $bvId =>
+      $body >>= fun $bodyId =>
+      $(layer.name `Datatype.caseAny) $bvId $bodyId)
+  | ``smtAlt =>
+    let ctor : Ident := ⟨alt[1]⟩
+    let rawBody := alt[4]
+    let body ← deferSmt layer rawBody
+
+    let pats ← patArgs alt[2].getArgs
+    let mut vars : Array Ident := #[]
+    for idx in [0 : pats.size] do
+      vars := vars.push (← freshId s!"smtBVar{idx}")
+    let bvIds := vars
+
+    let ctorId ← freshId "smtCtor"
+    let bodyId ← freshId "smtBody"
+
+    -- built innermost outwards, so each binder is in scope of everything after it
+    let mut acc ← `(($ctorId).caseErased #[ $bvIds,* ] $bodyId)
+    acc ← `($body >>= fun $bodyId => $acc)
+    for idx in [0 : pats.size] do
+      let jdx := pats.size - 1 - idx
+      let (binder, typ?) := pats[jdx]!
+      let used := occursIn binder.getId rawBody
+      unless typ?.isNone && !used do
+        let tc ←
+          match typ? with
+          | some typ => `((($(bvIds[jdx]!)).toTerm).typeCheckAs $typ)
+          | none => `((($(bvIds[jdx]!)).toTerm).typeCheck)
+        -- a used variable is bound under the writer's own name, so a mismatch in the body names
+        -- it; one that is only ascribed is bound out of sight, its check being the whole point
+        let bindTo ← if used then pure binder else freshId "smtChecked"
+        acc ← `($tc >>= fun $bindTo => $acc)
+    for idx in [0 : pats.size] do
+      let jdx := pats.size - 1 - idx
+      let name : TSyntax `term := quote pats[jdx]!.fst.getId.toString
+      acc ← `(($ctorId).mkBVarAt $(quote jdx) $name >>= fun $(bvIds[jdx]!) => $acc)
+    acc ← `(($ctorId).checkArity $(quote pats.size) >>= fun _ => $acc)
+    `($(layer.op `ctorOf) $scrutId $(quote ctor.getId.toString) >>= fun $ctorId => $acc)
+  | k => Macro.throwErrorAt alt s!"unsupported match alternative (kind `{k}`)"
+
+@[inherit_doc Cvc.Ext.expandSmt]
+macro_rules
+  | `(smtExpand% $l $t:smtTerm) => do
+    let layer := Layer.ofIdent l
+    unless layer == Layer.typed do Macro.throwUnsupported
+    let stx := t.raw
+    unless stx.getKind == ``smtMatch do Macro.throwUnsupported
+    let scrut ← deferSmt layer stx[1]
+    let scrutId ← freshId "smtScrut"
+    let alts ← stx[3].getArgs.mapM (expandMatchAltT layer scrutId)
+    let body ← bindArgs alts fun ids => `($(layer.op `mkMatch) $scrutId #[ $ids,* ])
+    `($scrut >>= fun $scrutId => $body)
+
+end Ext
+
+end

@@ -8,11 +8,9 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped.Core.Bool
-import Cvc.Untyped.Core.Arith
 import Cvc.Untyped.Solver
 
 public meta import Cvc.Untyped.Core.Bool
-public meta import Cvc.Untyped.Core.Arith
 public meta import Cvc.Untyped.Solver
 
 
@@ -78,3 +76,50 @@ generated theory constructor — it produces a `BVar` rather than a `Term` — a
 /-- info: mkSymbol : x -/
 #guard_msgs in #eval Env.runIO do
   println! "mkSymbol : {← mkSymbol (← Srt.of Int) "x"}"
+
+
+/-! # The `smt!` DSL, boolean notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+and      : (and a b)
+or       : (or a b)
+xor      : (xor a b)
+implies  : (=> a b)
+not      : (not a)
+nested   : (not (or a b))
+equal    : (= i j)
+distinct : (distinct i j)
+nary and : (and a b a)
+nary or  : (or a b a)
+nary eq  : (and (= i j) (= j i))
+bool lit : (and a true)
+ite      : (ite a i j)
+right-assoc ∧ : (and a (and b a))
+-/
+#guard_msgs in #eval Env.runIO do
+  let a ← mkSymbolAs Bool "a"
+  let b ← mkSymbolAs Bool "b"
+  let i ← mkSymbolAs Int "i"
+  let j ← mkSymbolAs Int "j"
+
+  println! "and      : {← smt! a ∧ b}"
+  println! "or       : {← smt! a ∨ b}"
+  println! "xor      : {← smt! a ⊻ b}"
+  println! "implies  : {← smt! a → b}"
+  println! "not      : {← smt! ¬ a}"
+  println! "nested   : {← smt! ¬ (a ∨ b)}"
+  println! "equal    : {← smt! i = j}"
+  println! "distinct : {← smt! i ≠ j}"
+  println! "nary and : {← smt! ∧[a, b, a]}"
+  println! "nary or  : {← smt! ∨[a, b, a]}"
+  println! "nary eq  : {← smt! =[i, j, i]}"
+  println! "bool lit : {← smt! a ∧ true}"
+  println! "ite      : {← smt! if a then i else j}"
+  -- associativity follows the `op%` entry: `∧` is `infixr`
+  println! "right-assoc ∧ : {← smt! a ∧ b ∧ a}"

@@ -89,3 +89,23 @@ empty    : (as bag.empty (Bag Int))
 -/
 #guard_msgs in #eval Env.runIO do
   println! "empty    : {← (bagEmpty : Env (Cvc.Typed.Term (Cvc.Bag Int)))}"
+
+
+/-! # The `smt!` DSL, bag notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+bag union : (bag.union_disjoint s t)
+bag nary  : (bag.union_disjoint (bag.union_disjoint s t) s)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← mkSymbolAs (Cvc.Bag Int) "s"
+  let t ← mkSymbolAs (Cvc.Bag Int) "t"
+
+  println! "bag union : {← smt! s ⊎ t}"
+  println! "bag nary  : {← smt! ⊎[s, t, s]}"

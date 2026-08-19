@@ -9,9 +9,11 @@ module
 
 import Cvc.Untyped.Solver
 import Cvc.Untyped.Core
+import Cvc.Untyped.Theory.Arith
 
 public meta import Cvc.Untyped.Solver
 public meta import Cvc.Untyped.Core
+public meta import Cvc.Untyped.Theory.Arith
 
 
 

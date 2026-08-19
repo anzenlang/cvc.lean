@@ -12,6 +12,7 @@ import all Cvc.Untyped.Core.Defs
 -- `mkBool`/`mkInt` back the unit elements of the `N'` variants
 
 public import Cvc.Ext
+public meta import Cvc.Ext
 public import Cvc.Untyped.Core.Value
 public import Cvc.Gen
 public import Cvc.Spec.Arith
@@ -132,3 +133,43 @@ instance : ValueToTerm Nat where
 instance : SrtLike Rat where
   valueToTerm := mkReal
   termToValue t := t.getRatValue
+
+
+
+/-! ## The DSL's literals for this theory
+
+Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
+theories they imported: without this module, `smt!` does not accept them at all. The expander's own
+machinery lives in `Cvc.Ext`, never in `Cvc`.
+-/
+
+public meta section
+
+open Lean
+
+/-- Integer literal. -/
+syntax:max (name := smtNum) num : smtTerm
+
+/-- Real literal, `1.5` or `1.5e-3`.
+
+The literal is handed to `mkReal` unascribed, so Lean elaborates it against that function's `Rat`
+argument through `OfScientific`. Nothing here has to name `Rat`.
+-/
+syntax:max (name := smtSci) scientific : smtTerm
+
+namespace Ext open Cvc.Ext
+
+@[inherit_doc Cvc.Ext.expandSmt]
+macro_rules
+  | `(smtExpand% $l $t:smtTerm) => do
+    let layer := Layer.ofIdent l
+    unless layer == Layer.untyped do Macro.throwUnsupported
+    let stx := t.raw
+    match stx.getKind with
+    | ``smtNum => do let n : TSyntax `term := ⟨stx[0]⟩; `($(layer.op `mkInt) ($n : Int))
+    | ``smtSci => do let r : TSyntax `term := ⟨stx[0]⟩; `($(layer.op `mkReal) $r)
+    | _ => Macro.throwUnsupported
+
+end Ext
+
+end

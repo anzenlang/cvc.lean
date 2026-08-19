@@ -275,3 +275,154 @@ ordered  : true
   println! "back     : {← term.getValue}"
   -- ordered, so a set of records can be spelled *and* built
   println! "ordered  : {compare value (value.set "a" 8) == Ordering.lt}"
+
+
+/-! # The `smt!` DSL's record forms
+
+`{a := t}`, `{r with a := t}`, `r.a` and `e |>.a` are declared and expanded in this theory's own
+module, so they exist exactly where records do — importing another theory alone leaves them out of
+the grammar. Their tests belong here for the same reason.
+-/
+
+/-! ## Records
+
+`{a := 7, b := tru}` is Lean's structure-instance syntax, and the index is inferred from the field
+terms — this layer needs no sort stated anywhere. A field may state one anyway, in which case it is
+*checked* against the index before the record is built.
+
+**Field order is part of the sort**, unlike Lean's structure instances, and here it shows in the
+index: the two orders are different Lean types.
+-/
+
+/-- info:
+inferred  : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+a         : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+annotated : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+mixed     : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  let r ← smt! {a := 7, b := true}
+  println! "inferred  : {r}"
+  println! "a         : {← r.recordGet "a"}"
+  println! "annotated : {← smt! {a : int := 7, b : bool := true}}"
+  println! "mixed     : {← smt! {a := 7, b : bool := true}}"
+
+/-- The index really is inferred from the field terms, and carries their order. -/
+example [Ω] : Env (Term (Record [("a", Int), ("b", Bool)])) := smt! {a := 7, b := true}
+/-- The other order is a different index. -/
+example [Ω] : Env (Term (Record [("b", Bool), ("a", Int)])) := smt! {b := true, a := 7}
+
+/-- A field read off a literal comes back at its own type, with nothing ascribed. -/
+example [Ω] : Env (Term Int) := do (← smt! {a := 7, b := true}).recordGet "a"
+
+/-! A stated sort that disagrees with the index is caught before the record is built. Sort-erased
+the same mistake is caught by `Term.mkRecord`; here there is no sort to build from, so the check
+is its own. -/
+
+/-- info:
+wrong sort : caught: field `a` is stated at sort `Bool`, but its term has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let bool ← Srt.bool
+  let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
+  println! "wrong sort : {← caught do pure s!"{← smt! {a : bool := 7}}"}"
+
+
+
+/-! ## Projection and updates
+
+`r.a` reads field `a` off `r`, resolved exactly as in the sort-erased layer — a local head first,
+then the longest prefix that resolves. What differs is what the result *is*: the index gives the
+field's type, so a projection is an operand of that type's operators with nothing ascribed, and a
+field that is not there does not compile.
+-/
+
+/-- info:
+local    : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+nested   : (a (inner (__cvc5_record_inner___cvc5_record_a_Int_b_Bool_tag_Int_ctor (__cvc5_record_a_Int_b_Bool_ctor 7 true) 1)))
+operand  : (+ (a (__cvc5_record_a_Int_b_Bool_ctor 7 true)) 1)
+paren    : (a (__cvc5_record_a_Int_ctor 1))
+update   : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
+two      : ((_ update b) ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9) false)
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let r ← smt! {a := 7, b := true}
+  println! "local    : {← smt! r.a}"
+  let n ← smt! {inner := ![pure r], tag := 1}
+  println! "nested   : {← smt! n.inner.a}"
+  println! "operand  : {← smt! r.a + 1}"
+  println! "paren    : {← smt! ({a := 1}).a}"
+  println! "update   : {← smt! {r with a := 9}}"
+  println! "two      : {← smt! {r with a := 9, b := false}}"
+  -- an annotation here can only confirm what the index says
+  let _ ← smt! {r with a : int := 9}
+
+section signatures
+variable [Ω] (r : Term (Record [("a", Int), ("b", Bool)]))
+
+/-- A projection has the field's type. -/
+example : Env (Term Int) := smt! r.a
+/-- And an update has the record's. -/
+example : Env (Term (Record [("a", Int), ("b", Bool)])) := smt! {r with a := 9}
+
+end signatures
+
+/-! A field that is not there does not compile, where sort-erased it is a runtime error. -/
+
+/--
+error: failed to synthesize instance of type class
+  FieldOf [("a", Int), ("b", Bool)] "zzz" Int
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example [Ω] (r : Term (Record [("a", Int), ("b", Bool)])) : Env (Term Int) := smt! r.zzz
+
+/-! Naming a field twice in an update is refused as the literal is expanded. -/
+
+/--
+error: record update names field `a` more than once
+-/
+#guard_msgs in
+example [Ω] (r : Term (Record [("a", Int)])) : Env (Term (Record [("a", Int)])) :=
+  smt! {r with a := 9, a := 8}
+
+
+
+/-! ### `|>.`, Lean's pipeline projection
+
+`e |>.a` is `(e).a`, at Lean's own precedence — minimum, so it takes everything to its left. Typed
+it is where the form earns most: an application head needs no parentheses, and the field still
+comes back at the type the index gives it.
+-/
+
+/-- info:
+application : (a (f 1))
+literal     : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+chained     : (a (inner (__cvc5_record_inner___cvc5_record_a_Int_b_Bool_tag_Int_ctor (__cvc5_record_a_Int_b_Bool_ctor 7 true) 1)))
+-/
+#guard_msgs in #eval Env.runIO do
+  let r ← smt! {a := 7, b := true}
+  let s ← Solver.new
+  let f ← s.declareFun (α := Int → Record [("a", Int), ("b", Bool)]) "f"
+  println! "application : {← smt! f 1 |>.a}"
+  println! "literal     : {← smt! {a := 7, b := true} |>.a}"
+  let n ← smt! {inner := ![pure r], tag := 1}
+  println! "chained     : {← smt! ![pure n] |>.inner |>.a}"
+
+/-- The index survives the pipe. -/
+example [Ω] (r : Term (Record [("a", Int), ("b", Bool)])) : Env (Term Int) := smt! ![pure r] |>.a
+
+/-! And a field that is not there still does not compile. -/
+
+/--
+error: failed to synthesize instance of type class
+  FieldOf [("a", Int), ("b", Bool)] "zzz" Int
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example [Ω] (r : Term (Record [("a", Int), ("b", Bool)])) : Env (Term Int) := smt! ![pure r] |>.zzz

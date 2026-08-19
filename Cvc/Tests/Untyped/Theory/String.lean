@@ -99,3 +99,18 @@ mkString: "hi"
 -/
 #guard_msgs in #eval Env.runIO do
   println! "mkString: {← mkString "hi" false}"
+
+
+/-! # The `smt!` DSL, string literals
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does — importing another theory alone leaves them out of the
+grammar. Their tests belong here for the same reason.
+-/
+
+open Cvc.Untyped in
+/-- info:
+string   : "hello"
+-/
+#guard_msgs in #eval Env.runIO do
+  println! "string   : {← smt! "hello"}"
