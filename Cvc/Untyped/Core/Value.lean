@@ -38,7 +38,7 @@ open cvc5 renaming Term → T
 /-- Reads the value a constant term denotes, as a Lean `α`. -/
 class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
-  termToValue : Term → Env α
+  termToValue : [Ω] → Term → Env α
 
 namespace TermToValue
 instance : TermToValue Term := ⟨pure⟩
@@ -47,7 +47,7 @@ end TermToValue
 /-- Builds the constant term denoting a Lean `α`. -/
 class ValueToTerm (α : Type) where
   /-- Builds the constant term denoting a value. -/
-  valueToTerm : α → Env Term
+  valueToTerm : [Ω] → α → Env Term
 
 namespace ValueToTerm
 instance : ValueToTerm Term := ⟨pure⟩

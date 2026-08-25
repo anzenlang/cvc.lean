@@ -40,8 +40,9 @@ namespace Cvc.Untyped public section variable [Ω]
 
 A synthesis check splits the world in three, as a check-sat does, and the queries that make sense
 differ in each: a solution can be read only where one was found. The `env_gen%` mechanism is the
-same, and so is the guarantee — the lift from `EnvT` is private to this module, so only
-`checkSynth` below can enter these.
+same, and so are both of its guarantees — the lift from `EnvT` is private to this module, so only
+`checkSynth` below can enter these, and each is indexed by the solver that answered, so a solution
+cannot be read off a solver other than the one whose check found it.
 
 They are separate from the sat monads on purpose. `EnvUnknown` gates a *timeout core*, which has
 nothing to do with a synthesis check giving up, so reusing it would let one be asked for where it

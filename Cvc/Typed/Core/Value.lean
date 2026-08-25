@@ -41,7 +41,7 @@ open Cvc renaming Untyped.Term → T
 /-- Reads the value a constant term denotes, as a Lean `α`. -/
 class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
-  termToValue : Term α → Env α
+  termToValue : [Ω] → Term α → Env α
 
 -- no `TermToValue (Term α)`: `TermToValue β` reads a `Term β`, so at `β := Term α` it would have to
 -- read a `Term (Term α)`. An index describes a sort, and a term is not one.
@@ -49,7 +49,7 @@ class TermToValue (α : Type) where
 /-- Builds the constant term denoting a Lean `α`. -/
 class ValueToTerm (α : Type) where
   /-- Builds the constant term denoting a value. -/
-  valueToTerm : α → Env (Term α)
+  valueToTerm : [Ω] → α → Env (Term α)
 
 /-- A Lean type usable as a sort, in both directions. -/
 class abbrev SrtLike (α : Type) (β : Type := α) := ToTyp α, TermToValue α, ValueToTerm α

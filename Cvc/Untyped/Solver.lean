@@ -28,8 +28,9 @@ public import Cvc.Gen.SolverMode
 Three things live here:
 
 - `Solver` itself, and the `Result` a check-sat produces;
-- the three monadic environments that record *which answer the solver just gave*, so that a query
-  only valid after one answer cannot be written after another;
+- the three monadic environments that record *which answer the solver just gave, and which solver
+  gave it*, so that a query only valid after one answer cannot be written after another, nor
+  addressed to a different solver;
 - every solver function whose signature mentions no term, and which is therefore shared verbatim
   by both layers rather than re-typed.
 
@@ -60,8 +61,18 @@ Each answer therefore gets its own monad, wrapping `EnvT` privately. Since the w
 user code cannot lift arbitrary `EnvT` code — a check-sat in particular — into one of them, so a
 sat-only block cannot smuggle in a query that would invalidate the very answer it stands on.
 
-`env_gen%` comes from `Cvc/Untyped/Mode.lean`; the private lift it generates is private to
-*this* module, which is what lets `checkSat` below enter these monads and nothing else.
+**Each is also indexed by the solver that answered**, `s.EnvSatT m α` rather than `EnvSatT m α`,
+and that catches the other mistake two solvers in one scope invite: a block standing on one
+solver's answer querying another solver. Every modal query carries the index —
+`getValue : s.EnvSat Term` — and `checkSat`'s branches are typed at the solver it was called on, so
+asking `s₂` for a value inside `s₁`'s sat branch does not typecheck rather than answering about the
+wrong model.
+
+The two mechanisms are separate and both are needed: the private lift is about *when* a query may
+be written, the index about *what* it may be written against.
+
+`env_gen%` comes from `Cvc.Gen.SolverMode`; the private lift it generates is private to *this*
+module, which is what lets `checkSat` below enter these monads and nothing else.
 -/
 namespace Solver variable [Ω] [Monad m]
 

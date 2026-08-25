@@ -7,14 +7,44 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Theory.Arith
+public meta import Cvc.Gen.Symbols
 public import Cvc.Untyped.Solver
 
 import all Cvc.Untyped.Solver
 
 
 
-namespace Cvc.Untyped public section variable [Ω]
+
+/-! # Symbols, sort-erased
+
+A *symbol structure* is a record of the symbols a problem is stated over, written once and read at
+three different instantiations: at identifiers (`Idents`), at terms (`Terms`) and at the Lean
+values a model gives them (`Values`). `Symbols.Wrap` is what makes one record serve all three, and
+the `Symbols` class supplies the `mapM` that walks it.
+
+**A symbol structure's whole obligation is its `Symbols` instance**, and `structure.symbols`
+generates that, so an ordinary one is written with no boilerplate at all:
+
+```lean
+structure.symbols MySymbols where
+  /-- A boolean symbol. -/
+  myBoolVar : Bool
+  /-- A real symbol. -/
+  myRealVar : Rat
+```
+
+The structure, the aliases and the instance are generated; `declare`, `getValues` and `findCex`
+are generic over the `Sig`, so they need no per-structure definition either.
+
+**`Ω` is taken only where a term is actually mentioned.** `Wrap` takes none, so `Idents` and
+`Values` take none either — only `Terms` does, along with `mapM` and the operations that build or
+read terms. A caller can therefore name a structure's identifiers and read its values outside a
+scope, entering one only to solve.
+
+Worked examples, including the hand-written path for what `structure.symbols` cannot express, are
+in `Cvc.Tests.Untyped.Symbols`.
+-/
+namespace Cvc.Untyped public section
 
 namespace Symbols
 
@@ -26,9 +56,11 @@ namespace Sig variable (sig : Sig)
 
 abbrev Idents : Type := sig (fun _α => String)
 
-abbrev Terms : Type := sig (𝕂 Term)
+abbrev Terms [Ω] : Type := sig (𝕂 Term)
 
 abbrev Values : Type := sig (fun α => α)
+
+abbrev Fun : Type := [Ω] → sig.Terms → Env Term
 
 end Sig
 
@@ -37,12 +69,17 @@ end Symbols
 class Symbols (S : Symbols.Sig) where
   InitData : Type := Unit
   idents : InitData → S.Idents
-  mapM {W W' : Symbols.Wrap} [Monad m]
+  mapM [Ω] {W W' : Symbols.Wrap} [Monad m]
     (s : S W) (f : {α : Type} → [ToTyp α] → [TermToValue α] → W α → m (W' α)) : m (S W')
 
 section variable {S : Symbols.Sig} [inst : Symbols S]
 
 namespace Symbols
+
+abbrev Idents [Symbols S] := Sig.Idents S
+abbrev Terms [Ω] [Symbols S] := Sig.Terms S
+abbrev Values [Symbols S] := Sig.Values S
+abbrev Fun [Symbols S] := Sig.Fun S
 
 namespace Sig
 abbrev idents : inst.InitData → S.Idents := inst.idents
@@ -50,16 +87,26 @@ abbrev Idents.get := @Sig.idents
 
 abbrev mapM := @inst.mapM
 
-def Idents.declareIn (idents : S.Idents) (solver : Solver) : Env S.Terms :=
+def Idents.declareIn [Ω] (idents : S.Idents) (solver : Solver) : Env S.Terms :=
   S.mapM idents fun {α} _ _ symbol => Srt.of α >>= solver.declareFun symbol #[]
 
-def Idents.declare (idents : S.Idents) : Env S.Terms :=
+def Idents.declare [Ω] (idents : S.Idents) : Env S.Terms :=
   S.mapM idents fun {α} _ _ symbol => do Term.mkSymbol (← Srt.of α) symbol
 
-def Terms.getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values := do
+def Terms.getValues [Ω] (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values := do
   S.mapM terms fun term => do
     let valueTerm ← solver.getValue term
     valueTerm.getValue
+
+/-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
+
+Needs no per-`Sig` code: `mapM` is what makes it generic, so a user's symbol structure gets this
+by instancing `Symbols` and nothing else.
+-/
+def Terms.findCex [Ω] (terms : S.Terms) (solver : Solver)
+  (assuming : Option Untyped.Terms := none)
+: Env (Option S.Values) :=
+  solver.checkSat? assuming (ifSat := terms.getValues solver)
 
 end Sig
 
@@ -75,93 +122,28 @@ def getSymbolValues := @Symbols.Sig.Terms.getValues
 
 end Solver
 
+
+
+/-! ## The `symbols structure` command
+
+Declared `scoped`, so `open Cvc.Untyped` selects the sort-erased spelling exactly as it selects
+`smt!`. What it generates is described in `Cvc.Ext.elabSymbols`.
+-/
+
+open Lean Elab Command in
+meta section
+
+/-- Declares a symbols structure and everything a `Symbols` instance needs. -/
+scoped syntax (name := symbolsStructure) atomic((docComment)? "structure.symbols ") ident
+  " where" withPosition((ppLine colGe Lean.Parser.Command.structSimpleBinder)+) : command
+
+elab_rules : command
+  | `($[$doc?:docComment]? structure.symbols $id where $fields*) =>
+    Cvc.Ext.elabSymbols `Cvc.Untyped #[
+      fun id => `(command|
+        abbrev $(mkIdent (id.getId ++ `Fun)) := Cvc.Untyped.Symbols.Sig.Fun $id),
+    ] doc? id fields
+
 end
 
-
-
-/-! ## Example 1
-
-The code below is an example of the user experience for the `Symbols` API.
--/
-namespace Ex1
-
-/-- User-defined symbol structure. -/
-structure MySymbols (W : Symbols.Wrap) : Type where
-  myBoolVar : W Bool
-  myIntVar : W Int
-  myRealVar : W Rat
-
-namespace MySymbols
-
-/-- Idents alias. -/
-abbrev Idents := Symbols.Sig.Idents MySymbols
-
-/-- Terms alias. -/
-abbrev Terms := Symbols.Sig.Terms MySymbols
-
-/-- Values alias. -/
-abbrev Values := Symbols.Sig.Values MySymbols
-
-/-- `Symbols` instance giving access to the `Symbols` API. -/
-instance : Symbols MySymbols where
-  idents _ := { myBoolVar := "myBoolVar", myIntVar := "myIntVar", myRealVar := "myRealVar" }
-  mapM syms f := return {
-    myBoolVar := ← f syms.myBoolVar
-    myIntVar := ← f syms.myIntVar
-    myRealVar := ← f syms.myRealVar
-  }
-
-/-! With this instance users can very easily declare or get-value their symbols. -/
-
-/-- Declares `MySymbols` in `solver` -/
-def declare (idents : MySymbols.Idents) : Env MySymbols.Terms :=
-  idents.declare
-
-/-- Tries to extract a satisfiable `MySymbols`-assignment in `solver`. -/
-def findCex (syms : MySymbols.Terms) (solver : Solver)
-  (assuming : Option Untyped.Terms := none)
-: Env (Option MySymbols.Values) :=
-  solver.checkSat? assuming (ifSat := syms.getValues solver)
-
-end MySymbols
-
-end Ex1
-
-
-
-/-! ## Example 2 -/
-namespace Ex2
-
-structure MySymbols (W : Symbols.Wrap) where
-  boolVars : Array (W Bool)
-  intVars : Array (W Int)
-  realVars : Array (W Rat)
-
-namespace MySymbols
-
-abbrev Idents := Symbols.Sig.Idents MySymbols
-abbrev Terms := Symbols.Sig.Terms MySymbols
-abbrev Values := Symbols.Sig.Values MySymbols
-
-instance : Symbols MySymbols where
-  InitData := Idents
-  idents := id
-  mapM symbols f := return {
-    boolVars := ← symbols.boolVars.mapM f
-    intVars := ← symbols.intVars.mapM f
-    realVars := ← symbols.realVars.mapM f
-  }
-
-/-- Declares `MySymbols` in `solver` -/
-def declare (idents : MySymbols.Idents) : Env MySymbols.Terms :=
-  idents.declare
-
-/-- Tries to extract a satisfiable `MySymbols`-assignment in `solver`. -/
-def findCex (syms : MySymbols.Terms) (solver : Solver)
-  (assuming : Option Untyped.Terms := none)
-: Env (Option MySymbols.Values) :=
-  solver.checkSat? assuming (ifSat := syms.getValues solver)
-
-end MySymbols
-
-end Ex2
+end
