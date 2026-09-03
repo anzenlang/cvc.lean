@@ -261,3 +261,34 @@ example : Term Int := bv
 example : bv.toTerm = bv := rfl
 
 end discipline
+
+
+
+/-! ## A signature is shown in the form it computes to
+
+`BVars.signatureTo` is what indexes `lambda`, `Solver.defineFun`, `synthAnyFun` and a `Grammar`, and
+it is *computed* — so without help a term indexed by one is shown as the application rather than as
+the arrow it denotes. A delaborator beside the definition reduces it before printing.
+
+Being an `abbrev` does not do this on its own: reducibility governs unification, not printing.
+-/
+
+/-- info: fun [Ω] x y => sorry : [inst : Ω] → (x y : BVar Int) → Term (Int → Int → Int) -/
+#guard_msgs in
+#check fun [Ω] (x y : BVar Int) =>
+  (sorry : Term (BVars.signatureTo Int (BVars.push y (BVars.push x []))))
+
+/-! A spine that cannot reduce is left alone — and, more to the point, does not send the
+delaborator round in circles. -/
+
+/-- info: fun [Ω] bvs => sorry : [inst : Ω] → (bvs : BVars) → Term (BVars.signatureTo Int bvs) -/
+#guard_msgs in
+#check fun [Ω] (bvs : BVars) => (sorry : Term (BVars.signatureTo Int bvs))
+
+/-! A partly concrete one shows how far it got: `x` has been accounted for, the rest has not. -/
+
+/-- info: fun [Ω] x bvs => sorry : [inst : Ω] → (x : BVar Int) → (bvs : BVars) → Term (BVars.signatureTo (Int → Int) bvs)
+-/
+#guard_msgs in
+#check fun [Ω] (x : BVar Int) (bvs : BVars) =>
+  (sorry : Term (BVars.signatureTo Int (BVars.push x bvs)))

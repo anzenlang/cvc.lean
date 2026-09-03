@@ -57,7 +57,7 @@ def mkSetValue [ValueToTerm α] (set : Cvc.Set α) : Env Term := do
 /-- The set of values a constant set term denotes. -/
 def getSetValue [TermToValue α] (term : Term) : Env (Cvc.Set α) := do
   let elems ← term.getSetElems
-  elems.foldlM (init := Cvc.Set.empty) fun set elem => set.insert <$> getValue elem
+  elems.foldlM (init := Cvc.Set.empty) fun set elem => set.insert <$> extractValue elem
 
 instance [ValueToTerm α] : ValueToTerm (Cvc.Set α) := ⟨mkSetValue⟩
 instance [TermToValue α] : TermToValue (Cvc.Set α) := ⟨getSetValue⟩

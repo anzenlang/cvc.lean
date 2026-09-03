@@ -74,10 +74,10 @@ def mkValue [A : ValueToTerm α] : (value : α) → Env (Term α) := A.valueToTe
 def mkValueAs (α : Type) [ValueToTerm α] : (value : α) → Env (Term α) := mkValue
 
 /-- The value a constant term denotes. -/
-def getValue [A : TermToValue α] : Term α → Env α := A.termToValue
+def extractValue [A : TermToValue α] : Term α → Env α := A.termToValue
 
-@[inherit_doc getValue]
-def getValueAs (α : Type) [TermToValue α] : Term α → Env α := getValue
+@[inherit_doc extractValue]
+def extractValueAs (α : Type) [TermToValue α] : Term α → Env α := extractValue
 
 
 

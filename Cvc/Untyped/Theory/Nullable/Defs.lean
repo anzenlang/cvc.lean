@@ -112,7 +112,7 @@ def mkNullableValue [ValueToTerm α] (value : Option α) : Env Term :=
 def getNullableValue [TermToValue α] (term : Term) : Env (Option α) := do
   match ← term.getNullableElem? with
   | none => return none
-  | some elem => some <$> getValue elem
+  | some elem => some <$> extractValue elem
 
 instance [ValueToTerm α] : ValueToTerm (Option α) := ⟨mkNullableValue⟩
 instance [TermToValue α] : TermToValue (Option α) := ⟨getNullableValue⟩

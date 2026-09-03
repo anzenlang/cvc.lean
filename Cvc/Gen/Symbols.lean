@@ -93,6 +93,97 @@ def wrapSymbolsField (w : Ident) (field : TSyntax ``Lean.Parser.Command.structSi
   let ty' ← `($w $ty)
   return stx.setArg 2 (sig.setArg 1 (mkNullNode #[spec.setArg 1 ty'.raw]))
 
+/-- The name a state variable's *stored* field gets, `count` becoming `rawCount`.
+
+The projection generated beside it takes the field's own name, and unwraps the `Symbol.At` the
+stored one carries — so a reader writes `state.count`, never `state.rawCount.get`.
+-/
+def rawFieldName (name : Name) : Name :=
+  Name.mkSimple ("raw" ++ name.toString.capitalize)
+
+/-- One field, renamed to its `raw` form and with its type wrapped in `w`. -/
+def rawSymbolsField (w : Ident) (field : TSyntax ``Lean.Parser.Command.structSimpleBinder)
+: CommandElabM Syntax := do
+  let stx ← wrapSymbolsField w field
+  return stx.setArg 1 (mkIdent (rawFieldName stx[1].getId))
+
+/-- Emits a state-variable structure and everything generated beside it.
+
+Same shape as `elabSymbols`, with two differences, both forced by `Symbol.At`. A field is *stored*
+under its `raw` name, and beside it comes a projection under the name the writer used, which
+unwraps the `At`:
+
+```lean
+def MySVars.count {W : Symbols.Wrap} {k : Nat} (s : MySVars (Symbol.At k W)) : W Int :=
+  s.rawCount.get
+```
+
+**One projection covers every instantiation**, being generic in the wrap: at `TermsAt` it answers a
+term, at `ValuesAt` a Lean value. Per-alias projections — `TermsAt.count`, `ValuesAt.count` — do
+not work, and the reason is worth recording: dot notation resolves against the head constant of the
+value's type *after unfolding*, and everything that hands a state over (`Sys.init`, `Sys.next`, a
+candidate) types it as `ι.TermsAt k`, which unfolds to `MySVars (Symbol.At k …)`. So Lean looks in
+`MySVars` and never in `MySVars.TermsAt`, and a per-alias projection is unreachable exactly where
+it would be used.
+-/
+def elabStateVars (root : Name) (extras : Array (Ident → CommandElabM (TSyntax `command)))
+  (doc? : Option (TSyntax ``Lean.Parser.Command.docComment)) (id : Ident)
+  (fields : Array (TSyntax ``Lean.Parser.Command.structSimpleBinder))
+: CommandElabM Unit := do
+  let omegaId := mkIdent ``Ω
+  let omegaArg ← `(bracketedBinder| [$omegaId])
+  let mut names := Array.mkEmpty fields.size
+  let mut types := Array.mkEmpty fields.size
+  for field in fields do
+    let name := field.raw[1].getId
+    if symbolsReserved.contains name then
+      throwErrorAt field.raw[1]
+        s!"`{name}` is generated beside a state-variable structure, so a state variable cannot be \
+          called that"
+    names := names.push name
+    types := types.push (⟨field.raw[2][1][0][1]⟩ : TSyntax `term)
+
+  let w := mkIdent `W
+  let wrap := mkIdent (root ++ `Symbols.Wrap)
+  let binders ← fields.mapM (rawSymbolsField w)
+  elabCommand (mkSymbolsStructure (doc?.map (·.raw)) id w wrap binders)
+
+  let ns := id.getId
+  let raws := names.map rawFieldName
+  let identArgs : Array (TSyntax `term) := names.map (Syntax.mkStrLit ·.toString)
+  let mapArgs ← raws.mapM fun f => `(← f syms.$(mkIdent f):ident)
+  let atId := mkIdent (root ++ `Symbol.At)
+  let mut cmds := #[]
+
+  -- the projection each field is read through
+  for h : i in [0 : names.size] do
+    let proj := mkIdent (ns ++ names[i]!)
+    let raw := mkIdent raws[i]!
+    let ty := types[i]!
+    cmds := cmds.push (← `(command|
+      def $proj {W : $wrap} {k : Nat} (state : $id ($atId k W)) : W $ty := (state.$raw).get))
+
+  -- the instance comes first, its identifiers inlined, so that `Idents` below can be stated as
+  -- `SVars.Idents` rather than `Symbols.Sig.Idents`: dot notation walks the unfolding chain, so
+  -- `ids.declareAt k` is found only if `SVars.Idents` is *on* that chain
+  cmds := cmds.push (← `(command| instance : $(mkIdent (root ++ `Symbols)) $id where
+    idents _ := ⟨$identArgs,*⟩
+    mapM syms f := return ⟨$mapArgs,*⟩))
+  cmds := cmds.push (← `(command|
+    abbrev $(mkIdent (ns ++ `Idents)) := $(mkIdent (root ++ `SVars.Idents)) (S := $id)))
+  cmds := cmds.push (←
+    `(command| def $(mkIdent (ns ++ `idents)) : $(mkIdent (ns ++ `Idents)) := ⟨$identArgs,*⟩))
+  -- the two specialised aliases, after the instance they need
+  cmds := cmds.push (← `(command|
+    abbrev $(mkIdent (ns ++ `TermsAt)) $omegaArg (k : Nat) :=
+      $(mkIdent (root ++ `SVars.TermsAt)) (S := $id) k))
+  cmds := cmds.push (← `(command|
+    abbrev $(mkIdent (ns ++ `ValuesAt)) (k : Nat) :=
+      $(mkIdent (root ++ `SVars.ValuesAt)) (S := $id) k))
+  for mk in extras do
+    cmds := cmds.push (← mk id)
+  for cmd in cmds do elabCommand cmd
+
 /-- Emits a symbols structure and everything generated beside it.
 
 `root` is the layer's namespace, and `extras` the aliases only that layer has — `Fun` and `Pred`

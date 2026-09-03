@@ -229,8 +229,8 @@ same     : true
 #guard_msgs in #eval Env.runIO do
   let term ← Term.mkValue value
   println! "term     : {term}"
-  println! "round trip: {← term.getValue}"
-  println! "same     : {(← term.getValue) == value}"
+  println! "round trip: {← term.extractValue}"
+  println! "same     : {(← term.extractValue) == value}"
 
 /-! The reader walks the constructor's arguments, so it works on a term that was *built* — sets and
 sequences need a model's answer, records do not. -/
@@ -240,9 +240,9 @@ not a value: caught: `p` is not a record value
 -/
 #guard_msgs in #eval Env.runIO do
   let built ← Term.mkRecord (← fields)
-  println! "built    : {← built.getValue}"
+  println! "built    : {← built.extractValue}"
   let p ← (← Solver.new).declareConst P "p"
-  println! "not a value: {← caught do pure s!"{← p.getValue}"}"
+  println! "not a value: {← caught do pure s!"{← p.extractValue}"}"
 
 /-! And out of a model, in one go rather than field by field. -/
 
@@ -272,7 +272,7 @@ ordered  : true
   println! "inner a  : {(nested.get "inner").get "a"}"
   let term ← Term.mkValue nested
   println! "term     : {term}"
-  println! "back     : {← term.getValue}"
+  println! "back     : {← term.extractValue}"
   -- ordered, so a set of records can be spelled *and* built
   println! "ordered  : {compare value (value.set "a" 8) == Ordering.lt}"
 

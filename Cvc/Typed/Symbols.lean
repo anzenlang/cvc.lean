@@ -7,6 +7,7 @@ Authors: Adrien Champion
 
 module
 
+public import Cvc.Untyped.Symbols
 public meta import Cvc.Gen.Symbols
 public import Cvc.Typed.Solver
 
@@ -46,12 +47,15 @@ namespace Cvc.Typed public section
 
 namespace Symbols
 
+@[inherit_doc Cvc.Untyped.Symbols.Wrap]
 abbrev Wrap : Type 1 := (α : Type) → [ToTyp α] → [TermToValue α] → Type
 
+@[inherit_doc Cvc.Untyped.Symbols.Sig]
 abbrev Sig : Type 1 := Wrap → Type
 
 namespace Sig variable (sig : Sig)
 
+@[inherit_doc Cvc.Untyped.Symbols.Idents]
 abbrev Idents : Type := sig (fun _α => String)
 
 abbrev Terms [Ω] : Type := sig (Typed.Term ·)
@@ -76,10 +80,15 @@ section variable {S : Symbols.Sig} [inst : Symbols S]
 
 namespace Symbols
 
+@[inherit_doc Untyped.Symbols.Idents]
 abbrev Idents [Symbols S] := Sig.Idents S
+
 abbrev Terms [Ω] [Symbols S] := Sig.Terms S
+
 abbrev Values [Symbols S] := Sig.Values S
+
 abbrev Fun [Symbols S] := Sig.Fun S
+
 abbrev Pred [Symbols S] := Sig.Pred S
 
 namespace Sig

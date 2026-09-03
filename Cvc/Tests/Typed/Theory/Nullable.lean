@@ -104,7 +104,7 @@ of Bool : (nullable.some true) → (some true)
   let roundTrip (α : Type) [Cvc.Typed.SrtLike α] (value : Option α) [ToString α]
   : Env String := do
     let term : Term (Option α) ← mkValue value
-    let back : Option α ← getValue term
+    let back : Option α ← extractValue term
     return s!"{term.erase} → {back}"
   println! "some 3  : {← roundTrip Int (some 3)}"
   println! "none    : {← roundTrip Int none}"

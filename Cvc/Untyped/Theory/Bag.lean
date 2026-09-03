@@ -56,7 +56,7 @@ partial def getBagValue [TermToValue α] (term : Term) : Env (Cvc.Bag α) := do
   | .BAG_EMPTY => return Cvc.Bag.empty
   | .BAG_MAKE =>
     let ⟨kids, _⟩ ← term.getSizedKids 2
-    return Cvc.Bag.empty.insert (← getValue kids[0]) (← getValue kids[1])
+    return Cvc.Bag.empty.insert (← extractValue kids[0]) (← extractValue kids[1])
   | .BAG_UNION_MAX | .BAG_UNION_DISJOINT =>
     let ⟨kids, _⟩ ← term.getSizedKids 2
     let lft : Cvc.Bag α ← getBagValue kids[0]

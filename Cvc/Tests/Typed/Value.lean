@@ -43,11 +43,11 @@ String : hello world
 BitVec : 0x0a#8
 -/
 #guard_msgs in #eval Env.runIO do
-  println! "Bool   : {← Term.getValue (← Term.mkValue true)}"
-  println! "Int    : {← Term.getValue (← Term.mkValue (-7 : Int))}"
-  println! "Rat    : {← Term.getValue (← Term.mkValue (-3/4 : Rat))}"
-  println! "String : {← Term.getValue (← Term.mkValue "hello world")}"
-  println! "BitVec : {← Term.getValue (← Term.mkValue (10 : BitVec 8))}"
+  println! "Bool   : {← Term.extractValue (← Term.mkValue true)}"
+  println! "Int    : {← Term.extractValue (← Term.mkValue (-7 : Int))}"
+  println! "Rat    : {← Term.extractValue (← Term.mkValue (-3/4 : Rat))}"
+  println! "String : {← Term.extractValue (← Term.mkValue "hello world")}"
+  println! "BitVec : {← Term.extractValue (← Term.mkValue (10 : BitVec 8))}"
 
 -- and the reader's index is what makes a mismatch impossible to write: `getBoolValue` takes a
 -- `Term Bool` and nothing else
@@ -58,8 +58,8 @@ example : Res Bool := Term.getBoolValue b
 example : Res Int := Term.getIntValue i
 example : Env (BitVec 8) := Term.getBitVecValue bv
 
-/-- info: @Term.getValue : [inst : Ω] → {α : Type} → [A : TermToValue α] → Term α → Env α -/
-#guard_msgs in #check @Cvc.Typed.Term.getValue
+/-- info: @Term.extractValue : [inst : Ω] → {α : Type} → [A : TermToValue α] → Term α → Env α -/
+#guard_msgs in #check @Cvc.Typed.Term.extractValue
 
 /-- info: @Term.getBitVecValue : [inst : Ω] → {size : Nat} → Term (BitVec size) → Env (BitVec size) -/
 #guard_msgs in #check @Cvc.Typed.Term.getBitVecValue
@@ -100,10 +100,10 @@ TotalMap : { 1 ↦ 10, 2 ↦ 20, _ ↦ 0 }
 -/
 #guard_msgs in #eval Env.runIO do
   let bag : Cvc.Bag Int := (Cvc.Bag.empty.insert 1 2).insert 3 1
-  println! "Bag      : {← Term.getValue (← Term.mkValue bag)}"
+  println! "Bag      : {← Term.extractValue (← Term.mkValue bag)}"
 
   let map : Cvc.TotalMap Int Int := ((Cvc.TotalMap.mkConst 0).insert 1 10).insert 2 20
-  println! "TotalMap : {← Term.getValue (← Term.mkValue map)}"
+  println! "TotalMap : {← Term.extractValue (← Term.mkValue map)}"
 
 
 

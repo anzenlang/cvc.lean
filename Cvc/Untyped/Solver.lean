@@ -400,16 +400,19 @@ end check_sat
 @[inherit_doc S.getValue]
 def getValue (term : Term) : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValue term
 
+@[inherit_doc S.getValue]
+abbrev _root_.Cvc.Untyped.Term.getValue {s: Solver} (term : Term) : s.EnvSat Term := s.getValue term
+
 @[inherit_doc S.getValues]
 def getValues (terms : Terms) : s.EnvSat Terms := runUnsafe' do s.toUnsafe.getValues terms
 
 /-- The value the model gives a term, as the Lean value `α` denotes. -/
 def getValueAs (α : Type) [TermToValue α] (term : Term) : s.EnvSat α := do
-  Term.getValue (α := α) (← s.getValue term)
+  Term.extractValue (α := α) (← s.getValue term)
 
 /-- The values the model gives some terms, as the Lean values `α` denotes. -/
 def getValuesAs (α : Type) [TermToValue α] (terms : Terms) : s.EnvSat (Array α) := do
-  (← s.getValues terms).mapM fun value => (Term.getValue value : s.EnvSat α)
+  (← s.getValues terms).mapM fun value => (Term.extractValue value : s.EnvSat α)
 
 @[inherit_doc S.getModelDomainElements]
 def getModelDomainElements (sort : Srt) : s.EnvSat Terms :=

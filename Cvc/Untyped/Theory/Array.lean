@@ -65,11 +65,11 @@ where
   peel (acc : Std.TreeMap α β) (term : Term) : Env (Cvc.TotalMap α β) := do
     if term.getKind? = some .STORE then
       let ⟨kids, _⟩ ← term.getSizedKids 3
-      let idx : α ← getValue kids[1]
-      let elem : β ← getValue kids[2]
+      let idx : α ← extractValue kids[1]
+      let elem : β ← extractValue kids[2]
       peel (if acc.contains idx then acc else acc.insert idx elem) kids[0]
     else if let some dflt := term.getConstArrayBase? then
-      return .mk (← getValue dflt) acc
+      return .mk (← extractValue dflt) acc
     else throwUser s!"expected a constant array term, got `{term}`"
 
 instance [ValueToTerm α] [ValueToTerm β] : ValueToTerm (Cvc.TotalMap α β) := ⟨mkArrayValue⟩

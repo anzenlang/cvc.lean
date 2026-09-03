@@ -98,14 +98,14 @@ inner ∅ → (nullable.some (as nullable.null (Nullable Int))) → (some none)
 #guard_msgs in #eval Env.runIO do
   let roundTrip (value : Option Int) : Env String := do
     let term ← Term.mkValue value
-    let back : Option Int ← Term.getValue term
+    let back : Option Int ← Term.extractValue term
     return s!"{term} → {back}"
   println! "some 3  → {← roundTrip (some 3)}"
   println! "none    → {← roundTrip none}"
 
   let nested (value : Option (Option Int)) : Env String := do
     let term ← Term.mkValue value
-    let back : Option (Option Int) ← Term.getValue term
+    let back : Option (Option Int) ← Term.extractValue term
     return s!"{term} → {back}"
   println! "nested  → {← nested (some (some 3))}"
   println! "inner ∅ → {← nested (some none)}"
@@ -130,7 +130,7 @@ rejected   : expected a nullable value, got `x`
   println! "element    : {← Term.isNullableValue (← Term.nullableVal some3)}"
   let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
   println! "rejected   : {← caught do
-    let v : Option Int ← Term.getValue x
+    let v : Option Int ← Term.extractValue x
     pure s!"{v}"}"
 
 

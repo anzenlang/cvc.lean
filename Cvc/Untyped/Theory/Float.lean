@@ -102,7 +102,7 @@ def toTerm : (f : Cvc.Float exp sig) → Env Term
 /-- The floating-point value a constant term denotes, at whatever sizes it turns out to have. -/
 def ofTermErased (term : Term) : Env Cvc.Float.Erased := do
   if let some (exp, sig, bv) := term.getFloatComponents? then
-    return {exp, sig, get := .ofBitVec (← getValue bv)}
+    return {exp, sig, get := .ofBitVec (← extractValue bv)}
   let srt ← term.getSort
   let exp ← UInt32.toNat <$> srt.getFloatingPointExponentSize
   let sig ← UInt32.toNat <$> srt.getFloatingPointSignificandSize

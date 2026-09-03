@@ -36,17 +36,17 @@ String : hello world
 BitVec : 0x0a#8
 -/
 #guard_msgs in #eval Env.runIO do
-  println! "Bool   : {← Term.getValueAs Bool (← Term.mkValue true)}"
-  println! "Int    : {← Term.getValueAs Int (← Term.mkValue (-7 : Int))}"
-  println! "Rat    : {← Term.getValueAs Rat (← Term.mkValue (-3/4 : Rat))}"
-  println! "String : {← Term.getValueAs String (← Term.mkValue "hello world")}"
-  println! "BitVec : {← Term.getValueAs (BitVec 8) (← Term.mkValue (10 : BitVec 8))}"
+  println! "Bool   : {← Term.extractValueAs Bool (← Term.mkValue true)}"
+  println! "Int    : {← Term.extractValueAs Int (← Term.mkValue (-7 : Int))}"
+  println! "Rat    : {← Term.extractValueAs Rat (← Term.mkValue (-3/4 : Rat))}"
+  println! "String : {← Term.extractValueAs String (← Term.mkValue "hello world")}"
+  println! "BitVec : {← Term.extractValueAs (BitVec 8) (← Term.mkValue (10 : BitVec 8))}"
 
 -- `Nat` builds a term but has no reader: the sort is `Int`, so reading one back would have to fail
 -- on a negative value rather than answer
 /-- info: Nat as Int : 42 -/
 #guard_msgs in #eval Env.runIO do
-  println! "Nat as Int : {← Term.getValueAs Int (← Term.mkValueAs Nat 42)}"
+  println! "Nat as Int : {← Term.extractValueAs Int (← Term.mkValueAs Nat 42)}"
 
 -- a bit-vector is read at the size asked for, and a mismatch is an error rather than a truncation
 /-- info: wrong size : caught -/
@@ -54,7 +54,7 @@ BitVec : 0x0a#8
   let term ← Term.mkValue (10 : BitVec 8)
   let outcome ←
     try
-      let _ ← Term.getValueAs (BitVec 16) term
+      let _ ← Term.extractValueAs (BitVec 16) term
       pure "no error"
     catch _ => pure "caught"
   println! "wrong size : {outcome}"
@@ -112,12 +112,12 @@ TotalMap : { 1 ↦ 10, 2 ↦ 20, _ ↦ 0 }
 -/
 #guard_msgs in #eval Env.runIO do
   let bag : Cvc.Bag Int := (Cvc.Bag.empty.insert 1 2).insert 3 1
-  println! "Bag      : {← Term.getValueAs (Cvc.Bag Int) (← Term.mkValue bag)}"
+  println! "Bag      : {← Term.extractValueAs (Cvc.Bag Int) (← Term.mkValue bag)}"
   let empty : Cvc.Bag Int := Cvc.Bag.empty
-  println! "empty bag: {← Term.getValueAs (Cvc.Bag Int) (← Term.mkValue empty)}"
+  println! "empty bag: {← Term.extractValueAs (Cvc.Bag Int) (← Term.mkValue empty)}"
 
   let map : Cvc.TotalMap Int Int := ((Cvc.TotalMap.mkConst 0).insert 1 10).insert 2 20
-  println! "TotalMap : {← Term.getValueAs (Cvc.TotalMap Int Int) (← Term.mkValue map)}"
+  println! "TotalMap : {← Term.extractValueAs (Cvc.TotalMap Int Int) (← Term.mkValue map)}"
 
 
 
@@ -141,7 +141,7 @@ wrong exp: caught
 -/
 #guard_msgs in #eval Env.runIO do
   let roundTrip (f : Cvc.Float 8 24) : Env (Cvc.Float 8 24) := do
-    Term.getValueAs (Cvc.Float 8 24) (← Term.mkValue f)
+    Term.extractValueAs (Cvc.Float 8 24) (← Term.mkValue f)
   println! "+oo      : {← roundTrip .posInf}"
   println! "NaN      : {← roundTrip .nan}"
   println! "-0       : {← roundTrip .negZero}"
@@ -150,7 +150,7 @@ wrong exp: caught
   let outcome ←
     try
       let single ← Term.mkValueAs (Cvc.Float 8 24) .posInf
-      let _ ← Term.getValueAs (Cvc.Float 11 53) single
+      let _ ← Term.extractValueAs (Cvc.Float 11 53) single
       pure "no error"
     catch _ => pure "caught"
   println! "wrong exp: {outcome}"
@@ -163,11 +163,11 @@ wrong size : caught
 #guard_msgs in #eval Env.runIO do
   let elem : Cvc.FiniteField 5 := {repr := 3}
   let term ← Term.mkValue elem
-  println! "field      : {← Term.getValueAs (Cvc.FiniteField 5) term}"
+  println! "field      : {← Term.extractValueAs (Cvc.FiniteField 5) term}"
 
   let outcome ←
     try
-      let _ ← Term.getValueAs (Cvc.FiniteField 7) term
+      let _ ← Term.extractValueAs (Cvc.FiniteField 7) term
       pure "no error"
     catch _ => pure "caught"
   println! "wrong size : {outcome}"

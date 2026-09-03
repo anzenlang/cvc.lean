@@ -221,7 +221,11 @@ def% blockModelValues : (s : Solver) → (terms : Terms α) → s.EnvSat Unit �
 /-- The value the model gives a term, as the Lean value its index describes. -/
 def getValue [TermToValue α] (term : Term α) : s.EnvSat α := do
   let value ← s.getValueTerm term
-  Term.getValue value
+  Term.extractValue value
+
+@[inherit_doc getValue]
+abbrev _root_.Cvc.Typed.Term.getValue [TermToValue α] {s : Solver} (term : Term α) : s.EnvSat α :=
+  s.getValue term
 
 /-- The values the model gives some terms, as the Lean values their index describes. -/
 def getValues [TermToValue α] (terms : Terms α) : s.EnvSat (Array α) := do

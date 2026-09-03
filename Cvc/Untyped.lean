@@ -12,3 +12,4 @@ public import Cvc.Untyped.Core
 public import Cvc.Untyped.Solver
 public import Cvc.Untyped.Symbols
 public import Cvc.Untyped.Theory
+public import Cvc.Untyped.Extra

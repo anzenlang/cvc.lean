@@ -48,8 +48,10 @@ namespace Cvc.Untyped public section
 
 namespace Symbols
 
+/-- Signature of the symbol wrapper. -/
 abbrev Wrap : Type 1 := (α : Type) → [ToTyp α] → [TermToValue α] → Type
 
+/-- Signature of a user-provided type representing some symbols. -/
 abbrev Sig : Type 1 := Wrap → Type
 
 namespace Sig variable (sig : Sig)
@@ -76,6 +78,7 @@ section variable {S : Symbols.Sig} [inst : Symbols S]
 
 namespace Symbols
 
+/-- Specialization of `S` where each symbol is a `String`. -/
 abbrev Idents [Symbols S] := Sig.Idents S
 abbrev Terms [Ω] [Symbols S] := Sig.Terms S
 abbrev Values [Symbols S] := Sig.Values S
@@ -96,7 +99,7 @@ def Idents.declare [Ω] (idents : S.Idents) : Env S.Terms :=
 def Terms.getValues [Ω] (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values := do
   S.mapM terms fun term => do
     let valueTerm ← solver.getValue term
-    valueTerm.getValue
+    valueTerm.extractValue
 
 /-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
 
