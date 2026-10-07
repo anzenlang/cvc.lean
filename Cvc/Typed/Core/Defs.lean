@@ -41,15 +41,15 @@ namespace Term
 def erase (t : Term α) : Untyped.Term := t
 
 /-- Types an untyped term. -/
-def ofUntyped' (t : Untyped.Term) (α : Type) [ToTyp α] : Env (Term α) := do
+def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
   let srt ← t.getSort
   let srt' ← Srt.of α
   if srt != srt' then
     throwUser s!"cannot type the following term as `{srt'}`, term has sort `{srt}`:\n{t}"
   return t
 
-@[inherit_doc ofUntyped']
-abbrev ofUntyped [ToTyp α] (t : Untyped.Term) : Env (Term α) := ofUntyped' t α
+@[inherit_doc ofUntypedAs]
+abbrev ofUntyped [ToTyp α] (t : Untyped.Term) : Env (Term α) := ofUntypedAs α t
 
 /-! ## Substitution
 
@@ -86,9 +86,9 @@ def heteroSubstitute (t : Term α) (terms : Array ((β : Type) × Term β × Ter
 
 end Term
 
-@[inherit_doc Typed.Term.ofUntyped']
-def _root_.Cvc.Untyped.Term.typeCheckAs (t : Untyped.Term) (α : Type) [ToTyp α]
-: Env (Term α) := Typed.Term.ofUntyped' t α
+@[inherit_doc Typed.Term.ofUntypedAs]
+def _root_.Cvc.Untyped.Term.typeCheckAs (α : Type) [ToTyp α] (t : Untyped.Term)
+: Env (Term α) := Typed.Term.ofUntypedAs α t
 
 @[inherit_doc Untyped.Term.typeCheckAs]
 def _root_.Cvc.Untyped.Term.typeCheck [ToTyp α] (t : Untyped.Term)

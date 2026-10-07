@@ -99,7 +99,7 @@ def ctor (α : Type) [ToTyp α] (name : String) : Env (Ctor α) := do
 
 end Datatype
 
-open Datatype (Args Ctor Field)
+open Typed.Datatype (Args Ctor Field)
 
 
 
@@ -194,7 +194,7 @@ structure Case (α β : Type) where
 
 end Datatype
 
-open Datatype (Case)
+open Typed.Datatype (Case)
 
 
 

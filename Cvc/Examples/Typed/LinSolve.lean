@@ -13,7 +13,7 @@ public import Cvc.Typed.Solver
 
 
 
-namespace LinSolve open Cvc Typed variable {Syms : Symbols.Sig}
+namespace LinSolve open Cvc Typed variable [Ω] {Syms : Symbols.Sig}
 
 inductive Result (S : Symbols Syms)
 | sat (values : S.Values)
@@ -21,12 +21,12 @@ inductive Result (S : Symbols Syms)
 | unknown
 | error (e : Error)
 
-structure State [Ω] (S : Symbols Syms) where
+structure State (S : Symbols Syms) where
   solver : Solver
   terms : S.Terms
   constraints : Array (String × Term Bool)
 
-namespace State variable [Ω] [S : Symbols Syms]
+namespace State variable [S : Symbols Syms]
 
 def init (vars : S.Idents) (constraints : Array (String × S.Pred)) : Env (State S) := do
   let terms ← vars.declare
