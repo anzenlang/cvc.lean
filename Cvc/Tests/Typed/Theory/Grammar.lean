@@ -67,16 +67,34 @@ that is just the start sort, which is the shape `getInterpolant` and `getAbduct`
 section signatures
 variable [Ω] (s : Solver) (i : BVar Int) (b : BVar Bool) (nt : NT Int) (ntB : NT Bool)
 
-example : Env (Typed.Grammar Int) := s.mkGrammar [] nt
-example : Env (Typed.Grammar (Int → Int)) := s.mkGrammar (BVars.push i []) nt
-example : Env (Typed.Grammar (Int → Bool → Int)) := s.mkGrammar (BVars.push b (BVars.push i [])) nt
-example : Env (Typed.Grammar Bool) := s.mkGrammar [] ntB
+example : Env (s.Grammar Int) := s.mkGrammar [] nt
+example : Env (s.Grammar (Int → Int)) := s.mkGrammar (BVars.push i []) nt
+example : Env (s.Grammar (Int → Bool → Int)) := s.mkGrammar (BVars.push b (BVars.push i [])) nt
+example : Env (s.Grammar Bool) := s.mkGrammar [] ntB
 
 /-- info: @Solver.mkGrammar : [inst : Ω] →
-  Solver →
+  (s : Solver) →
     {α : Type} →
-      [ToTyp α] → (boundVars : BVars) → NT α → optParam NTs [] → Env (Typed.Grammar (BVars.signatureTo α boundVars)) -/
+      [ToTyp α] → (boundVars : BVars) → NT α → optParam NTs [] → Env (s.Grammar (BVars.signatureTo α boundVars)) -/
 #guard_msgs in #check @Cvc.Typed.Solver.mkGrammar
+
+-- a grammar belongs to the solver that built it: handing it to another does not typecheck
+/--
+error: Application type mismatch: The argument
+  g
+has type
+  s.Grammar Bool
+but is expected to have type
+  s₂.Grammar Bool
+in the application
+  some g
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Untyped.Solver ↦ 1
+-/
+#guard_msgs in
+example (s₂ : Solver) (g : s.Grammar Bool) (conj : Term Bool) : Env (Option (Term Bool)) :=
+  s₂.getInterpolant conj (some g)
 
 end signatures
 
@@ -96,12 +114,13 @@ has type
 but is expected to have type
   Term Int
 in the application
-  g.addRule nt tru
+  Grammar.addRule g nt tru
 
 Note: The following definitions were not unfolded because their definition is not exposed:
   Term ↦ 4 -/
 #guard_msgs in
-example [Ω] (g : Typed.Grammar Int) (nt : NT Int) (tru : Term Bool) : Env (Typed.Grammar Int) :=
+example [Ω] (s : Solver) (g : s.Grammar Int) (nt : NT Int) (tru : Term Bool)
+: Env (s.Grammar Int) :=
   g.addRule nt tru
 
 /-- info: foreign nt : caught -/
@@ -153,13 +172,86 @@ constrained: (< a b)
 
   let a ← s.declareConst Int "a"
   let b ← s.declareConst Int "b"
-  (do Term.lt a b) >>= s.assert
+  Term.lt a b >>= s.assert
   let goal ← Term.lt a (← Term.add b (← Term.mkInt 1))
 
-  println! "no grammar : {← s.getInterpolant goal}"
+  let some free ← s.getInterpolant goal | println! "no interpolant"
+  println! "no grammar : {free}"
 
   let start ← NT.mk (α := Bool) "start"
   let g ← s.mkGrammar [] start
   let g ← g.addRule start (← Term.lt a b)
   let g ← g.addRule start (← Term.equal a b)
-  println! "constrained: {← s.getInterpolant goal g}"
+  let some constrained ← s.getInterpolant goal g | println! "no interpolant"
+  println! "constrained: {constrained}"
+
+
+
+/-! ## `grammar!`
+
+The block form builds the same grammar as `mkGrammar` and the builders, with the same index: the
+parameters folded over the start symbol's sort.
+-/
+
+/-- info:
+block : ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let g ← grammar! s (x y : Int) where
+    start : Int  := x | y | if cnd then start else start
+    cnd   : Bool := start ≤ start
+  println! "block : {g}"
+  let g ← grammar! s (x : Int) where
+    start : Int := 0 | ?const | ?var | start + start
+  println! "any   : {g}"
+
+section indices
+variable [Ω] (s : Solver)
+
+/-- With parameters, the index is the signature a `synth-fun` over the grammar has. -/
+example : Env (s.Grammar (Int → Bool → Int)) := grammar! s (x : Int) (b : Bool) where
+  start : Int := x | if b then start else start
+/-- Without, it is the start sort, which is what interpolants and abducts ask for. -/
+example : Env (s.Grammar Bool) := grammar! s where
+  start : Bool := true | false
+
+end indices
+
+/-! An alternative at the wrong sort is reported at that alternative. -/
+
+/--
+error: Type mismatch
+  Term.mkTrue
+has type
+  Env (Term Bool)
+but is expected to have type
+  Env (Term Int)
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Term ↦ 6
+-/
+#guard_msgs in
+example [Ω] (s : Solver) : Env (s.Grammar Int) := grammar! s where
+  start : Int := 0 | true
+
+/-! The interpolation of the remainders example, with the grammar written as a block: no single
+remainder fact rules out both 5 and 6, so the interpolant is a conjunction. -/
+
+/-- info: interpolant : (and (= (mod y 2) 1) (= (mod y 3) 0)) -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+  let x ← s.declareConst Int "x"
+  let y ← s.declareConst Int "y"
+  smt! y = 6 * x + 3 >>= s.assert
+  smt! x ≥ 0 >>= s.assert
+  let g ← grammar! s where
+    start : Bool := atom | atom ∧ start
+    atom  : Bool := y % k = r
+    k     : Int  := 2 | 3 | 4 | 5
+    r     : Int  := 0 | 1 | 2
+  let some i ← s.getInterpolant (← smt! ¬ (y = 5) ∧ ¬ (y = 6)) g | println! "no interpolant"
+  println! "interpolant : {i}"

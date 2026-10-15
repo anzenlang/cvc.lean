@@ -123,7 +123,7 @@ model    : 7
 
   -- the indices are exact, so the model read needs no `typeCheck`
   let x ← s.declareConst Pair "x"
-  (do Term.equal x p) >>= s.assert
+  Term.equal x p >>= s.assert
   let xFst ← fst.get x
   s.checkSat (ifSat := do println! "model    : {← s.getValue xFst}")
 
@@ -219,7 +219,7 @@ head of l : 7
 
   -- `l` is a one-element list, so the match takes the `cons` branch
   let seven ← consC.apply2 (← Term.mkInt 7) (← nilC.apply)
-  (do Term.equal l seven) >>= s.assert
+  Term.equal l seven >>= s.assert
   s.checkSat (ifSat := do println! "head of l : {← s.getValue m}")
 
 /-! What a `Case` checks is what `Ctor.apply` checks: the constructor's arity, and the sorts of the
@@ -308,7 +308,7 @@ head of l : 15
 
   let consC ← Datatype.ctor Lst "cons"
   let seven ← consC.apply2 (← Term.mkInt 7) (← (← Datatype.ctor Lst "nil").apply)
-  (do Term.equal l seven) >>= s.assert
+  Term.equal l seven >>= s.assert
   s.checkSat (ifSat := do println! "head of l : {← s.getValue m}")
 
 /-- info:

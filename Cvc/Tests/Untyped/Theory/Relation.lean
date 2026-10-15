@@ -112,7 +112,7 @@ An equi-join on the one shared column, against the product it filters.
   let product ← Term.relProduct a b
   -- a joined row that is not a product row would be a counterexample
   let sub ← Term.setSubset joined product
-  (do Term.not sub) >>= s.assert
+  Term.not sub >>= s.assert
   println! "join ⊆ product : {
     if ← s.checkIsSat then "SAT" else "unsat (so every joined pair is a product pair)"}"
 
@@ -169,7 +169,7 @@ aggrAll : (set.singleton 13)
   let tuple (i : Int) (b : Bool) : Env Term := do
     Term.setSingleton (← Term.mkTuple #[← Term.mkInt i, ← Term.mkBool b])
   let value ← Term.setUnionN #[← tuple 1 true, ← tuple 2 true, ← tuple 10 false]
-  (do Term.equal a value) >>= s.assert
+  Term.equal a value >>= s.assert
 
   s.checkSat (ifSat := do
     println! "aggr    : {← s.getValue aggr}"

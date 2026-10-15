@@ -158,7 +158,7 @@ join ⊆ product     : unsat
   let s ← Solver.new
   let pair ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
   let single ← relSingleton pair
-  (do not (← relMember pair single)) >>= s.assert
+  not (← relMember pair single) >>= s.assert
   println! "1,true ∈ singleton : {if ← s.checkIsSat then "SAT" else "unsat (so it is a member)"}"
 
   let s2 ← Solver.new
@@ -166,7 +166,7 @@ join ⊆ product     : unsat
   let b ← s2.declareConst (Rel [Bool] Rat) "B"
   let joined ← relTableJoin #[(1, 0)] a b
   let product ← relProduct a b
-  (do not (← relSubset joined product)) >>= s2.assert
+  not (← relSubset joined product) >>= s2.assert
   println! "join ⊆ product     : {if ← s2.checkIsSat then "SAT" else "unsat"}"
 
 
@@ -315,7 +315,7 @@ aggrAll : { 13 }
   let tuple (i : Int) (b : Bool) : Env (Term (Rel [Int] Bool)) := do
     relSingleton (← mkTup (.cons (← mkInt i) (.last (← mkBool b))))
   let value ← relUnion (← tuple 1 true) (← relUnion (← tuple 2 true) (← tuple 10 false))
-  (do equal a value) >>= s.assert
+  equal a value >>= s.assert
 
   s.checkSat (ifSat := do
     println! "aggr    : {← s.getValue aggr}"
@@ -431,7 +431,7 @@ tupRest = at 1 : yes
   let t ← mk4
   let agree {α : Type} (label : String) (a b : Term α) : Env Unit := do
     s.push
-    (do equal a b >>= Term.not) >>= s.assert
+    equal a b >>= Term.not >>= s.assert
     println! "{label} : {if ← s.checkIsSat then "NO" else "yes"}"
     s.pop
   agree "tupFst  = at 0" (← tupFst t) (← t.tupAt col%0)
@@ -545,10 +545,10 @@ and holds nothing else              : yes
   let expected ← mkTup (.cons (← mkString "s" false) (.last (← mkInt 1)))
 
   s.push
-  (do relMember expected projected >>= Term.not) >>= s.assert
+  relMember expected projected >>= Term.not >>= s.assert
   println! "projection holds the expected tuple : {if ← s.checkIsSat then "NO" else "yes"}"
   s.pop
 
   -- membership alone would not rule out a projection holding more, so pin it exactly
-  (do equal projected (← relSingleton expected) >>= Term.not) >>= s.assert
+  equal projected (← relSingleton expected) >>= Term.not >>= s.assert
   println! "and holds nothing else              : {if ← s.checkIsSat then "NO" else "yes"}"

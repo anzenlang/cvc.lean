@@ -95,9 +95,9 @@ result `none`, even where the operator would not need that argument's value.
   let lt ← Term.lt? x y
   let ltNull ← Term.lt? z y
 
-  (do Term.equal x (← Term.nullableSome (← Term.mkInt 3))) >>= s.assert
-  (do Term.equal y (← Term.nullableSome (← Term.mkInt 4))) >>= s.assert
-  (do Term.nullableIsNull z) >>= s.assert
+  Term.equal x (← Term.nullableSome (← Term.mkInt 3)) >>= s.assert
+  Term.equal y (← Term.nullableSome (← Term.mkInt 4)) >>= s.assert
+  Term.nullableIsNull z >>= s.assert
 
   s.checkSat (ifSat := do
     println! "3 + 4     : {← s.getValueAs (Option Int) sum}"

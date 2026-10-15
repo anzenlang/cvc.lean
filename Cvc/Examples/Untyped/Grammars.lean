@@ -29,7 +29,7 @@ Two things about grammars are worth knowing before writing one:
   though grammars were persistent, but the object underneath is shared: after `synthFun`, cvc5
   rejects further rules.
 -/
-namespace Cvc.Examples.Untyped.Grammars
+namespace Cvc.Untyped.Examples.Grammars
 
 open Cvc Untyped
 
@@ -142,3 +142,37 @@ solved, but the shape of the answer is the solver's to choose. -/
 
   s.checkSynth (ifSolved := do
     println! "f := {← s.getSynthSolution f}")
+
+
+
+/-! ## Writing one as a block
+
+`grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
+parameters, then one line per non-terminal, the first being the start symbol. A sort is a Lean type
+or a `Srt`, mixed freely.
+
+The parameters are made by the block, out of sight, and `synthFun` must be declared over those very
+variables — so a grammar carries them, as `boundVars`.
+-/
+
+/-- info: max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  let g ← grammar! s (x y : Int) where
+    start : int  := x | y | if cnd then start else start
+    cnd   : Bool := start ≤ start
+
+  let mx ← s.synthFun "max" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  let b ← s.declareSygusVar "b" int
+  let mab ← smt! mx a b
+  s.addSygusConstraint (← smt! mab ≥ a)
+  s.addSygusConstraint (← smt! mab ≥ b)
+  s.addSygusConstraint (← smt! mab = a ∨ mab = b)
+
+  s.checkSynth (ifSolved := do
+    println! "max := {← s.getSynthSolution mx}")

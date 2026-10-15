@@ -9,9 +9,11 @@ module
 
 import Cvc.Typed.Theory.Set
 import Cvc.Typed.Core.Bool
+import Cvc.Typed.Theory.Arith
 
 public meta import Cvc.Typed.Theory.Set
 public meta import Cvc.Typed.Core.Bool
+public meta import Cvc.Typed.Theory.Arith
 
 
 
@@ -120,3 +122,20 @@ mixed     : (and (set.member i s) (set.subset s t))
   println! "minus     : {← smt! s ∖ t}"
   println! "unionN    : {← smt! ∪[s, t, s]}"
   println! "mixed     : {← smt! (i ∈ s) ∧ (s ⊆ t)}"
+
+
+
+/-! ## Comprehension
+
+The index is the element term's: the bound variables, here an `Int` and a `Bool`, do not reach it.
+-/
+
+/-- info: comprehension : (set.comprehension ((x Int) (b Bool)) (and b (> x 0)) (* x 2)) -/
+#guard_msgs in #eval Env.runIO do
+  let x ← Typed.BVar.mk (α := Int) "x"
+  let b ← Typed.BVar.mk (α := Bool) "b"
+  let pred ← and b.toTerm (← gt x.toTerm (← mkInt 0))
+  let elem ← mul x.toTerm (← mkInt 2)
+  let comp : Typed.Term (Cvc.Set Int) ←
+    setComprehension (Typed.BVars.push b (Typed.BVars.push x [])) pred elem
+  println! "comprehension : {comp}"

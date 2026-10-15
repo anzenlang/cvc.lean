@@ -136,7 +136,7 @@ values  : #[1, true, (/ 1 2)]
   let x ← s.declareConst Int "x"
   let lft ← Term.mkTuple x (.last (← Term.mkTrue))
   let rgt ← Term.mkTuple (← Term.mkInt 4) (.last (← Term.mkTrue))
-  (do Term.equal lft rgt) >>= s.assert
+  Term.equal lft rgt >>= s.assert
 
   s.checkSat (ifSat := do println! "x = {← s.getValue x}")
 
@@ -195,7 +195,7 @@ two are the same term to the solver, which is what this checks.
   let viaSnd ← x.snd
   let viaProject ← Untyped.Term.tupleProject #[1, 2] x.erase
   let same ← Untyped.Term.equal viaSnd.erase viaProject
-  (do Untyped.Term.not same) >>= Untyped.Solver.assert s
+  Untyped.Term.not same >>= Untyped.Solver.assert s
   println! "snd = tupleProject #[1, 2] : {if ← Untyped.Solver.checkIsSat s then "SAT" else "unsat"}"
 
 /-! Both read back off a *symbolic* tuple, which is what distinguishes them from `getTupleValue`:
@@ -210,7 +210,7 @@ snd : false
   let s ← Solver.new
   s.setOption "produce-models" "true"
   let x ← s.declareConst (Int × Bool) "x"
-  (do Term.equal x (← Term.mkTuple (← Term.mkInt 9) (.last (← Term.mkFalse)))) >>= s.assert
+  Term.equal x (← Term.mkTuple (← Term.mkInt 9) (.last (← Term.mkFalse))) >>= s.assert
   let first ← x.fst
   let second ← x.snd
   s.checkSat (ifSat := do

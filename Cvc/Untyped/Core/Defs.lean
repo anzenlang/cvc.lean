@@ -32,6 +32,16 @@ and have the generator's `T.<id>` delegation resolve.
 -/
 namespace Cvc.Untyped public section variable [Ω]
 
+/-- A sort-erased cvc5 term.
+
+The term carries no sort on the Lean side: its sort is known to cvc5 alone, so a sort mistake, such
+as `and` applied to an integer, is reported by cvc5 at runtime. In exchange, terms of different
+sorts share one type, and an `Array Term` can hold them side by side.
+
+A term belongs to the `Ω` scope it was built in and cannot leave it. At runtime it is exactly a
+cvc5 term, so the wrapper costs nothing. `typeCheck` checks its sort against a Lean type and gives
+it that type as an index, producing a `Cvc.Typed.Term`.
+-/
 def3% Term ← cvc5.Term
 
 /-- An array of sort-erased terms. -/

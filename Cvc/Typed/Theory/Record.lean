@@ -263,7 +263,8 @@ macro_rules
       let checked ← fields.mapIdxM fun i field =>
         match recFieldSrt? field with
         | some srt =>
-          `($(terms[i]!) >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+          let check := layer.op `checkFieldSrt
+          `($(terms[i]!) >>= fun v => srtOf% ($srt) >>= fun srt => $check $(names[i]!) srt v)
         | Option.none => pure terms[i]!
       bindArgs checked fun ids => do
         let last := ids.size - 1
@@ -281,7 +282,8 @@ macro_rules
         let value ← deferSmt layer (recFieldTerm field)
         match recFieldSrt? field with
         | some srt =>
-          `($value >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+          let check := layer.op `checkFieldSrt
+          `($value >>= fun v => srtOf% ($srt) >>= fun srt => $check $(names[i]!) srt v)
         | Option.none => pure value
       recUpdate layer names values record
     | _ => Macro.throwUnsupported

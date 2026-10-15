@@ -45,7 +45,7 @@ def solver (proofs := true) : Env Solver := do
   if proofs then s.setOption "produce-proofs" "true"
   let b ← s.declareConst Bool "b"
   s.assert b
-  (do Term.not b) >>= s.assert
+  Term.not b >>= s.assert
   return s
 
 /-- Every step of a proof tree. -/

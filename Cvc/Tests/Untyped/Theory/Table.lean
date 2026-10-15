@@ -72,7 +72,7 @@ multiplicities, not just on which rows occur.
   let joined ← Term.tableJoin #[(1, 0)] a b
   let product ← Term.tableProduct a b
   let sub ← Term.bagSubbag joined product
-  (do Term.not sub) >>= s.assert
+  Term.not sub >>= s.assert
   println! "join ⊑ product : {
     if ← s.checkIsSat then "SAT" else "unsat (so every joined row is a product row)"}"
 
@@ -130,7 +130,7 @@ aggrAll : (bag 12 1)
   let row (i : Int) (b : Bool) (count : Int) : Env Term := do
     Term.bagMake (← Term.mkTuple #[← Term.mkInt i, ← Term.mkBool b]) (← Term.mkInt count)
   let value ← Term.bagUnionDisjointN #[← row 1 true 2, ← row 10 false 1]
-  (do Term.equal a value) >>= s.assert
+  Term.equal a value >>= s.assert
 
   s.checkSat (ifSat := do
     println! "aggr    : {← s.getValue aggr}"

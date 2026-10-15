@@ -192,7 +192,7 @@ HO_ALL  : sat
     try
       -- one argument at a time, so `applyHo f i` is function-sorted
       let applied ← applyHo (← applyHo f i) b
-      (do equal applied (← mkInt 1)) >>= s.assert
+      equal applied (← mkInt 1) >>= s.assert
       pure (if ← s.checkIsSat then "sat" else "unsat")
     catch e => pure s!"ERR {e}"
 
@@ -215,7 +215,7 @@ coe chain  : sat
     let f ← s.declareFun (α := Int → Bool → Int) "f"
     let i ← s.declareConst Int "i"
     let b ← s.declareConst Bool "b"
-    (do equal (← build f i b) (← mkInt 1)) >>= s.assert
+    equal (← build f i b) (← mkInt 1) >>= s.assert
     pure (if ← s.checkIsSat then "sat" else "unsat")
 
   println! "applyN     : {← attempt fun f i b => applyN f (.cons i (.last b))}"

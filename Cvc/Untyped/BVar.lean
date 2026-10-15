@@ -34,6 +34,9 @@ lambda or witness. Each call produces a fresh variable even for the same name an
 -/
 def mk (srt : Srt) (name : String) : Env BVar := runUnsafe fun tm => tm.mkVar srt.toUnsafe name
 
+/-- Same as `mk` but from a lean type instead of an `Srt`. -/
+def mkAs (α : Type) [ToTyp α] (name : String) : Env BVar := do mk (← Srt.of α) name
+
 /-- Turns itself into a term. -/
 def toTerm : (bv : BVar) → Term := id
 
@@ -62,6 +65,9 @@ namespace Term
 
 @[inherit_doc BVar.mk]
 def mkBVar (srt : Srt) (name : String) : Env BVar := BVar.mk srt name
+
+@[inherit_doc BVar.mkAs]
+def mkBVarAs (α : Type) [ToTyp α] (name : String) : Env BVar := BVar.mkAs α name
 
 @[inherit_doc BVars.lambda]
 def lambda (bvs : BVars) (body : Term) : Env Term := bvs.lambda body

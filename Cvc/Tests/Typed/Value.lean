@@ -79,7 +79,7 @@ def roundTrip [Ω] (α : Type) [SrtLike α] (value : α) : Env α := do
   let s ← Solver.new
   s.setOption "produce-models" "true"
   let x ← s.declareConst α "x"
-  (do Term.equal x (← Term.mkValue value)) >>= s.assert
+  Term.equal x (← Term.mkValue value) >>= s.assert
   s.checkSat (ifSat := s.getValue x)
 
 /-- info:
@@ -123,13 +123,13 @@ xs : #[3, 4]
   s.setOption "produce-models" "true"
 
   let x ← s.declareConst Int "x"
-  (do Term.equal x (← Term.mkValue (3 : Int))) >>= s.assert
+  Term.equal x (← Term.mkValue (3 : Int)) >>= s.assert
 
   let b ← s.declareConst Bool "b"
   s.assert b
 
   let xs ← s.declareConst (Array Int) "xs"
-  (do Term.equal xs (← Term.mkValue #[(3 : Int), 4])) >>= s.assert
+  Term.equal xs (← Term.mkValue #[(3 : Int), 4]) >>= s.assert
 
   s.checkSat (ifSat := do
     println! "x  : {← s.getValue x}"

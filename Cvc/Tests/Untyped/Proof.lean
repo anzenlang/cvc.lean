@@ -43,7 +43,7 @@ def contradiction (s : Solver) : Env Unit := do
   let bool ← Srt.bool
   let b ← s.declareConst "b" bool
   s.assert b
-  (do Term.not b) >>= s.assert
+  Term.not b >>= s.assert
 
 /-- A solver with proofs on, holding `contradiction`. -/
 def solver (proofs := true) : Env Solver := do
@@ -190,7 +190,7 @@ total form agrees         : true
   let int ← Srt.int
   let x ← s.declareConst "x" int
   let zero ← Term.mkInt 0
-  (do Term.add x zero) >>= (Term.distinct · x) >>= s.assert
+  Term.add x zero >>= (Term.distinct · x) >>= s.assert
 
   let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
   let all := proofs.flatMap (steps 100 ·)

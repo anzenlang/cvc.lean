@@ -163,7 +163,7 @@ aggrAll : { 12 ↦ 1 }
   let row (i : Int) (b : Bool) (count : Int) : Env (Term (Tab [Int] Bool)) := do
     tableMake (← mkTup (.cons (← mkInt i) (.last (← mkBool b)))) (← mkInt count)
   let value ← tableUnionDisjoint (← row 1 true 2) (← row 10 false 1)
-  (do equal a value) >>= s.assert
+  equal a value >>= s.assert
 
   s.checkSat (ifSat := do
     println! "aggr    : {← s.getValue aggr}"

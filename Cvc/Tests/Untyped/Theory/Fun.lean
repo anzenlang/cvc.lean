@@ -119,7 +119,7 @@ higher-order    : (hof f)
   let y ← Cvc.Untyped.Term.mkSymbolAs Int "y"
 
   equal x y >>= solver.assert
-  (do distinct (← apply f x) (← apply f y)) >>= solver.assert
+  distinct (← apply f x) (← apply f y) >>= solver.assert
 
   let result ← solver.checkSat (ifSat := return "sat") (ifUnsat := return "unsat")
   println! "x = y ∧ f(x) ≠ f(y) → {result}"
@@ -225,5 +225,5 @@ function-sorted term is ever created.
   let f ← s.declareFun "f" #[int, int] int
   let i ← s.declareConst "i" int
   let applied ← apply (← apply f i) i
-  (do equal applied (← mkInt 1)) >>= s.assert
+  equal applied (← mkInt 1) >>= s.assert
   println! "stepwise, no logic set : {if ← s.checkIsSat then "sat" else "unsat"}"

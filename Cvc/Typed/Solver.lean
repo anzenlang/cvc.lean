@@ -48,6 +48,13 @@ Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proo
 -/
 abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (Solver.Proof s pc)
 
+/-- A grammar built by `s`, generating terms of signature `σ`.
+
+An abbreviation of `Typed.Grammar`, so that it reads `s.Grammar σ`; unfolding it lands on the typed
+grammar, whose builders are the typed ones.
+-/
+abbrev Solver.Grammar [Ω] (s : Solver) (σ : Type) : Type := Typed.Grammar s σ
+
 
 
 /-- What a check-sat answered. -/
@@ -133,7 +140,7 @@ is the signature those parameters and `start`'s sort describe. `others` are furt
 the rules may mention.
 -/
 def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
-: Env (Grammar (boundVars.signatureTo α)) := do
+: Env (s.Grammar (boundVars.signatureTo α)) := do
   let startSrt ← Srt.of α
   let untyped ← Untyped.Solver.mkGrammar s boundVars.erase start.erase others.erase
   return ⟨untyped, boundVars.erase, startSrt⟩
@@ -143,15 +150,17 @@ def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := []
 /-! ## Quantifier elimination, interpolants and abducts -/
 
 def% qe : (s : Solver) → (q : Term Bool) → Env (Term Bool) ← qe
-def% qeDisjunct : (s : Solver) → (q : Term Bool) → Env (Term Bool) ← qeDisjunct
+def% qeDisjunct : (s : Solver) → (q : Term Bool) → Env (Option (Term Bool)) ← qeDisjunct
 @[inherit_doc U.getInterpolant]
-def getInterpolant (conj : Term Bool) (grammar : Option (Grammar Bool) := none) : Env (Term Bool) :=
+def getInterpolant (conj : Term Bool) (grammar : Option (s.Grammar Bool) := none)
+: Env (Option (Term Bool)) :=
   U.getInterpolant s conj (grammar.map Grammar.toUntyped)
-def% getNextInterpolant : (s : Solver) → Env (Term Bool) ← getNextInterpolant
+def% getNextInterpolant : (s : Solver) → Env (Option (Term Bool)) ← getNextInterpolant
 @[inherit_doc U.getAbduct]
-def getAbduct (conj : Term Bool) (grammar : Option (Grammar Bool) := none) : Env (Term Bool) :=
+def getAbduct (conj : Term Bool) (grammar : Option (s.Grammar Bool) := none)
+: Env (Option (Term Bool)) :=
   U.getAbduct s conj (grammar.map Grammar.toUntyped)
-def% getNextAbduct : (s : Solver) → Env (Term Bool) ← getNextAbduct
+def% getNextAbduct : (s : Solver) → Env (Option (Term Bool)) ← getNextAbduct
 
 
 

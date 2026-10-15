@@ -23,7 +23,7 @@ and a value read out of a model comes back as the Lean type it should be with no
 `open Cvc.Typed` selects this layer, and with it the `smt!` spelling that expands to
 `Cvc.Typed.Term.…`.
 -/
-namespace Cvc.Examples.Typed.Tour
+namespace Cvc.Typed.Examples.Tour
 
 open Cvc Typed
 

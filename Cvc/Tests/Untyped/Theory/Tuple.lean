@@ -139,7 +139,7 @@ reading a value, so the component comes back out of a model.
   let s ← Solver.new
   s.setOption "produce-models" "true"
   let x ← s.declareConst "x" (← Srt.tuple #[← Srt.int, ← Srt.bool])
-  (do Term.equal x (← Term.mkTuple #[← Term.mkInt 42, ← Term.mkFalse])) >>= s.assert
+  Term.equal x (← Term.mkTuple #[← Term.mkInt 42, ← Term.mkFalse]) >>= s.assert
   let fst ← Term.tupleSelect 0 x
   s.checkSat (ifSat := do println! "model fst : {← s.getValueAs Int fst}")
 
@@ -175,6 +175,6 @@ A tuple equality constrains the components, so the solver answers about them.
   let x ← s.declareConst "x" (← Srt.int)
   let lft ← Term.mkTuple #[x, ← Term.mkTrue]
   let rgt ← Term.mkTuple #[← Term.mkInt 4, ← Term.mkTrue]
-  (do Term.equal lft rgt) >>= s.assert
+  Term.equal lft rgt >>= s.assert
 
   s.checkSat (ifSat := do println! "x = {← s.getValueAs Int x}")

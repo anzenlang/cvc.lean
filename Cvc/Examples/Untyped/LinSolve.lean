@@ -13,6 +13,10 @@ public import Cvc.Untyped.Solver
 
 
 
+namespace Cvc.Untyped.Examples public section
+
+
+
 namespace LinSolve open Cvc Untyped variable {Syms : Symbols.Sig}
 
 inductive Result (S : Symbols Syms)

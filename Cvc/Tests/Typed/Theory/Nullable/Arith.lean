@@ -109,9 +109,9 @@ end indices
   let lt ← lt? x y
   let ltNull ← lt? z y
 
-  (do equal x (← nullableSome (← mkInt 3))) >>= s.assert
-  (do equal y (← nullableSome (← mkInt 4))) >>= s.assert
-  (do nullableIsNull z) >>= s.assert
+  equal x (← nullableSome (← mkInt 3)) >>= s.assert
+  equal y (← nullableSome (← mkInt 4)) >>= s.assert
+  nullableIsNull z >>= s.assert
 
   s.checkSat (ifSat := do
     println! "3 + 4     : {← s.getValue sum}"
@@ -142,7 +142,7 @@ mulN'? []   : (some 1)
   let single ← addN'? #[x]
   let many ← addN'? #[x, x]
   let unit : Term (Option Int) ← mulN'? #[]
-  (do equal x (← nullableSome (← mkInt 5))) >>= s.assert
+  equal x (← nullableSome (← mkInt 5)) >>= s.assert
   s.checkSat (ifSat := do
     println! "addN'? []   : {← s.getValue empty}"
     println! "addN'? [x]  : {← s.getValue single}"

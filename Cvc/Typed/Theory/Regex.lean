@@ -15,6 +15,9 @@ public import Cvc.Untyped.Theory.Regex
 public import Cvc.Ext
 public import Cvc.Typed.Core.Value
 public import Cvc.Spec.Regex
+public import Cvc.Typed.Theory.String
+public meta import Cvc.Untyped.Theory.Regex
+public meta import Cvc.Ext
 
 
 
@@ -41,3 +44,37 @@ def getRegexValue (term : Term Regex) : Env Regex := T.getRegexValue term
 instance : SrtLike Regex where
   valueToTerm _value := throwTodo "value-to-term for `Regex`"
   termToValue := getRegexValue
+
+end
+
+end Cvc.Typed.Term
+
+
+
+/-! ## `regex!`
+
+The syntax is declared beside the sort-erased constructors; this is the typed expansion, answering
+an `Env (Term Regex)`. A regex term in scope, or a `![…]` escape, must be a `Term Regex`.
+-/
+
+namespace Cvc.Typed
+
+/-- Typed `regex!`. -/
+scoped syntax "regex! " smtRegex : term
+
+macro_rules
+  | `(regex! $r) => `(regexT! $r)
+
+end Cvc.Typed
+
+namespace Cvc
+
+public meta section
+
+@[inherit_doc regexT]
+macro_rules
+  | `(regexT! $r) => Ext.expandRegex Ext.Layer.typed r.raw
+
+end
+
+end Cvc

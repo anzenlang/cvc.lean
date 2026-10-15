@@ -15,6 +15,9 @@ public import Cvc.Types.Set
 public import Cvc.Untyped.Theory.Set
 public import Cvc.Typed.Core.Value
 public import Cvc.Spec.Set
+public import Cvc.Typed.BVar
+
+import all Cvc.Typed.BVar
 
 
 
@@ -51,3 +54,18 @@ instance [ValueToTerm α] : ValueToTerm (Cvc.Set α) := ⟨mkSetValue⟩
 instance [TermToValue α] : TermToValue (Cvc.Set α) := ⟨getSetValue⟩
 
 end
+
+
+
+/-! ## Comprehension
+
+`{ elem | bvs. pred }`, whose index is the element's: the bound variables' sorts do not reach the
+result. See `Cvc.Untyped.Term.setComprehension` for what cvc5 supports of it.
+-/
+
+/-- The set of the values `elem` takes, over the bindings of `bvs` that satisfy `pred`. -/
+def setComprehension [ToTyp β] [Ord β] (bvs : BVars) (pred : Term Bool) (elem : Term β)
+  (_nonEmpty : bvs ≠ [] := by
+    (try simp) <;> fail "failed to prove a comprehension binds at least one variable")
+: Env (Term (Cvc.Set β)) :=
+  T.setComprehension bvs.erase pred elem (by cases bvs <;> simp_all [BVars.erase])

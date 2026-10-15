@@ -68,7 +68,7 @@ model fst : 7
   println! "updated   : {← Term.applyUpdater (← fst.getUpdaterTerm) p (← Term.mkInt 9)}"
 
   let x ← s.declareConst "x" pair
-  (do Term.equal x p) >>= s.assert
+  Term.equal x p >>= s.assert
   let xFst ← Term.applySelector (← fst.getTerm) x
   s.checkSat (ifSat := do println! "model fst : {← s.getValueAs Int xFst}")
 
@@ -267,7 +267,7 @@ head of l : 7
   -- `l` is a one-element list, so the match takes the `cons` branch
   let nilT ← Term.applyCtor (← nilC.getTerm)
   let seven ← Term.applyCtor (← consC.getTerm) #[← Term.mkInt 7, nilT]
-  (do Term.equal l seven) >>= s.assert
+  Term.equal l seven >>= s.assert
   s.checkSat (ifSat := do println! "head of l : {← s.getValueAs Int m}")
 
 /-! A case whose pattern is a lone bound variable matches whatever the earlier ones left over, and
@@ -356,7 +356,7 @@ head of l : 7
   let nilT ← Term.applyCtor (← (← dt.getCtorNamed "nil").getTerm)
   let seven ← Term.applyCtor (← (← dt.getCtorNamed "cons").getTerm)
     #[← Term.mkInt 7, nilT]
-  (do Term.equal l seven) >>= s.assert
+  Term.equal l seven >>= s.assert
   s.checkSat (ifSat := do println! "head of l : {← s.getValueAs Int m}")
 
 /-! A bound variable is an ordinary term in the body, so the operators and the rest of the DSL

@@ -75,7 +75,7 @@ applied    : 42
 
   -- the definition is a function symbol like any other, so it applies
   let n ← s.declareConst "n" int
-  (do Term.equal n (← Term.mkInt 21)) >>= s.assert
+  Term.equal n (← Term.mkInt 21) >>= s.assert
   let applied ← Term.apply dbl n
   let value ← s.checkSat (ifSat := do s.getValue applied)
   println! "applied    : {value}"

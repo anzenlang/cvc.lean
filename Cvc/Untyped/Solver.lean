@@ -49,6 +49,28 @@ def Solver.Proof [Ω] : (solver : Solver) → (pc : Proof.Component) → Type :=
 abbrev Solver.Proofs [Ω] (solver : Solver) (pc : Proof.Component) : Type :=
   Array (solver.Proof pc)
 
+/-- A SyGuS grammar, built by `solver` and usable with that solver only.
+
+cvc5 makes a grammar from a solver and rejects it anywhere else, so the index makes handing one
+solver's grammar to another a type error. The rule builders live in `Cvc.Untyped.Theory.Grammar`;
+the type is declared here because the interpolant and abduct queries below take one.
+-/
+structure Solver.Grammar [Ω] (solver : Solver) where
+  private mk ::
+  private raw : Cvc.Grammar
+  /-- The parameters the grammar was built over.
+
+  A `synth-fun` restricted by the grammar must be declared over these very variables, which is
+  what lets a grammar whose parameters were made out of sight, by `grammar!`, be used for one.
+  -/
+  boundVars : BVars
+
+/-- String representation, as the SyGuS pre-declaration and rule set. -/
+protected def Solver.Grammar.toString [Ω] {solver : Solver} (g : solver.Grammar) : String :=
+  toString g.raw
+
+instance [Ω] {solver : Solver} : ToString solver.Grammar := ⟨Solver.Grammar.toString⟩
+
 
 
 /-! ## Solver-mode monadic environments
@@ -322,34 +344,69 @@ def defineFunsRec (funs : Terms) (bvs : Array BVars) (bodies : Terms)
 
 
 
-/-! ### Quantifier elimination, interpolants and abducts -/
+/-! ### Quantifier elimination, interpolants and abducts
+
+cvc5 answers the null term when there is no interpolant or abduct to give, and when an enumeration
+is exhausted. The functions that can be answered that way return an `Option`, `none` standing for
+the null term, so that no null term ever reaches a caller.
+-/
+
+/-- `none` for the null term, the term itself otherwise. -/
+private def nonNull? (t : cvc5.Term) : Option Term := if t.isNull then none else some t
 
 @[inherit_doc S.getQuantifierElimination]
 def qe (q : Term) : Env Term := runUnsafe' do s.toUnsafe.getQuantifierElimination q
 
-@[inherit_doc S.getQuantifierEliminationDisjunct]
-def qeDisjunct (q : Term) : Env Term :=
-  runUnsafe' do s.toUnsafe.getQuantifierEliminationDisjunct q
+/-- Partial quantifier elimination, `none` if cvc5 answers the null term.
 
-@[inherit_doc S.getInterpolant]
-def getInterpolant (conj : Term) (grammar : Option Grammar := none) : Env Term :=
+See `cvc5.Solver.getQuantifierEliminationDisjunct` for what the disjuncts are, and how repeated
+calls compute the full elimination incrementally.
+-/
+def qeDisjunct (q : Term) : Env (Option Term) :=
+  runUnsafe' do return nonNull? (← s.toUnsafe.getQuantifierEliminationDisjunct q)
+
+/-- An interpolant of the assertions and `conj`, `none` if cvc5 finds none.
+
+An interpolant is a formula `I` over the symbols the assertions `A` and `conj` share, such that
+`A → I` and `I → conj`. A `grammar` restricts the shape of `I`. Needs `produce-interpolants`.
+-/
+def getInterpolant (conj : Term) (grammar : Option s.Grammar := none) : Env (Option Term) :=
   runUnsafe' do
-    match grammar with
-    | none => s.toUnsafe.getInterpolant conj
-    | some g => s.toUnsafe.getInterpolantOfGrammar conj g
+    let t ← match grammar with
+      | none => s.toUnsafe.getInterpolant conj
+      | some g => s.toUnsafe.getInterpolantOfGrammar conj g.raw
+    return nonNull? t
 
-@[inherit_doc S.getInterpolantNext]
-def getNextInterpolant : Env Term := runUnsafe' do s.toUnsafe.getInterpolantNext
+/-- The next interpolant, `none` when there is no other.
 
-@[inherit_doc S.getAbduct]
-def getAbduct (conj : Term) (grammar : Option Grammar := none) : Env Term :=
+Only legal right after a successful `getInterpolant` or `getNextInterpolant`. Needs
+`incremental`, which is on by default.
+-/
+def getNextInterpolant : Env (Option Term) :=
+  runUnsafe' do return nonNull? (← s.toUnsafe.getInterpolantNext)
+
+/-- An abduct of the assertions and `conj`, `none` if cvc5 finds none.
+
+An abduct is a formula `B` such that the assertions `A` and `B` are consistent and `A ∧ B → conj`.
+A `grammar` restricts the shape of `B`. Needs `produce-abducts`.
+
+When no abduct exists, cvc5 may search for one indefinitely rather than answer: asking for an
+abduct of `false` does not return.
+-/
+def getAbduct (conj : Term) (grammar : Option s.Grammar := none) : Env (Option Term) :=
   runUnsafe' do
-    match grammar with
-    | none => s.toUnsafe.getAbduct conj
-    | some g => s.toUnsafe.getAbductOfGrammar conj g
+    let t ← match grammar with
+      | none => s.toUnsafe.getAbduct conj
+      | some g => s.toUnsafe.getAbductOfGrammar conj g.raw
+    return nonNull? t
 
-@[inherit_doc S.getAbductNext]
-def getNextAbduct : Env Term := runUnsafe' do s.toUnsafe.getAbductNext
+/-- The next abduct, `none` when there is no other.
+
+Only legal right after a successful `getAbduct` or `getNextAbduct`. Needs `incremental`, which
+is on by default.
+-/
+def getNextAbduct : Env (Option Term) :=
+  runUnsafe' do return nonNull? (← s.toUnsafe.getAbductNext)
 
 
 

@@ -10,10 +10,12 @@ module
 import Cvc.Untyped.Theory.Set
 import Cvc.Untyped.Core.Bool
 import Cvc.Types.Set
+import Cvc.Untyped.Theory.Arith
 
 public meta import Cvc.Untyped.Theory.Set
 public meta import Cvc.Untyped.Core.Bool
 public meta import Cvc.Types.Set
+public meta import Cvc.Untyped.Theory.Arith
 
 
 
@@ -128,3 +130,24 @@ mixed     : (and (set.member i s) (set.subset s t))
   println! "interN    : {← smt! ∩[s, t, s]}"
   -- and they mix with another theory's notation, the grammar being one category
   println! "mixed     : {← smt! (i ∈ s) ∧ (s ⊆ t)}"
+
+
+
+/-! ## Comprehension
+
+Built by hand, as quantifiers are, since it binds variables. Its sort is that of a set of the
+element term's sort, whatever the bound variables' sorts are.
+-/
+
+/-- info:
+comprehension : (set.comprehension ((x Int) (b Bool)) (and b (> x 0)) (* x 2))
+sort          : (Set Int)
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Cvc.Srt.int
+  let x ← Untyped.BVar.mk int "x"
+  let b ← Untyped.BVar.mk (← Cvc.Srt.bool) "b"
+  let pred ← and b.toTerm (← gt x.toTerm (← mkInt 0))
+  let comp ← setComprehension #[x, b] pred (← mul x.toTerm (← mkInt 2))
+  println! "comprehension : {comp}"
+  println! "sort          : {← comp.getSort}"

@@ -19,6 +19,9 @@ public import Cvc.Untyped.Core.Value
 public import Cvc.Types.Set
 public import Cvc.Gen.Term
 public import Cvc.Spec.Set
+public import Cvc.Untyped.BVar
+
+import all Cvc.Untyped.BVar
 
 
 
@@ -61,5 +64,22 @@ def getSetValue [TermToValue α] (term : Term) : Env (Cvc.Set α) := do
 
 instance [ValueToTerm α] : ValueToTerm (Cvc.Set α) := ⟨mkSetValue⟩
 instance [TermToValue α] : TermToValue (Cvc.Set α) := ⟨getSetValue⟩
+
+
+
+/-! ## Comprehension
+
+`{ elem | bvs. pred }`: a set built by binding variables, so it is written here by hand rather than
+generated, as quantifiers are. cvc5 supports it only under `sets-exp`, and its reasoning about one
+is incomplete: even a membership in a finite comprehension can come back `unknown`.
+-/
+
+/-- The set of the values `elem` takes, over the bindings of `bvs` that satisfy `pred`. -/
+def setComprehension (bvs : BVars) (pred elem : Term)
+  (_nonEmpty : 0 < bvs.size := by
+    (try grind) <;> fail "failed to prove a comprehension binds at least one variable")
+: Env Term := do
+  let vars ← bvs.toTerm
+  runUnsafe fun tm => tm.mkTerm .SET_COMPREHENSION #[vars, pred, elem]
 
 end

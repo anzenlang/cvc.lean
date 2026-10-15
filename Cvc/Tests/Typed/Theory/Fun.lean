@@ -119,7 +119,7 @@ higher-order    : (hof f)
   let y ← Cvc.Typed.Term.mkSymbolAs Int "y"
 
   equal x y >>= solver.assert
-  (do distinct (← apply f x) (← apply f y)) >>= solver.assert
+  distinct (← apply f x) (← apply f y) >>= solver.assert
 
   let result ← solver.checkSat (ifSat := return "sat") (ifUnsat := return "unsat")
   println! "x = y ∧ f(x) ≠ f(y) → {result}"
@@ -222,5 +222,5 @@ apply then : (f i b r)
   let i ← s.declareConst Int "i"
   let b ← s.declareConst Bool "b"
   let applied ← f i b
-  (do equal applied (← mkInt 1)) >>= s.assert
+  equal applied (← mkInt 1) >>= s.assert
   println! "coe chain, no logic set : {if ← s.checkIsSat then "sat" else "unsat"}"

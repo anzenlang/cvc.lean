@@ -381,6 +381,7 @@ cannot be pinned here — a parse error aborts before `#guard_msgs` can see any 
 annotated : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 inferred  : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 mixed     : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+lean type : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 same sort : true
 -/
 #guard_msgs in #eval Env.runIO do
@@ -391,6 +392,8 @@ same sort : true
   println! "annotated : {annotated}"
   println! "inferred  : {inferred}"
   println! "mixed     : {← smt! {a := 7, b : bool := true}}"
+  -- a stated sort may be a Lean type as well as a `Srt`
+  println! "lean type : {← smt! {a : Int := 7, b : bool := true}}"
   println! "same sort : {(← annotated.getSort) == (← inferred.getSort)}"
 
 /-! A stated sort that disagrees with its term is caught before the record is built, naming the
@@ -495,6 +498,7 @@ though the record already fixes it, and naming a field twice is refused as the l
 one       : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
 two       : ((_ update b) ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9) false)
 annotated : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
+lean type : ((_ update a) (__cvc5_record_a_Int_b_Bool_ctor 7 true) 9)
 sort kept : true
 -/
 #guard_msgs in #eval Env.runIO do
@@ -503,6 +507,7 @@ sort kept : true
   println! "one       : {← smt! {r with a := 9}}"
   println! "two       : {← smt! {r with a := 9, b := false}}"
   println! "annotated : {← smt! {r with a : int := 9}}"
+  println! "lean type : {← smt! {r with a : Int := 9}}"
   println! "sort kept : {(← (← smt! {r with a := 9}).getSort) == (← r.getSort)}"
 
 /-- info:

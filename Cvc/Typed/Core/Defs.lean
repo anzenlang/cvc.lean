@@ -30,6 +30,16 @@ so a signature can mention `Term α` without reaching outside the layer.
 -/
 namespace Cvc.Typed public section variable [Ω]
 
+/-- A cvc5 term whose sort is the one the Lean type `α` denotes.
+
+`Term Int`, `Term (Set Bool)` and `Term (Int → Bool)` are terms of the SMT-LIB sorts `Int`,
+`(Set Bool)` and `(-> Int Bool)`; a Lean type denotes a sort through its `ToTyp` instance. Every
+constructor states its sorts through the index, so a sort mistake is a Lean type error rather than
+a cvc5 error at runtime, and a value read out of a model comes back as an `α`.
+
+The index is phantom: at runtime a `Term α` is exactly a `Cvc.Untyped.Term`. `erase` goes down for
+free, and `Cvc.Untyped.Term.typeCheck` goes up by checking the term's sort.
+-/
 def3% Term α ← Cvc.Untyped.Term (ofUntypedUnsafe / toUntypedUnsafe)
 
 /-- An array of terms of the sort `α` describes. -/

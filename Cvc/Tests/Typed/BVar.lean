@@ -37,33 +37,33 @@ open Cvc.Typed
 
 /-! ## Construction
 
-`Term.mkBVar'` takes the type explicitly, `Term.mkBVar` infers it from the expected index, and
+`Term.mkBVarAs` takes the type explicitly, `Term.mkBVar` infers it from the expected index, and
 `BVar.mk` is the same function reached from the type.
 -/
 
 /-- info:
-mkBVar' : v
+mkBVarAs : v
 mkBVar  : w
 BVar.mk : z
 -/
 #guard_msgs in #eval Env.runIO do
-  println! "mkBVar' : {(← Term.mkBVar' Int "v").toTerm}"
+  println! "mkBVarAs : {(← Term.mkBVarAs Int "v").toTerm}"
   println! "mkBVar  : {(← (Term.mkBVar "w" : Env (Typed.BVar Int))).toTerm}"
   println! "BVar.mk : {(← (Typed.BVar.mk "z" : Env (Typed.BVar Rat))).toTerm}"
 
 -- each call is a fresh variable, even at the same name and index
 /-- info: distinct : true -/
 #guard_msgs in #eval Env.runIO do
-  let x ← Term.mkBVar' Int "x"
-  let x' ← Term.mkBVar' Int "x"
+  let x ← Term.mkBVarAs Int "x"
+  let x' ← Term.mkBVarAs Int "x"
   println! "distinct : {!(x.toTerm.beq x'.toTerm)}"
 
 -- the index decides the sort, and nothing else does: a variable at a `Rat` index is usable where a
 -- `Rat` term is expected, and only there
 /-- info: sum : (+ x y) -/
 #guard_msgs in #eval Env.runIO do
-  let x ← Term.mkBVar' Rat "x"
-  let y ← Term.mkBVar' Rat "y"
+  let x ← Term.mkBVarAs Rat "x"
+  let y ← Term.mkBVarAs Rat "y"
   println! "sum : {(← Term.add x.toTerm y.toTerm).erase}"
 
 
@@ -104,7 +104,7 @@ constant : x
   let f ← s.declareFun (α := Int → Int) "f"
   let two ← Term.mkInt 2
   let fTwo ← Term.apply f two
-  (do Term.equal fTwo (← Term.mkInt 7)) >>= s.assert
+  Term.equal fTwo (← Term.mkInt 7) >>= s.assert
 
   let value ← s.checkSat (ifSat := do s.getValue (α := Int) fTwo)
   println! "f 2 = {value}"
@@ -128,7 +128,7 @@ dbl 21     : 42
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let x ← Term.mkBVar' Int "x"
+  let x ← Term.mkBVarAs Int "x"
   let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
   println! "define-fun : {dbl.erase}"
 
@@ -146,8 +146,8 @@ sub 4 10   : -6
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let x ← Term.mkBVar' Int "x"
-  let y ← Term.mkBVar' Int "y"
+  let x ← Term.mkBVarAs Int "x"
+  let y ← Term.mkBVarAs Int "y"
   let sub ← s.defineFun "sub" (BVars.push y (BVars.push x [])) (← Term.sub x.toTerm y.toTerm)
   println! "define-fun : {sub.erase}"
 
@@ -170,9 +170,9 @@ pick false 7 2 : 5
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let b ← Term.mkBVar' Bool "b"
-  let x ← Term.mkBVar' Int "x"
-  let y ← Term.mkBVar' Int "y"
+  let b ← Term.mkBVarAs Bool "b"
+  let x ← Term.mkBVarAs Int "x"
+  let y ← Term.mkBVarAs Int "y"
   let bvs := BVars.push y (BVars.push x (BVars.push b []))
   let body ← Term.ite b.toTerm (← Term.add x.toTerm y.toTerm) (← Term.sub x.toTerm y.toTerm)
   let pick ← s.defineFun "pick" bvs body
@@ -192,13 +192,13 @@ pick false 7 2 : 5
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
 
-  let x ← Term.mkBVar' Int "x"
+  let x ← Term.mkBVarAs Int "x"
   let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
 
   let n ← s.declareConst Int "n"
   let lft ← Term.apply dbl n
   let rgt ← Term.mul n (← Term.mkInt 2)
-  (do Term.distinct lft rgt) >>= s.assert
+  Term.distinct lft rgt >>= s.assert
 
   println! "dbl n ≠ 2 * n → {← s.checkSat (ifUnsat := do return "unsat")}"
 
@@ -222,8 +222,8 @@ c          : 7
 section signatures
 variable [Ω]
 
-/-- info: @Term.mkBVar' : [inst : Ω] → (α : Type) → [ToTyp α] → String → Env (BVar α) -/
-#guard_msgs in #check @Cvc.Typed.Term.mkBVar'
+/-- info: @Term.mkBVarAs : [inst : Ω] → (α : Type) → [ToTyp α] → String → Env (BVar α) -/
+#guard_msgs in #check @Cvc.Typed.Term.mkBVarAs
 
 /-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → Env (Term α) -/
 #guard_msgs in #check @Cvc.Typed.Solver.declareFun

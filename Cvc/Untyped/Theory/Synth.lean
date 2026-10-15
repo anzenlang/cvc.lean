@@ -135,10 +135,10 @@ of the candidates; without one, any term of the right sort is allowed. The gramm
 built over these very parameters.
 -/
 def synthFun (symbol : String) (boundVars : BVars) (srt : Srt)
-  (grammar : Option Grammar := none)
+  (grammar : Option s.Grammar := none)
 : Env Term :=
   runUnsafe' do
-    s.toUnsafe.synthFun symbol (boundVars.map BVar.toTerm) srt.toUnsafe grammar
+    s.toUnsafe.synthFun symbol (boundVars.map BVar.toTerm) srt.toUnsafe (grammar.map (·.raw))
 
 /-- Adds a formula the synthesized functions must satisfy. -/
 def addSygusConstraint (t : Term) : Env Unit :=
@@ -265,8 +265,8 @@ def getSynthSolutions (fns : Terms) : s.EnvSolved Terms :=
 
 A `grammar` restricts what may be enumerated.
 -/
-def findSynth (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none) : Env Term :=
-  runUnsafe' do s.toUnsafe.findSynth target.toUnsafe grammar
+def findSynth (target : Cvc.Synth.FindTarget) (grammar : Option s.Grammar := none) : Env Term :=
+  runUnsafe' do s.toUnsafe.findSynth target.toUnsafe (grammar.map (·.raw))
 
 @[inherit_doc findSynth]
 def findSynthNext : Env Term :=

@@ -22,7 +22,7 @@ twice — no index to write down, no `ToTyp` to satisfy.
 `open Cvc.Untyped` selects this layer, and with it the `smt!` spelling that expands to
 `Cvc.Untyped.Term.…`.
 -/
-namespace Cvc.Examples.Untyped.Tour
+namespace Cvc.Untyped.Examples.Tour
 
 open Cvc Untyped
 

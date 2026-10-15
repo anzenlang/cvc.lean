@@ -13,6 +13,9 @@ public import Cvc.Typed.Solver
 
 
 
+namespace Cvc.Typed.Examples public section
+
+
 namespace LinSolve open Cvc Typed variable [Ω] {Syms : Symbols.Sig}
 
 inductive Result (S : Symbols Syms)

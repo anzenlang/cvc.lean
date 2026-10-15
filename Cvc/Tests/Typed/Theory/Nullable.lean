@@ -130,13 +130,13 @@ inSet : true
   s.setOption "produce-models" "true"
   let x ← s.declareConst (Option Int) "x"
   let y ← s.declareConst (Option Int) "y"
-  (do nullableIsSome x) >>= s.assert
-  (do equal (← nullableVal x) (← mkInt 7)) >>= s.assert
-  (do nullableIsNull y) >>= s.assert
+  nullableIsSome x >>= s.assert
+  equal (← nullableVal x) (← mkInt 7) >>= s.assert
+  nullableIsNull y >>= s.assert
 
   -- an `Option` index nests in a container, which is what a structural sort buys
   let set ← s.declareConst (Cvc.Set (Option Int)) "set"
-  (do setMember x set) >>= s.assert
+  setMember x set >>= s.assert
 
   s.checkSat (ifSat := do
     println! "x     : {← s.getValue x}"

@@ -9,9 +9,13 @@ module
 
 import Cvc.Untyped.Theory.String
 import Cvc.Untyped.Core.Bool
+import Cvc.Untyped.Theory.Arith
+import Cvc.Untyped.Solver
 
 public meta import Cvc.Untyped.Theory.String
 public meta import Cvc.Untyped.Core.Bool
+public meta import Cvc.Untyped.Theory.Arith
+public meta import Cvc.Untyped.Solver
 
 
 
@@ -114,3 +118,137 @@ string   : "hello"
 -/
 #guard_msgs in #eval Env.runIO do
   println! "string   : {← smt! "hello"}"
+
+
+
+/-! # Solving
+
+The tests above check how each constructor prints; these hand the terms to a solver. Each asks for
+something the constraints pin down to a single answer, so the model can be read back and pinned as
+a Lean `String` — which also exercises reading a string value out of a model.
+-/
+
+section solving
+open Cvc.Untyped
+
+/-- A literal string term, without escape sequences. -/
+def lit [Ω] (s : String) : Env Term := mkString s false
+
+/-- info:
+y        : " world"
+len y    : 6
+abc      : "abc"
+digits   : "42"
+in regex : "abc"
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let str ← Srt.string
+  let x ← s.declareConst "x" str
+  let y ← s.declareConst "y" str
+  let z ← s.declareConst "z" str
+  let w ← s.declareConst "w" str
+  let v ← s.declareConst "v" str
+
+  -- `x ++ y = "hello world"` with `x = "hello"` leaves one `y`
+  equal (← strConcat x y) (← lit "hello world") >>= s.assert
+  equal x (← lit "hello") >>= s.assert
+  -- three characters, starting with "ab" and ending with "c"
+  equal (← strLength z) (← mkInt 3) >>= s.assert
+  strPrefix (← lit "ab") z >>= s.assert
+  strSuffix (← lit "c") z >>= s.assert
+  -- the two-character string denoting 42
+  equal (← strToInt w) (← mkInt 42) >>= s.assert
+  equal (← strLength w) (← mkInt 2) >>= s.assert
+  -- membership in the regex matching exactly "abc"
+  strInRegex v (← strToRegex (← lit "abc")) >>= s.assert
+  -- terms are built before the check: a sat branch can read the model but not build terms
+  let lenY ← strLength y
+
+  s.checkSat (ifSat := do
+    println! "y        : {repr (← s.getValueAs String y)}"
+    println! "len y    : {← s.getValueAs Int lenY}"
+    println! "abc      : {repr (← s.getValueAs String z)}"
+    println! "digits   : {repr (← s.getValueAs String w)}"
+    println! "in regex : {repr (← s.getValueAs String v)}")
+
+/-! Unsatisfiable constraints, each refuted by the theory rather than by a model search. -/
+
+/-- info:
+contains, too short : unsat
+b < x < a           : unsat
+digit, not a digit  : unsat
+-/
+#guard_msgs in #eval Env.runIO do
+  let str ← Srt.string
+  let check (name : String) (f : Solver → Term → Env Unit) : Env Unit := do
+    let s ← Solver.new
+    let x ← s.declareConst "x" str
+    f s x
+    println! "{name} : {if ← s.checkIsSat then "sat" else "unsat"}"
+  check "contains, too short" fun s x => do
+    strContains x (← lit "abc") >>= s.assert
+    lt (← strLength x) (← mkInt 3) >>= s.assert
+  check "b < x < a          " fun s x => do
+    strLt (← lit "b") x >>= s.assert
+    strLt x (← lit "a") >>= s.assert
+  check "digit, not a digit " fun s x => do
+    strIsDigit x >>= s.assert
+    equal (← strToInt x) (← mkInt (-1)) >>= s.assert
+
+/-! Every other operator, evaluated by the solver on ground arguments: each result is bound to a
+constant whose model value is then read back. -/
+
+/-- info:
+replace    : "a+b-c"
+replaceAll : "a+b+c"
+indexof    : 3
+substr     : "ell"
+charAt     : "e"
+rev        : "cba"
+update     : "jello"
+toUpper    : "ABC"
+toLower    : "abc"
+toCode     : 65
+fromCode   : "a"
+fromInt    : "17"
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let str ← Srt.string
+  let int ← Srt.int
+  let bind (name : String) (srt : Srt) (value : Term) : Env Term := do
+    let c ← s.declareConst name srt
+    equal c value >>= s.assert
+    return c
+  let replace ← bind "replace" str (← strReplace (← lit "a-b-c") (← lit "-") (← lit "+"))
+  let replaceAll ← bind "replaceAll" str (← strReplaceAll (← lit "a-b-c") (← lit "-") (← lit "+"))
+  let indexof ← bind "indexof" int (← strIndexof (← lit "a-b-c") (← lit "-") (← mkInt 2))
+  let substr ← bind "substr" str (← strSubstr (← lit "hello") (← mkInt 1) (← mkInt 3))
+  let charAt ← bind "charAt" str (← strCharAt (← lit "hello") (← mkInt 1))
+  let rev ← bind "rev" str (← strRev (← lit "abc"))
+  let update ← bind "update" str (← strUpdate (← lit "hello") (← mkInt 0) (← lit "j"))
+  let toUpper ← bind "toUpper" str (← strToUpper (← lit "aBc"))
+  let toLower ← bind "toLower" str (← strToLower (← lit "aBc"))
+  let toCode ← bind "toCode" int (← strToCode (← lit "A"))
+  let fromCode ← bind "fromCode" str (← strFromCode (← mkInt 97))
+  let fromInt ← bind "fromInt" str (← strFromInt (← mkInt 17))
+
+  s.checkSat (ifSat := do
+    let str (t : Term) : s.EnvSat String := do return repr (← s.getValueAs String t) |>.pretty
+    println! "replace    : {← str replace}"
+    println! "replaceAll : {← str replaceAll}"
+    println! "indexof    : {← s.getValueAs Int indexof}"
+    println! "substr     : {← str substr}"
+    println! "charAt     : {← str charAt}"
+    println! "rev        : {← str rev}"
+    println! "update     : {← str update}"
+    println! "toUpper    : {← str toUpper}"
+    println! "toLower    : {← str toLower}"
+    println! "toCode     : {← s.getValueAs Int toCode}"
+    println! "fromCode   : {← str fromCode}"
+    println! "fromInt    : {← str fromInt}")
+
+end solving

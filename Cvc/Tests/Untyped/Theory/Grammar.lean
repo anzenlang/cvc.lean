@@ -96,7 +96,7 @@ wrong sort : caught
   let stranger ← NT.mk int "stranger"
   let g ← s.mkGrammar #[] start
 
-  let caught (code : Env Cvc.Grammar) : Env String :=
+  let caught (code : Env s.Grammar) : Env String :=
     try let _ ← code ; pure "no error" catch _ => pure "caught"
 
   println! "foreign nt : {← caught (g.addRule stranger (← Term.mkInt 0))}"
@@ -109,12 +109,68 @@ section discipline
 variable [Ω] (s : Solver) (start cnd : NT)
 
 /-- A grammar always has a start symbol; there is no empty case to reject. -/
-example : Env Cvc.Grammar := s.mkGrammar #[] start
+example : Env s.Grammar := s.mkGrammar #[] start
 
 /-- Auxiliary non-terminals are separate, and cannot be mistaken for the start symbol. -/
-example : Env Cvc.Grammar := s.mkGrammar #[] start #[cnd]
+example : Env s.Grammar := s.mkGrammar #[] start #[cnd]
 
-/-- info: @Solver.mkGrammar : [inst : Ω] → Solver → BVars → NT → optParam NTs #[] → Env Grammar -/
+/-- info: @Solver.mkGrammar : [inst : Ω] → (s : Solver) → BVars → NT → optParam NTs #[] → Env s.Grammar -/
 #guard_msgs in #check @Cvc.Untyped.Solver.mkGrammar
 
+-- a grammar belongs to the solver that built it: handing it to another does not typecheck
+/--
+error: Application type mismatch: The argument
+  g
+has type
+  s.Grammar
+but is expected to have type
+  s₂.Grammar
+in the application
+  some g
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Solver ↦ 1
+-/
+#guard_msgs in
+example (s₂ : Solver) (g : s.Grammar) (conj : Term) : Env (Option Term) :=
+  s₂.getInterpolant conj (some g)
+
 end discipline
+
+
+
+/-! ## `grammar!`
+
+The block form builds the same grammar as the builders do: the first test is the hand-built one
+above, rewritten. A sort is a Lean type or a `Srt`, freely mixed. `?var` is printed as the
+parameters it stands for, cvc5 inlining them.
+-/
+
+/-- info:
+block : ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let g ← grammar! s (x : Int) (y : int) where
+    start : Int  := x | y | if cnd then start else start
+    cnd   : Bool := start ≤ start
+  println! "block : {g}"
+  let g ← grammar! s (x : Int) where
+    start : int := 0 | ?const | ?var | start + start
+  println! "any   : {g}"
+
+/-! What the expansion refuses, where it is written. -/
+
+/-- error: non-terminal `start` is declared twice -/
+#guard_msgs in
+example [Ω] (s : Solver) : Env s.Grammar := grammar! s where
+  start : Int := 0
+  start : Int := 1
+
+/-- error: expected `?const` or `?var`, got `?foo` -/
+#guard_msgs in
+example [Ω] (s : Solver) : Env s.Grammar := grammar! s where
+  start : Int := ?foo

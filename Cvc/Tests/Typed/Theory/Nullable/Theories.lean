@@ -86,7 +86,7 @@ and true ⊥  : none
   let sum ← bvAdd? bv one
 
   let n ← s.declareConst (Option Int) "n"
-  (do nullableIsNull n) >>= s.assert
+  nullableIsNull n >>= s.assert
   let eq ← equal? n n
   let andT ← and? (← nullableSome (← mkTrue)) (← mkNull' Bool)
 

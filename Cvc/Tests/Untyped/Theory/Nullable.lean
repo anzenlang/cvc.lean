@@ -147,9 +147,9 @@ y : none
   let srt ← Srt.of (Option Int)
   let x ← s.declareConst "x" srt
   let y ← s.declareConst "y" srt
-  (do Term.nullableIsSome x) >>= s.assert
-  (do Term.equal (← Term.nullableVal x) (← Term.mkInt 7)) >>= s.assert
-  (do Term.nullableIsNull y) >>= s.assert
+  Term.nullableIsSome x >>= s.assert
+  Term.equal (← Term.nullableVal x) (← Term.mkInt 7) >>= s.assert
+  Term.nullableIsNull y >>= s.assert
   s.checkSat (ifSat := do
     println! "x : {← s.getValueAs (Option Int) x}"
     println! "y : {← s.getValueAs (Option Int) y}")

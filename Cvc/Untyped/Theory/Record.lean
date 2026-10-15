@@ -293,8 +293,8 @@ refuses to mix, where Lean's structure instances are order-insensitive.
 A field's sort may be **stated or left out**, per field, in either layer. Left out it is inferred:
 sort-erased from the field term's own sort, typed from the index its term carries. Stated it is
 *checked* against that same thing before the record is built, so an annotation can only confirm
-what is there, never change it. The sort is an ordinary Lean term of type `Srt`, so the idiom is to
-bind the sorts first and name them here.
+what is there, never change it. In both layers the sort is written as a Lean type (`Int`) or as a
+`Srt` value (`int`).
 
 There is **no syntax for the empty record**: `Srt.record` refuses one, the empty record denoting
 what the empty tuple already denotes.
@@ -465,14 +465,15 @@ macro_rules
       let fields := stx[1].getSepArgs
       let names := fields.map fun field => Syntax.mkStrLit (recFieldName field)
       let terms ← fields.mapM fun field => deferSmt layer (recFieldTerm field)
-      -- a field's sort is the one stated, or the one its term turns out to have
-      bindArgs terms fun ids => do
+      -- a field's sort is the one stated, a Lean type or a `Srt`, or the one its term turns out to
+      -- have; a stated one is an `Env Srt`, so it is bound along with the field terms
+      let srts ← fields.mapM fun field => match recFieldSrt? field with
+        | some srt => `(Option.some <$> srtOf% ($srt))
+        | Option.none => `(pure Option.none)
+      bindArgs (terms ++ srts) fun ids => do
         let mut args := #[]
         for i in [0 : fields.size] do
-          let srt ← match recFieldSrt? fields[i]! with
-            | some srt => `(some ($srt : $(mkIdent `Cvc.Srt)))
-            | Option.none => `(Option.none)
-          args := args.push (← `(($(names[i]!), $srt, $(ids[i]!))))
+          args := args.push (← `(($(names[i]!), $(ids[fields.size + i]!), $(ids[i]!))))
         `($(layer.op `mkRecordFrom) #[$args,*])
     | ``smtWith =>
       let fields := stx[3].getSepArgs
@@ -483,7 +484,8 @@ macro_rules
         let value ← deferSmt layer (recFieldTerm field)
         match recFieldSrt? field with
         | some srt =>
-          `($value >>= $(layer.op `checkFieldSrt) $(names[i]!) ($srt : $(mkIdent `Cvc.Srt)))
+          let check := layer.op `checkFieldSrt
+          `($value >>= fun v => srtOf% ($srt) >>= fun srt => $check $(names[i]!) srt v)
         | Option.none => pure value
       recUpdate layer names values record
     | _ => Macro.throwUnsupported

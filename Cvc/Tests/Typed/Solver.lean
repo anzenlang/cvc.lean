@@ -119,8 +119,8 @@ sat        : x = 1, y = 2
   let y ← s.declareConst Int "y"
   let three ← Term.mkInt 3
 
-  (do Term.equal (← Term.add x y) three) >>= s.assert
-  (do Term.lt x y) >>= s.assert
+  Term.equal (← Term.add x y) three >>= s.assert
+  Term.lt x y >>= s.assert
   println! "assertions : {(← s.getAssertions).size}"
 
   s.checkSat (ifSat := do
@@ -135,7 +135,7 @@ sat        : x = 1, y = 2
 
   let b ← s.declareConst Bool "b"
   s.assert b
-  (do Term.not b) >>= s.assert
+  Term.not b >>= s.assert
 
   let core ← s.checkSat (ifUnsat := do return (← s.getUnsatCore).size)
   println! "unsat core : {core}"
@@ -154,6 +154,79 @@ sat        : x = 1, y = 2
 
 
 
+/-! ## Interpolants
+
+The sort-erased tests cover the semantics; these pin that the same answers come back indexed at
+`Bool`, an interpolant being a formula, and that the absence of one is `none` here too.
+-/
+
+/-- Whether `hyps` entail `concl`, by refuting `hyps ∧ ¬concl` on a fresh solver. -/
+def entails [Ω] (hyps : Array (Term Bool)) (concl : Term Bool) : Env Bool := do
+  let s ← Solver.new
+  for h in hyps do s.assert h
+  Term.not concl >>= s.assert
+  return !(← s.checkIsSat)
+
+/-- info:
+interpolant : (and (= a (+ 1 (+ 1 c))) true)
+A → I       : true
+I → C       : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+
+  let a ← s.declareConst Int "a"
+  let b ← s.declareConst Int "b"
+  let c ← s.declareConst Int "c"
+  let one ← Term.mkInt 1
+  let hyps := #[← Term.equal a (← Term.add b one), ← Term.equal b (← Term.add c one)]
+  for h in hyps do s.assert h
+  let conj ← Term.gt a c
+
+  let some (i : Term Bool) ← s.getInterpolant conj
+    | println! "no interpolant"
+  println! "interpolant : {i}"
+  println! "A → I       : {← entails hyps i}"
+  println! "I → C       : {← entails #[i] conj}"
+
+/-- info: not entailed : none -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+
+  let a ← s.declareConst Int "a"
+  let c ← s.declareConst Int "c"
+  Term.gt a c >>= s.assert
+  println! "not entailed : {← s.getInterpolant (← Term.lt a c)}"
+
+/-- info:
+first  : (<= 1 y)
+next   : (not (<= y 1))
+next   : (or (= y 1) (<= 1 y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+  s.setOption "incremental" "true"
+
+  let x ← s.declareConst Int "x"
+  let y ← s.declareConst Int "y"
+  let z ← s.declareConst Int "z"
+  let zero ← Term.mkInt 0
+  Term.gt (← Term.add x y) zero >>= s.assert
+  Term.lt x zero >>= s.assert
+  let conj ← Term.or (← Term.gt (← Term.add y z) zero) (← Term.lt z zero)
+
+  let some first ← s.getInterpolant conj
+    | println! "no interpolant"
+  println! "first  : {first}"
+  for _ in [0:2] do
+    let some next ← s.getNextInterpolant
+      | println! "exhausted"
+    println! "next   : {next}"
+
+
 /-! ## The signatures state the sorts -/
 
 section signatures
@@ -167,5 +240,12 @@ variable [Ω]
 
 /-- info: @Solver.getUnsatCore : [inst : Ω] → (s : Solver) → s.EnvUnsat (Terms Bool) -/
 #guard_msgs in #check @Cvc.Typed.Solver.getUnsatCore
+
+/-- info: @Solver.getInterpolant : [inst : Ω] →
+  (s : Solver) → Term Bool → optParam (Option (s.Grammar Bool)) none → Env (Option (Term Bool)) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getInterpolant
+
+/-- info: @Solver.getNextInterpolant : [inst : Ω] → Solver → Env (Option (Term Bool)) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getNextInterpolant
 
 end signatures

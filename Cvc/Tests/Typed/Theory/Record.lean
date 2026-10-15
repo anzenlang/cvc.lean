@@ -299,6 +299,7 @@ inferred  : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 a         : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
 annotated : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 mixed     : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
+lean type : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
 -/
 #guard_msgs in #eval Env.runIO do
   let int ← Srt.int
@@ -308,6 +309,8 @@ mixed     : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
   println! "a         : {← r.recordGet "a"}"
   println! "annotated : {← smt! {a : int := 7, b : bool := true}}"
   println! "mixed     : {← smt! {a := 7, b : bool := true}}"
+  -- a stated sort may be a Lean type as well as a `Srt`
+  println! "lean type : {← smt! {a : Int := 7, b : bool := true}}"
 
 /-- The index really is inferred from the field terms, and carries their order. -/
 example [Ω] : Env (Term (Record [("a", Int), ("b", Bool)])) := smt! {a := 7, b := true}

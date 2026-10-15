@@ -41,7 +41,7 @@ lambda or witness. Each call produces a fresh variable even for the same name an
 def mk [ToTyp α] (name : String) : Env (BVar α) := do Untyped.Term.mkBVar (← Srt.of α) name
 
 @[inherit_doc mk]
-def mk' (α : Type) : [ToTyp α] → (name : String) → Env (BVar α) := mk
+def mkAs (α : Type) : [ToTyp α] → (name : String) → Env (BVar α) := mk
 
 /-- Turns itself into a term. -/
 def toTerm : (bv : BVar α) → Term α := id
@@ -121,8 +121,8 @@ namespace Term
 @[inherit_doc BVar.mk]
 abbrev mkBVar := @BVar.mk
 
-@[inherit_doc BVar.mk']
-abbrev mkBVar' := @BVar.mk'
+@[inherit_doc BVar.mkAs]
+abbrev mkBVarAs := @BVar.mkAs
 
 @[inherit_doc BVars.lambda]
 abbrev lambda := @BVars.lambda
