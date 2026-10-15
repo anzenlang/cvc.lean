@@ -13,6 +13,7 @@ import all Cvc.Defs
 public import Cvc.Basic
 public import Cvc.Basic.Env
 public import Cvc.Defs
+public meta import Lean.Elab.Term
 
 
 
@@ -78,10 +79,10 @@ def isDeclared (name : String) : Env Bool := do
 def checkFreshSortSymbol (symbol : String) : Env Unit := do
   if ← Srt.isDeclared symbol then throwUser s!"a sort named `{symbol}` is already declared"
 
-@[inherit_doc Tm.mkArraySort]
+/-- Creates the sort of arrays from `idx` to `elm`, *e.g.* `idx.arrayTo elm`. -/
 def arrayTo (idx elm : Srt) := lift% mkArraySort idx elm
 
-@[inherit_doc arrayTo]
+/-- Creates the sort of arrays to `elm` from `idx`, *e.g.* `elm.arrayIdx idx`. -/
 def arrayFrom (elm idx : Srt) := idx.arrayTo elm
 
 /-- An array of `elm`-values indexed by `int`-values. -/
@@ -595,7 +596,9 @@ end ToTyp
 
 
 
+/-- Carries a proof that the `Typ` associated to `α` is arithmetic. -/
 class IsArith (α : Type) [A : ToTyp α] : Prop where
+  /-- Proof that `α`'s `Typ` is arithmetic. -/
   valid_typ : A.typ.isArith := by simp [Typ.isArith, ToTyp.typ] <;> grind
 
 instance : IsArith Int := {}
@@ -631,3 +634,36 @@ instance [A : ToTyp α] [B : ToTyp β] : ToTyp (α → β) := ⟨.function A.typ
 example : ToTyp (Int → Bool → Int → Rat) := inferInstance
 
 end ToTyp
+
+
+
+/-! ## A sort written either way
+
+Where the sort-erased DSL lets a sort be written — a quantifier's binders, a grammar's
+non-terminals and parameters, a record field's stated sort — it accepts **a Lean type or a `Srt`**
+alike. Which one was written is only known once the term is elaborated, `int` and `Int` both being
+identifiers, so it takes an elaborator rather than a macro.
+-/
+
+/-- `srtOf% e` is `Srt.of e` when `e` is a Lean type, and `pure e` when it is a `Srt`. -/
+syntax (name := srtOfStx) "srtOf% " term:max : term
+
+public meta section
+
+open Lean Elab Term Meta in
+/-- Elaborates `srtOf% e` by looking at what `e` turned out to be. -/
+@[term_elab srtOfStx] def elabSrtOf : TermElab := fun stx expected? => do
+  let `(srtOf% $e) := stx | throwUnsupportedSyntax
+  let value ← withSynthesize <| elabTerm e none
+  let type ← instantiateMVars (← inferType value)
+  if (← whnfR type).isSort then
+    elabTerm (← `(Cvc.Srt.of $e)) expected?
+  else
+    let srt ← elabType (← `(Cvc.Srt))
+    unless ← isDefEq type srt do
+      -- expansions parenthesize what they pass, which is not what the writer wrote
+      let shown := if e.raw.isOfKind ``Lean.Parser.Term.paren then e.raw[1] else e.raw
+      throwErrorAt e m!"expected a Lean type or a `Srt`, but `{shown}` has type{indentExpr type}"
+    elabTerm (← `(pure ($e : Cvc.Srt))) expected?
+
+end

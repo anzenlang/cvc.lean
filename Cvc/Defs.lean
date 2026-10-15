@@ -19,6 +19,10 @@ that a wrapper costs nothing at runtime while staying opaque to a user who impor
 level says which instances come with it: `1` adds `ToString`, `2` adds `BEq`/`Hashable`, `3` adds
 `Ord`/`LT`/`LE`/`compare`. An optional `( ofId / toId )` suffix renames the conversions.
 
+A doc comment in front of one documents the declared type. Without one the type inherits the
+underlying cvc5 type's docstring, which a downstream `module` only sees under `import all` of
+lean-cvc5's own module, so a type a user is meant to read about should carry its own.
+
 The tokens are `wrap*%` rather than `def*%` because a syntax category and its command are global:
 `Cvc.Untyped.Defs` already claims `def*%`, and two commands matching the same syntax make every use
 ambiguous.
@@ -35,6 +39,7 @@ namespace Cvc
 public meta section codeGen open Lean Syntax Elab Command
 
 structure TypeGen where mk' ::
+  doc? : Option (TSyntax ``Lean.Parser.Command.docComment)
   mainId : Ident
   tParam? : Option Ident
   subId : Ident
@@ -46,7 +51,9 @@ structure TypeGen where mk' ::
 
 namespace TypeGen variable (tg : TypeGen)
 
-def mk (mainId : Ident) (subId : Ident)  (tParam? ofSubId? toSubId? : Option Ident)
+def mk
+  (doc? : Option (TSyntax ``Lean.Parser.Command.docComment))
+  (mainId : Ident) (subId : Ident)  (tParam? ofSubId? toSubId? : Option Ident)
 : CommandElabM TypeGen := do
   let mut ofSubId := mkIdent `ofUnsafe
   let mut toSubId := mkIdent `toUnsafe
@@ -61,7 +68,7 @@ def mk (mainId : Ident) (subId : Ident)  (tParam? ofSubId? toSubId? : Option Ide
     idSig ← `( (_ : Type) → $idSig )
     idTerm ← `($idTerm $tParam)
   return {
-    mainId, tParam?, subId, ofSubId, toSubId
+    doc?, mainId, tParam?, subId, ofSubId, toSubId
     idTerm, idSig, idDef
   }
 
@@ -73,10 +80,16 @@ def elaborate (stx : CommandElabM (TSyntax `command)) : CommandElabM Unit := do
   elabCommand stx
 
 def elab0 : CommandElabM Unit := do
-  elaborate `(
-    @[inherit_doc $tg.subId]
-    def $tg.mainId [Ω] : $tg.idSig := $tg.idDef
-  )
+  if let some doc := tg.doc? then
+    elaborate `(
+      $doc:docComment
+      def $tg.mainId [Ω] : $tg.idSig := $tg.idDef
+    )
+  else
+    elaborate `(
+      @[inherit_doc $tg.subId]
+      def $tg.mainId [Ω] : $tg.idSig := $tg.idDef
+    )
   tg.namespaced do elaborate `(
     instance : Nonempty $tg.idTerm := inferInstanceAs (Nonempty $tg.subId)
     @[inline] private def $tg.ofSubId : $tg.subId → $tg.idTerm := id
@@ -151,14 +164,15 @@ syntax "def2% " : cvcCustomDefKw
 syntax "def3% " : cvcCustomDefKw
 
 syntax (name := cvcCustomDef)
-  cvcCustomDefKw ident (ident)? " ← " ident
+  (docComment)? cvcCustomDefKw ident (ident)? " ← " ident
     ("( " ident " / " ident " )")?
 : command
 
 @[command_elab cvcCustomDef]
 def elab_cvcCustomDef : CommandElab
-| `( $kw:cvcCustomDefKw $id $[ $tParam? ]? ← $subId $[ ( $ofSubId? / $toSubId? ) ]? ) => do
-  let tg ← TypeGen.mk id subId tParam? ofSubId? toSubId?
+| `( $[$doc?:docComment]? $kw:cvcCustomDefKw $id $[ $tParam? ]? ← $subId
+    $[ ( $ofSubId? / $toSubId? ) ]? ) => do
+  let tg ← TypeGen.mk doc? id subId tParam? ofSubId? toSubId?
   match kw with
   | `(cvcCustomDefKw| def0%) => tg.elab0
   | `(cvcCustomDefKw| def1%) => tg.elab1
@@ -613,6 +627,7 @@ end
 instance : ToString Typ := ⟨(Cvc.Typ.toString · )⟩
 instance : ToString Typ? := ⟨(Cvc.Typ?.toString · )⟩
 
+/-- Associates a `Typ` to a `Type`. -/
 class ToTyp (α : Type) where
   /-- `Typ` associated to a type through `ToTyp`. -/
   typ : Typ

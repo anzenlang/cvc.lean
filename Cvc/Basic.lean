@@ -16,7 +16,7 @@ import all Cvc.Basic.Env
 
 
 
-namespace Cvc -- variable [Ω]
+namespace Cvc
 
 section open Lean Elab Command
 

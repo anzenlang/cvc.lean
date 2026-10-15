@@ -73,7 +73,7 @@ end Error
 private def liftRes5 (code : Except Error5 α) : Except Error α := code.mapError Error.ofUnsafe
 
 
-
+/-- Argument of the `Env` monad representing a specific term manager. -/
 class Ω : Prop where private mk ::
 
 /-- What an `Env` threads.
@@ -93,9 +93,11 @@ structure State where
   /-- Sorts that were declared, by name. -/
   private declaredSorts : Std.HashMap String cvc5.Sort := {}
 
+/-- The environment monad transformer. -/
 structure EnvT [Ω] (m : Type → Type) (α : Type) : Type where private mk ::
   private runOn : StateRefT' IO.RealWorld State (ResT m) α
 
+/-- The environment monad. -/
 @[expose]
 def Env [Ω] : (α : Type) → Type := EnvT BaseIO
 

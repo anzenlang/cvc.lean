@@ -16,7 +16,7 @@ package cvc {
 require "abdoo8080" / cvc5
 
 @[default_target]
-lean_lib Cvc {}
+lean_lib Cvc
 
 lean_lib cvcTests {
   globs := #[Glob.submodules `Cvc.Tests, Glob.submodules `Cvc.Examples]
