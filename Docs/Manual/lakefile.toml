@@ -1,5 +1,5 @@
-name = "cvcManual"
-defaultTargets = ["textbook"]
+name = "cvc-manual"
+defaultTargets = ["CvcManual", "docs"]
 
 [[require]]
 scope = "leanprover"
@@ -7,12 +7,11 @@ name = "verso"
 
 [[require]]
 name = "cvc"
-path = ".."
+path = "../.."
 
 [[lean_lib]]
-name = "Manual"
-root = "Manual"
+name = "CvcManual"
 
 [[lean_exe]]
-name = "textbook"
+name = "docs"
 root = "Main"

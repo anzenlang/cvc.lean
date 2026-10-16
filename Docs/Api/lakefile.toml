@@ -1,0 +1,14 @@
+name = "docbuild"
+reservoir = false
+version = "0.1.0"
+# share the library's packages rather than fetching cvc5 a second time
+packagesDir = "../../.lake/packages"
+
+[[require]]
+name = "cvc"
+path = "../.."
+
+[[require]]
+scope = "leanprover"
+name = "doc-gen4"
+rev = "v4.34.1"

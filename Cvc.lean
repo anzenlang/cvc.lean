@@ -24,8 +24,6 @@ namespace Cvc
 
 /-! # A high-level, safety-oriented API for cvc5
 
-ping
-
 This library drives the [cvc5](https://cvc5.github.io) SMT solver from Lean. It sits on top of
 [lean-cvc5](https://github.com/abdoo8080/lean-cvc5), a thin binding over cvc5's C++ API, and its
 purpose is to turn the mistakes that binding reports at runtime — or does not report at all — into
