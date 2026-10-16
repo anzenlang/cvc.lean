@@ -40,8 +40,8 @@ group          : (Bag (Bag (Tuple Int Bool Real)))
 #guard_msgs in #eval Env.runIO do
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
   let s ← Solver.new
-  let abc ← s.declareConst (Tab [Int, Bool] Rat) "A"
-  let cde ← s.declareConst (Tab [Rat, String] Bool) "B"
+  let abc ← s.declareConstAs (Tab [Int, Bool] Rat) "A"
+  let cde ← s.declareConstAs (Tab [Rat, String] Bool) "B"
   println! "Tab [Int] Bool : {← (Srt.of (Tab [Int] Bool) : Env Srt)}"
   println! "product        : {← sortOf (← tableProduct abc cde).erase}"
   println! "join           : {← sortOf (← tableJoin #[(2, 0)] abc cde).erase}"
@@ -59,8 +59,8 @@ empty      : (Bag (Tuple Int Bool))
 #guard_msgs in #eval Env.runIO do
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
   let s ← Solver.new
-  let a ← s.declareConst (Tab [Int] Bool) "A"
-  let b ← s.declareConst (Tab [Int] Bool) "B"
+  let a ← s.declareConstAs (Tab [Int] Bool) "A"
+  let b ← s.declareConstAs (Tab [Int] Bool) "B"
   let row ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
   println! "count      : {← sortOf (← tableCount row a).erase}"
   println! "unionMax   : {← sortOf (← tableUnionMax a b).erase}"
@@ -121,7 +121,7 @@ aggrAll : (Bag Int)
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let a ← s.declareConst (Tab [Int] Bool) "A"
+  let a ← s.declareConstAs (Tab [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
   println! "f       : {← f.erase.getSort}"
@@ -154,7 +154,7 @@ aggrAll : { 12 ↦ 1 }
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let a ← s.declareConst (Tab [Int] Bool) "A"
+  let a ← s.declareConstAs (Tab [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
   let aggr ← tableAggregate #[1] f zero a
@@ -186,9 +186,9 @@ interMinN      : (Bag (Tuple Int Bool))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let a ← s.declareConst (Tab [Int] Bool) "A"
-  let b ← s.declareConst (Tab [Int] Bool) "B"
-  let c ← s.declareConst (Tab [Int] Bool) "C"
+  let a ← s.declareConstAs (Tab [Int] Bool) "A"
+  let b ← s.declareConstAs (Tab [Int] Bool) "B"
+  let c ← s.declareConstAs (Tab [Int] Bool) "C"
   println! "unionMaxN      : {← (← tableUnionMaxN #[a, b, c]).erase.getSort}"
   println! "unionDisjointN : {← (← tableUnionDisjointN #[a, b, c]).erase.getSort}"
   println! "interMinN      : {← (← tableInterMinN #[a, b, c]).erase.getSort}"
@@ -247,7 +247,7 @@ project [1]    : (Bag (Tuple Bool))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let b ← s.declareConst B4 "B"
+  let b ← s.declareConstAs B4 "B"
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
   println! "table          : {← sortOf b.erase}"
   -- reordering, duplication, and a one-column result that is still a tuple

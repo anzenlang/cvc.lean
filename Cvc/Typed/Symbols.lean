@@ -62,9 +62,9 @@ abbrev Terms [Ω] : Type := sig (Typed.Term ·)
 
 abbrev Values : Type := sig (fun α => α)
 
-abbrev Fun (α : Type) : Type := [Ω] → sig.Terms → Env (Term α)
+abbrev Fun (α : Type) : Type 1 := [Ω] → sig.Terms → Env (Term α)
 
-abbrev Pred : Type := [Ω] → sig.Fun Bool
+abbrev Pred : Type 1 := [Ω] → sig.Fun Bool
 
 end Sig
 

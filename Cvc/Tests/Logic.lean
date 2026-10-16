@@ -187,8 +187,8 @@ HO_ALL  : sat
     let s ← Solver.new
     if let some l := logic then s.setLogic l
     let f ← s.declareFun (α := Int → Bool → Int) "f"
-    let i ← s.declareConst Int "i"
-    let b ← s.declareConst Bool "b"
+    let i ← s.declareConstAs Int "i"
+    let b ← s.declareConstAs Bool "b"
     try
       -- one argument at a time, so `applyHo f i` is function-sorted
       let applied ← applyHo (← applyHo f i) b
@@ -213,8 +213,8 @@ coe chain  : sat
   : Env String := do
     let s ← Solver.new
     let f ← s.declareFun (α := Int → Bool → Int) "f"
-    let i ← s.declareConst Int "i"
-    let b ← s.declareConst Bool "b"
+    let i ← s.declareConstAs Int "i"
+    let b ← s.declareConstAs Bool "b"
     equal (← build f i b) (← mkInt 1) >>= s.assert
     pure (if ← s.checkIsSat then "sat" else "unsat")
 

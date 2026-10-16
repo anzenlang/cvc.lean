@@ -195,7 +195,7 @@ pick false 7 2 : 5
   let x ← Term.mkBVarAs Int "x"
   let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
 
-  let n ← s.declareConst Int "n"
+  let n ← s.declareConstAs Int "n"
   let lft ← Term.apply dbl n
   let rgt ← Term.mul n (← Term.mkInt 2)
   Term.distinct lft rgt >>= s.assert

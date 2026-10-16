@@ -98,7 +98,7 @@ it solves for. Both come from the grammar, so neither is stated at a call site.
 
 section signatures
 variable [Ω] (s : Solver) (i : BVar Int) (b : BVar Bool) (nt : NT Int)
-  (g : s.Grammar (Int → Int)) (f : Term (Int → Int))
+  (g : Grammar (Int → Int)) (f : Term (Int → Int))
 
 example : Env (Term (Int → Int)) := s.synthFun "f" g
 -- and a solution can only be read where one was found, which is what `EnvSolved` records
@@ -108,7 +108,7 @@ example : Env (Term Int) := s.synthAnyFun' "f" [] Int
 example : Env (Term (Int → Int)) := s.synthAnyFun' "f" (BVars.push i []) Int
 example : Env (Term (Int → Bool → Int)) := s.synthAnyFun' "f" (BVars.push b (BVars.push i [])) Int
 
-/-- info: @Solver.synthFun : [inst : Ω] → (s : Solver) → {σ : Type} → String → s.Grammar σ → Env (Term σ) -/
+/-- info: @Solver.synthFun : [inst : Ω] → Solver → {σ : Type} → String → Grammar σ → Env (Term σ) -/
 #guard_msgs in #check @Cvc.Typed.Solver.synthFun
 
 /-- info: @Solver.getSynthSolution : [inst : Ω] → (s : Solver) → {σ : Type} → Term σ → s.EnvSolved (Term σ) -/

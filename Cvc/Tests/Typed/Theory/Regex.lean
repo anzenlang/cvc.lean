@@ -105,25 +105,25 @@ allChar        : "yz"
   let digit ← reRange (← lit "0") (← lit "9")
   let lower ← reRange (← lit "a") (← lit "z")
 
-  let x₁ ← s.declareConst String "x₁"
+  let x₁ ← s.declareConstAs String "x₁"
   strInRegex x₁ (← reRepeat 3 digit) >>= s.assert
   equal (← strToInt x₁) (← mkInt 42) >>= s.assert
-  let x₂ ← s.declareConst String "x₂"
+  let x₂ ← s.declareConstAs String "x₂"
   strInRegex x₂ (← rePlus (← reLit "ab")) >>= s.assert
   equal (← strLength x₂) (← mkInt 6) >>= s.assert
-  let x₃ ← s.declareConst String "x₃"
+  let x₃ ← s.declareConstAs String "x₃"
   strInRegex x₃ (← reConcat (← reLit "a") (← reConcat (← reOpt (← reLit "b")) (← reLit "c")))
     >>= s.assert
   distinct x₃ (← lit "ac") >>= s.assert
-  let x₄ ← s.declareConst String "x₄"
+  let x₄ ← s.declareConstAs String "x₄"
   strInRegex x₄ (← reLoop 2 3 (← reLit "z")) >>= s.assert
   gt (← strLength x₄) (← mkInt 2) >>= s.assert
-  let x₅ ← s.declareConst String "x₅"
+  let x₅ ← s.declareConstAs String "x₅"
   strInRegex x₅ (← reInter (← reStar lower) (← reConcat (← reAll) (← reLit "q"))) >>= s.assert
   equal (← strLength x₅) (← mkInt 1) >>= s.assert
-  let x₆ ← s.declareConst String "x₆"
+  let x₆ ← s.declareConstAs String "x₆"
   strInRegex x₆ (← reDiff (← reUnion (← reLit "a") (← reLit "b")) (← reLit "a")) >>= s.assert
-  let x₇ ← s.declareConst String "x₇"
+  let x₇ ← s.declareConstAs String "x₇"
   strInRegex x₇ (← reConcat (← reAllChar) (← reAllChar)) >>= s.assert
   strPrefix (← lit "y") x₇ >>= s.assert
   strSuffix (← lit "z") x₇ >>= s.assert
@@ -146,7 +146,7 @@ in R and in comp R : unsat
 #guard_msgs in #eval Env.runIO do
   let check (name : String) (f : Solver → Term String → Env Unit) : Env Unit := do
     let s ← Solver.new
-    let x ← s.declareConst String "x"
+    let x ← s.declareConstAs String "x"
     f s x
     println! "{name} : {if ← s.checkIsSat then "sat" else "unsat"}"
   check "in re.none        " fun s x => do
@@ -168,7 +168,7 @@ replaceReAll : "a#b#"
   s.setOption "produce-models" "true"
   let digit ← reRange (← lit "0") (← lit "9")
   let bind {α : Type} [ToTyp α] (name : String) (value : Term α) : Env (Term α) := do
-    let c ← s.declareConst α name
+    let c ← s.declareConstAs α name
     equal c value >>= s.assert
     return c
   let indexofRe ← bind "indexofRe" (← strIndexofRe (← lit "ab12cd") (← rePlus digit) (← mkInt 0))
@@ -243,7 +243,7 @@ example [Ω] (s : Term String) : Env (Term Cvc.Regex) := regex! s*
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst String "x"
+  let x ← s.declareConstAs String "x"
   let digit ← regex! ['0'-'9']
   Term.strInRegex x (← regex! digit+ ("." digit+)?) >>= s.assert
   Term.equal (← Term.strLength x) (← Term.mkInt 3) >>= s.assert

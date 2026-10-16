@@ -49,15 +49,16 @@ def Solver.Proof [Ω] : (solver : Solver) → (pc : Proof.Component) → Type :=
 abbrev Solver.Proofs [Ω] (solver : Solver) (pc : Proof.Component) : Type :=
   Array (solver.Proof pc)
 
-/-- A SyGuS grammar, built by `solver` and usable with that solver only.
+/-- A SyGuS grammar.
 
-cvc5 makes a grammar from a solver and rejects it anywhere else, so the index makes handing one
-solver's grammar to another a type error. The rule builders live in `Cvc.Untyped.Theory.Grammar`;
-the type is declared here because the interpolant and abduct queries below take one.
+A grammar belongs to the scope, as a term does: cvc5 builds one through a solver
+(`Solver.mkGrammar`), but any solver of the same term manager accepts it. The rule builders live in
+`Cvc.Untyped.Theory.Grammar`; the type is declared here because the interpolant and abduct queries
+below take one.
 -/
-structure Solver.Grammar [Ω] (solver : Solver) where
+structure Grammar [Ω] where
   private mk ::
-  private raw : Cvc.Grammar
+  private raw : cvc5.Grammar
   /-- The parameters the grammar was built over.
 
   A `synth-fun` restricted by the grammar must be declared over these very variables, which is
@@ -66,10 +67,9 @@ structure Solver.Grammar [Ω] (solver : Solver) where
   boundVars : BVars
 
 /-- String representation, as the SyGuS pre-declaration and rule set. -/
-protected def Solver.Grammar.toString [Ω] {solver : Solver} (g : solver.Grammar) : String :=
-  toString g.raw
+protected def Grammar.toString [Ω] (g : Grammar) : String := toString g.raw
 
-instance [Ω] {solver : Solver} : ToString solver.Grammar := ⟨Solver.Grammar.toString⟩
+instance [Ω] : ToString Grammar := ⟨Grammar.toString⟩
 
 
 
@@ -370,7 +370,7 @@ def qeDisjunct (q : Term) : Env (Option Term) :=
 An interpolant is a formula `I` over the symbols the assertions `A` and `conj` share, such that
 `A → I` and `I → conj`. A `grammar` restricts the shape of `I`. Needs `produce-interpolants`.
 -/
-def getInterpolant (conj : Term) (grammar : Option s.Grammar := none) : Env (Option Term) :=
+def getInterpolant (conj : Term) (grammar : Option Grammar := none) : Env (Option Term) :=
   runUnsafe' do
     let t ← match grammar with
       | none => s.toUnsafe.getInterpolant conj
@@ -393,7 +393,7 @@ A `grammar` restricts the shape of `B`. Needs `produce-abducts`.
 When no abduct exists, cvc5 may search for one indefinitely rather than answer: asking for an
 abduct of `false` does not return.
 -/
-def getAbduct (conj : Term) (grammar : Option s.Grammar := none) : Env (Option Term) :=
+def getAbduct (conj : Term) (grammar : Option Grammar := none) : Env (Option Term) :=
   runUnsafe' do
     let t ← match grammar with
       | none => s.toUnsafe.getAbduct conj

@@ -14,6 +14,7 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 import all Cvc.Typed.BVar
 import all Cvc.Typed.Theory.Grammar
+import all Cvc.Typed.Solver
 import all Cvc.Untyped.Theory.Synth
 
 public import Cvc.Untyped.Theory.Synth
@@ -62,7 +63,7 @@ def declareSygusVar (α : Type) [ToTyp α] (symbol : String) : Env (Term α) := 
 The grammar carries the parameters and the start sort, so its index *is* the signature of the
 function this declares.
 -/
-def synthFun (symbol : String) (g : s.Grammar σ) : Env (Term σ) :=
+def synthFun (symbol : String) (g : Grammar σ) : Env (Term σ) :=
   U.synthFun s symbol g.boundVars g.startSrt g.toUntyped
 
 /-- Declares a function to synthesize, unrestricted.
@@ -146,7 +147,7 @@ def getSynthSolutions (fns : Terms σ) : s.EnvSolved (Terms σ) := U.getSynthSol
 
 The grammar says what may be enumerated, and its start sort is what comes back.
 -/
-def findSynth (target : Cvc.Synth.FindTarget) (g : s.Grammar σ) : Env (Term σ) :=
+def findSynth (target : Cvc.Synth.FindTarget) (g : Grammar σ) : Env (Term σ) :=
   U.findSynth s target g.toUntyped
 
 /-- Enumerates a term of interest with no grammar to restrict it.

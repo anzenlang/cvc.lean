@@ -71,13 +71,13 @@ has type
 but is expected to have type
   Term Bool
 in the application
-  Grammar.addRule g cnd start.toTerm
+  g.addRule cnd start.toTerm
 
 Note: The following definitions were not unfolded because their definition is not exposed:
   Term ↦ 4
 -/
 #guard_msgs in
-example (s : Solver) (g : s.Grammar σ) (cnd : NT Bool) (start : NT Int) : Env (s.Grammar σ) :=
+example (s : Solver) (g : Grammar σ) (cnd : NT Bool) (start : NT Int) : Env (Grammar σ) :=
   g.addRule cnd start.toTerm
 
 
@@ -198,8 +198,8 @@ I → C       : true
   let s ← Solver.new
   s.setOption "produce-interpolants" "true"
 
-  let x ← s.declareConst Int "x"
-  let y ← s.declareConst Int "y"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
   let hyps := #[← smt! y = 6 * x + 3, ← smt! x ≥ 0]
   for h in hyps do s.assert h
   let goal ← smt! ¬ (y = 5) ∧ ¬ (y = 6)

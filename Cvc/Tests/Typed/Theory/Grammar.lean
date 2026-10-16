@@ -67,33 +67,19 @@ that is just the start sort, which is the shape `getInterpolant` and `getAbduct`
 section signatures
 variable [Ω] (s : Solver) (i : BVar Int) (b : BVar Bool) (nt : NT Int) (ntB : NT Bool)
 
-example : Env (s.Grammar Int) := s.mkGrammar [] nt
-example : Env (s.Grammar (Int → Int)) := s.mkGrammar (BVars.push i []) nt
-example : Env (s.Grammar (Int → Bool → Int)) := s.mkGrammar (BVars.push b (BVars.push i [])) nt
-example : Env (s.Grammar Bool) := s.mkGrammar [] ntB
+example : Env (Grammar Int) := s.mkGrammar [] nt
+example : Env (Grammar (Int → Int)) := s.mkGrammar (BVars.push i []) nt
+example : Env (Grammar (Int → Bool → Int)) := s.mkGrammar (BVars.push b (BVars.push i [])) nt
+example : Env (Grammar Bool) := s.mkGrammar [] ntB
 
 /-- info: @Solver.mkGrammar : [inst : Ω] →
-  (s : Solver) →
+  Solver →
     {α : Type} →
-      [ToTyp α] → (boundVars : BVars) → NT α → optParam NTs [] → Env (s.Grammar (BVars.signatureTo α boundVars)) -/
+      [ToTyp α] → (boundVars : BVars) → NT α → optParam NTs [] → Env (Grammar (BVars.signatureTo α boundVars)) -/
 #guard_msgs in #check @Cvc.Typed.Solver.mkGrammar
 
--- a grammar belongs to the solver that built it: handing it to another does not typecheck
-/--
-error: Application type mismatch: The argument
-  g
-has type
-  s.Grammar Bool
-but is expected to have type
-  s₂.Grammar Bool
-in the application
-  some g
-
-Note: The following definitions were not unfolded because their definition is not exposed:
-  Untyped.Solver ↦ 1
--/
-#guard_msgs in
-example (s₂ : Solver) (g : s.Grammar Bool) (conj : Term Bool) : Env (Option (Term Bool)) :=
+-- a grammar belongs to the scope, not to the solver that built it: another solver takes it
+example (s₂ : Solver) (g : Grammar Bool) (conj : Term Bool) : Env (Option (Term Bool)) :=
   s₂.getInterpolant conj (some g)
 
 end signatures
@@ -114,13 +100,13 @@ has type
 but is expected to have type
   Term Int
 in the application
-  Grammar.addRule g nt tru
+  g.addRule nt tru
 
 Note: The following definitions were not unfolded because their definition is not exposed:
   Term ↦ 4 -/
 #guard_msgs in
-example [Ω] (s : Solver) (g : s.Grammar Int) (nt : NT Int) (tru : Term Bool)
-: Env (s.Grammar Int) :=
+example [Ω] (s : Solver) (g : Grammar Int) (nt : NT Int) (tru : Term Bool)
+: Env (Grammar Int) :=
   g.addRule nt tru
 
 /-- info: foreign nt : caught -/
@@ -170,8 +156,8 @@ constrained: (< a b)
   let s ← Solver.new
   s.setOption "produce-interpolants" "true"
 
-  let a ← s.declareConst Int "a"
-  let b ← s.declareConst Int "b"
+  let a ← s.declareConstAs Int "a"
+  let b ← s.declareConstAs Int "b"
   Term.lt a b >>= s.assert
   let goal ← Term.lt a (← Term.add b (← Term.mkInt 1))
 
@@ -212,10 +198,10 @@ section indices
 variable [Ω] (s : Solver)
 
 /-- With parameters, the index is the signature a `synth-fun` over the grammar has. -/
-example : Env (s.Grammar (Int → Bool → Int)) := grammar! s (x : Int) (b : Bool) where
+example : Env (Grammar (Int → Bool → Int)) := grammar! s (x : Int) (b : Bool) where
   start : Int := x | if b then start else start
 /-- Without, it is the start sort, which is what interpolants and abducts ask for. -/
-example : Env (s.Grammar Bool) := grammar! s where
+example : Env (Grammar Bool) := grammar! s where
   start : Bool := true | false
 
 end indices
@@ -234,7 +220,7 @@ Note: The following definitions were not unfolded because their definition is no
   Term ↦ 6
 -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env (s.Grammar Int) := grammar! s where
+example [Ω] (s : Solver) : Env (Grammar Int) := grammar! s where
   start : Int := 0 | true
 
 /-! The interpolation of the remainders example, with the grammar written as a block: no single
@@ -244,8 +230,8 @@ remainder fact rules out both 5 and 6, so the interpolant is a conjunction. -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-interpolants" "true"
-  let x ← s.declareConst Int "x"
-  let y ← s.declareConst Int "y"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
   smt! y = 6 * x + 3 >>= s.assert
   smt! x ≥ 0 >>= s.assert
   let g ← grammar! s where
@@ -255,3 +241,23 @@ remainder fact rules out both 5 and 6, so the interpolant is a conjunction. -/
     r     : Int  := 0 | 1 | 2
   let some i ← s.getInterpolant (← smt! ¬ (y = 5) ∧ ¬ (y = 6)) g | println! "no interpolant"
   println! "interpolant : {i}"
+
+
+
+/-! ## A grammar is the scope's
+
+Built through one solver, used by another: the grammar's restriction still holds.
+-/
+
+/-- info: interpolant from s2 : (< a b) -/
+#guard_msgs in #eval Env.runIO do
+  let s1 ← Solver.new
+  let s2 ← Solver.new
+  s2.setOption "produce-interpolants" "true"
+  let a ← Term.mkSymbolAs Int "a"
+  let b ← Term.mkSymbolAs Int "b"
+  let g ← grammar! s1 where
+    start : Bool := a < b | a = b
+  smt! a < b >>= s2.assert
+  let some i ← s2.getInterpolant (← smt! a < b + 1) g | println! "no interpolant"
+  println! "interpolant from s2 : {i}"

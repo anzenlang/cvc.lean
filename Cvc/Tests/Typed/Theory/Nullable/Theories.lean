@@ -85,7 +85,7 @@ and true ⊥  : none
   let one ← nullableSome (← mkBitVec (size := 8) 1)
   let sum ← bvAdd? bv one
 
-  let n ← s.declareConst (Option Int) "n"
+  let n ← s.declareConstAs (Option Int) "n"
   nullableIsNull n >>= s.assert
   let eq ← equal? n n
   let andT ← and? (← nullableSome (← mkTrue)) (← mkNull' Bool)

@@ -143,8 +143,8 @@ lambda   : (@ (@ (lambda ((x Int) (y Int)) (+ x y)) i) i) : Int
   let s ← Cvc.Typed.Solver.new
   let f ← s.declareFun (α := Int → Bool → Int) "f"
   let g ← s.declareFun (α := Int → Int → Int → Int → Int) "g"
-  let i ← s.declareConst Int "i"
-  let b ← s.declareConst Bool "b"
+  let i ← s.declareConstAs Int "i"
+  let b ← s.declareConstAs Bool "b"
 
   let show! (label : String) (t : Untyped.Term) : Env Unit := do
     println! "{label} : {t} : {← t.getSort}"
@@ -204,9 +204,9 @@ apply then : (f i b r)
 #guard_msgs in #eval Env.runIO do
   let s ← Cvc.Typed.Solver.new
   let f ← s.declareFun (α := Int → Bool → Rat → Int) "f"
-  let i ← s.declareConst Int "i"
-  let b ← s.declareConst Bool "b"
-  let r ← s.declareConst Rat "r"
+  let i ← s.declareConstAs Int "i"
+  let b ← s.declareConstAs Bool "b"
+  let r ← s.declareConstAs Rat "r"
 
   println! "applyN     : {(← applyN f (.cons i (.cons b (.last r)))).erase}"
   println! "apply3     : {(← apply3 f i b r).erase}"
@@ -219,8 +219,8 @@ apply then : (f i b r)
 #guard_msgs in #eval Env.runIO do
   let s ← Cvc.Typed.Solver.new
   let f ← s.declareFun (α := Int → Bool → Int) "f"
-  let i ← s.declareConst Int "i"
-  let b ← s.declareConst Bool "b"
+  let i ← s.declareConstAs Int "i"
+  let b ← s.declareConstAs Bool "b"
   let applied ← f i b
   equal applied (← mkInt 1) >>= s.assert
   println! "coe chain, no logic set : {if ← s.checkIsSat then "sat" else "unsat"}"

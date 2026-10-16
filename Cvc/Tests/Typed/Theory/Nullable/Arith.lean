@@ -99,9 +99,9 @@ end indices
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst (Option Int) "x"
-  let y ← s.declareConst (Option Int) "y"
-  let z ← s.declareConst (Option Int) "z"
+  let x ← s.declareConstAs (Option Int) "x"
+  let y ← s.declareConstAs (Option Int) "y"
+  let z ← s.declareConstAs (Option Int) "z"
 
   -- dot notation works through the `?`
   let sum ← x.add? y
@@ -137,7 +137,7 @@ mulN'? []   : (some 1)
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst (Option Int) "x"
+  let x ← s.declareConstAs (Option Int) "x"
   let empty : Term (Option Int) ← addN'? #[]
   let single ← addN'? #[x]
   let many ← addN'? #[x, x]

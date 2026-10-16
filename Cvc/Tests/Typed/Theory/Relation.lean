@@ -74,10 +74,10 @@ group     : (Set (Set (Tuple Int Bool Real)))
 #guard_msgs in #eval Env.runIO do
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
   let s ← Solver.new
-  let abc ← s.declareConst (Rel [Int, Bool] Rat) "A"
-  let cde ← s.declareConst (Rel [Rat, String] Bool) "B"
-  let rr ← s.declareConst (Rel [Int] Int) "R"
-  let u ← s.declareConst (Rel [] Int) "U"
+  let abc ← s.declareConstAs (Rel [Int, Bool] Rat) "A"
+  let cde ← s.declareConstAs (Rel [Rat, String] Bool) "B"
+  let rr ← s.declareConstAs (Rel [Int] Int) "R"
+  let u ← s.declareConstAs (Rel [] Int) "U"
 
   println! "join      : {← sortOf (← relJoin abc cde).erase}"
   println! "product   : {← sortOf (← relProduct abc cde).erase}"
@@ -133,8 +133,8 @@ singleton : (Set (Tuple Int Bool))
 #guard_msgs in #eval Env.runIO do
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
   let s ← Solver.new
-  let a ← s.declareConst (Rel [Int] Bool) "A"
-  let b ← s.declareConst (Rel [Int] Bool) "B"
+  let a ← s.declareConstAs (Rel [Int] Bool) "A"
+  let b ← s.declareConstAs (Rel [Int] Bool) "B"
   let pair ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
 
   println! "member    : {← sortOf (← relMember pair a).erase}"
@@ -162,8 +162,8 @@ join ⊆ product     : unsat
   println! "1,true ∈ singleton : {if ← s.checkIsSat then "SAT" else "unsat (so it is a member)"}"
 
   let s2 ← Solver.new
-  let a ← s2.declareConst (Rel [Int] Bool) "A"
-  let b ← s2.declareConst (Rel [Bool] Rat) "B"
+  let a ← s2.declareConstAs (Rel [Int] Bool) "A"
+  let b ← s2.declareConstAs (Rel [Bool] Rat) "B"
   let joined ← relTableJoin #[(1, 0)] a b
   let product ← relProduct a b
   not (← relSubset joined product) >>= s2.assert
@@ -270,7 +270,7 @@ aggrAll : (Set Int)
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let a ← s.declareConst (Rel [Int] Bool) "A"
+  let a ← s.declareConstAs (Rel [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
   println! "f       : {← f.erase.getSort}"
@@ -306,7 +306,7 @@ aggrAll : { 13 }
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let a ← s.declareConst (Rel [Int] Bool) "A"
+  let a ← s.declareConstAs (Rel [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
   let aggr ← relAggregate #[1] f zero a
@@ -339,9 +339,9 @@ minusN : (Set (Tuple Int Bool))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let a ← s.declareConst (Rel [Int] Bool) "A"
-  let b ← s.declareConst (Rel [Int] Bool) "B"
-  let c ← s.declareConst (Rel [Int] Bool) "C"
+  let a ← s.declareConstAs (Rel [Int] Bool) "A"
+  let b ← s.declareConstAs (Rel [Int] Bool) "B"
+  let c ← s.declareConstAs (Rel [Int] Bool) "C"
   println! "unionN : {← (← relUnionN #[a, b, c]).erase.getSort}"
   println! "interN : {← (← relInterN #[a, b, c]).erase.getSort}"
   println! "minusN : {← (← relMinusN #[a, b, c]).erase.getSort}"

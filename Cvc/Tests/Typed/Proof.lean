@@ -43,7 +43,7 @@ variable [Ω] {s : Solver}
 def solver (proofs := true) : Env Solver := do
   let s ← Solver.new
   if proofs then s.setOption "produce-proofs" "true"
-  let b ← s.declareConst Bool "b"
+  let b ← s.declareConstAs Bool "b"
   s.assert b
   Term.not b >>= s.assert
   return s
@@ -167,7 +167,7 @@ total form agrees         : true
   s.setOption "produce-proofs" "true"
   s.setOption "proof-granularity" "dsl-rewrite"
   -- proving `x + 0 ≠ x` unsat goes through rewriting, so the tree has rewrite steps in it
-  let x ← s.declareConst Int "x"
+  let x ← s.declareConstAs Int "x"
   (smt! x + 0 ≠ x) >>= s.assert
 
   let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)

@@ -12,10 +12,8 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 import all Cvc.Untyped.Solver
-import all Cvc.Typed.Theory.Grammar
 
 public import Cvc.Untyped.Solver
-public import Cvc.Typed.Theory.Grammar
 public import Cvc.Typed.BVar
 
 
@@ -48,12 +46,23 @@ Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proo
 -/
 abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (Solver.Proof s pc)
 
-/-- A grammar built by `s`, generating terms of signature `σ`.
+/-- A grammar generating terms of signature `σ`.
 
-An abbreviation of `Typed.Grammar`, so that it reads `s.Grammar σ`; unfolding it lands on the typed
-grammar, whose builders are the typed ones.
+Carries the parameters it was declared over, so that `synthFun` cannot be given different ones.
+Like the sort-erased one it belongs to the scope, not to the solver that built it. Declared here
+rather than beside the builders in `Cvc.Typed.Theory.Grammar` because the interpolant and abduct
+queries below take one.
 -/
-abbrev Solver.Grammar [Ω] (s : Solver) (σ : Type) : Type := Typed.Grammar s σ
+structure Grammar [Ω] (σ : Type) where
+  private mk ::
+  private toUntyped : Untyped.Grammar
+  private boundVars : Untyped.BVars
+  private startSrt : Srt
+
+/-- String representation, as the SyGuS pre-declaration and rule set. -/
+protected def Grammar.toString [Ω] (g : Grammar σ) : String := toString g.toUntyped
+
+instance [Ω] : ToString (Grammar σ) := ⟨Grammar.toString⟩
 
 
 
@@ -127,37 +136,18 @@ def getLearnedLiterals (t : LearnedLitType := LearnedLitType.input) : Env (Terms
 
 
 
-/-! ## Grammars
-
-`mkGrammar` is here rather than in `Cvc/Typed/Grammar.lean` because it needs a solver, and
-that module defines the type the solver's own signatures mention.
--/
-
-/-- A grammar over the given parameters, starting at `start`.
-
-`boundVars` are the parameters of the `synth-fun` this grammar will constrain; the resulting index
-is the signature those parameters and `start`'s sort describe. `others` are further non-terminals
-the rules may mention.
--/
-def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
-: Env (s.Grammar (boundVars.signatureTo α)) := do
-  let startSrt ← Srt.of α
-  let untyped ← Untyped.Solver.mkGrammar s boundVars.erase start.erase others.erase
-  return ⟨untyped, boundVars.erase, startSrt⟩
-
-
 
 /-! ## Quantifier elimination, interpolants and abducts -/
 
 def% qe : (s : Solver) → (q : Term Bool) → Env (Term Bool) ← qe
 def% qeDisjunct : (s : Solver) → (q : Term Bool) → Env (Option (Term Bool)) ← qeDisjunct
 @[inherit_doc U.getInterpolant]
-def getInterpolant (conj : Term Bool) (grammar : Option (s.Grammar Bool) := none)
+def getInterpolant (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
 : Env (Option (Term Bool)) :=
   U.getInterpolant s conj (grammar.map Grammar.toUntyped)
 def% getNextInterpolant : (s : Solver) → Env (Option (Term Bool)) ← getNextInterpolant
 @[inherit_doc U.getAbduct]
-def getAbduct (conj : Term Bool) (grammar : Option (s.Grammar Bool) := none)
+def getAbduct (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
 : Env (Option (Term Bool)) :=
   U.getAbduct s conj (grammar.map Grammar.toUntyped)
 def% getNextAbduct : (s : Solver) → Env (Option (Term Bool)) ← getNextAbduct
@@ -171,9 +161,14 @@ is one of these too, at an arrow index.
 -/
 
 /-- Declares a symbol of the given sort. -/
-def declareConst (α : Type) [ToTyp α] (symbol : String) (fresh : Bool := true)
+def declareConstAs (α : Type) [ToTyp α] (symbol : String) (fresh : Bool := true)
 : Env (Term α) := do
   U.declareConst s symbol (← Srt.of α) fresh
+
+/-- Declares a symbol, infers its sort. -/
+def declareConst [ToTyp α] (symbol : String) (fresh : Bool := true)
+: Env (Term α) :=
+  s.declareConstAs α symbol fresh
 
 /-- Defines a symbol of the given sort as the given body. -/
 def defineConst [ToTyp α] (symbol : String) (body : Term α) (global : Bool := false)

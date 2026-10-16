@@ -77,7 +77,7 @@ declareConst  : p : Pair
   println! "Int → Pair    : {← (Srt.of (Int → Pair) : Env Srt)}"
   println! "Int × Pair    : {← (Srt.of (Int × Pair) : Env Srt)}"
 
-  let p ← s.declareConst Pair "p"
+  let p ← s.declareConstAs Pair "p"
   println! "declareConst  : {p.erase} : {← p.erase.getSort}"
 
 -- naming a datatype before declaring it is an error, not a fresh incompatible sort
@@ -122,7 +122,7 @@ model    : 7
   println! "updated  : {(← fst.update p (← Term.mkInt 9)).erase}"
 
   -- the indices are exact, so the model read needs no `typeCheck`
-  let x ← s.declareConst Pair "x"
+  let x ← s.declareConstAs Pair "x"
   Term.equal x p >>= s.assert
   let xFst ← fst.get x
   s.checkSat (ifSat := do println! "model    : {← s.getValue xFst}")
@@ -210,7 +210,7 @@ head of l : 7
   -- the head of `l`, or zero if it has none
   let h ← BVar.mk (α := Int) "h"
   let t ← BVar.mk (α := Lst) "t"
-  let l ← s.declareConst Lst "l"
+  let l ← s.declareConstAs Lst "l"
   let m ← Term.mkMatch l #[
     ← consC.case2 h t h.toTerm,
     ← nilC.case0 (← Term.mkInt 0),
@@ -296,7 +296,7 @@ head of l : 15
   let s ← Solver.new
   s.setOption "produce-models" "true"
   let _ ← declareLst
-  let l ← s.declareConst Lst "l"
+  let l ← s.declareConstAs Lst "l"
 
   -- `h` is a `Term Int` in the body, so the arithmetic operators apply and the match is `Term Int`;
   -- `t` is never mentioned and needs no index
@@ -319,7 +319,7 @@ ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   let _ ← declareLst
-  let l ← s.declareConst Lst "l"
+  let l ← s.declareConstAs Lst "l"
 
   -- the index is stated here because nothing else says what it should be: the body is just `h`,
   -- so it takes the match's own expected type to pin it down
@@ -381,7 +381,7 @@ wrong width: caught: constructor `cons` takes 2 field(s), bound 1
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   let _ ← declareLst
-  let l ← s.declareConst Lst "l"
+  let l ← s.declareConstAs Lst "l"
   let caught (code : Env String) : Env String := try code catch e => pure s!"caught: {e}"
 
   -- an ascription disagreeing with the declaration is caught where the variable is re-typed

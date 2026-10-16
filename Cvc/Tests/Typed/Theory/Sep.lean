@@ -97,8 +97,8 @@ wand  : (wand (pto x v) sep.emp)
 #guard_msgs in #eval Env.runIO do
   let s ← solver
   let h ← s.declareSepHeap Int Bool
-  let x ← s.declareConst Int "x"
-  let v ← s.declareConst Bool "v"
+  let x ← s.declareConstAs Int "x"
+  let v ← s.declareConstAs Bool "v"
 
   let pto ← h.pto x v
   let emp ← Term.sepEmp
@@ -119,8 +119,8 @@ nil  : (= (as sep.nil Int) 0)
 #guard_msgs in #eval Env.runIO do
   let s ← solver
   let h ← s.declareSepHeap Int Bool
-  let x ← s.declareConst Int "x"
-  let v ← s.declareConst Bool "v"
+  let x ← s.declareConstAs Int "x"
+  let v ← s.declareConstAs Bool "v"
   (h.pto x v) >>= s.assert
 
   s.checkSat (ifSat := do

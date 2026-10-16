@@ -133,7 +133,7 @@ values  : #[1, true, (/ 1 2)]
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let x ← s.declareConst Int "x"
+  let x ← s.declareConstAs Int "x"
   let lft ← Term.mkTuple x (.last (← Term.mkTrue))
   let rgt ← Term.mkTuple (← Term.mkInt 4) (.last (← Term.mkTrue))
   Term.equal lft rgt >>= s.assert
@@ -191,7 +191,7 @@ two are the same term to the solver, which is what this checks.
 /-- info: snd = tupleProject #[1, 2] : unsat -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let x ← s.declareConst (Int × Bool × String) "x"
+  let x ← s.declareConstAs (Int × Bool × String) "x"
   let viaSnd ← x.snd
   let viaProject ← Untyped.Term.tupleProject #[1, 2] x.erase
   let same ← Untyped.Term.equal viaSnd.erase viaProject
@@ -209,7 +209,7 @@ snd : false
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst (Int × Bool) "x"
+  let x ← s.declareConstAs (Int × Bool) "x"
   Term.equal x (← Term.mkTuple (← Term.mkInt 9) (.last (← Term.mkFalse))) >>= s.assert
   let first ← x.fst
   let second ← x.snd

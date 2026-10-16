@@ -98,7 +98,7 @@ example [Ω] : Env (Term Bool) := Term.forallH fun (x : Term Int) => smt! x + 1
 #guard_msgs in #eval Env.runIO do
   let check (name : String) (f : Term Int → Env (Term Bool)) : Env Unit := do
     let s ← Solver.new
-    let y ← s.declareConst Int "y"
+    let y ← s.declareConstAs Int "y"
     s.assert (← f y)
     println! "{name} : {if ← s.checkIsSat then "sat" else "unsat"}"
   check "∀ x, x + y = y + x" fun y => Term.forallH fun (x : Term Int) => smt! x + y = y + x
@@ -117,7 +117,7 @@ qeDisjunct : (some (not (>= y 2)))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let y ← s.declareConst Int "y"
+  let y ← s.declareConstAs Int "y"
   let q ← Term.existsH fun (x : Term Int) => smt! y < x ∧ x < 3
   println! "q          : {q}"
   println! "qe         : {← s.qe q}"

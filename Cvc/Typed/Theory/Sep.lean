@@ -37,7 +37,7 @@ make a heap mismatch a *type* error, and `nil` comes out at the location index w
 ascribe.
 
 **A handle fits here where it did not fit datatypes.** The objection there was that a handle's
-index has no `ToTyp`, so it cannot go where one is required — inside `Set α`, `declareConst α`, a
+index has no `ToTyp`, so it cannot go where one is required — inside `Set α`, `declareConstAs α`, a
 tuple component. A heap is never a term's sort: `sep.nil` is a term of the *location* sort, which
 is an ordinary Lean type with an ordinary `ToTyp`. So nothing ever asks for `ToTyp (Heap α β)`, and
 the objection does not arise.

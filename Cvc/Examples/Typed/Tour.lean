@@ -172,8 +172,8 @@ end widths
 
 /-! ## Solving, and reading a model
 
-`declareConst` takes the Lean type, so the term it answers is indexed and `getValue` needs no
-target type: what comes back is an `Int`, a `Bool`, a `BitVec 8`.
+`declareConstAs` takes the Lean type (`declareConst` infers it), so the term it answers is indexed
+and `getValue` needs no target type: what comes back is an `Int`, a `Bool`, a `BitVec 8`.
 -/
 
 /-- info:
@@ -184,9 +184,9 @@ and they are Lean values: 10, 10
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let i ← s.declareConst Int "i"
-  let j ← s.declareConst Int "j"
-  let u ← s.declareConst (BitVec 8) "u"
+  let i ← s.declareConstAs Int "i"
+  let j ← s.declareConstAs Int "j"
+  let u ← s.declareConstAs (BitVec 8) "u"
 
   (← smt! i + j = 10) |> s.assert
   (← smt! i - j = 4) |> s.assert

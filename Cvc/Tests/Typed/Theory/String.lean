@@ -143,11 +143,11 @@ in regex : "abc"
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst String "x"
-  let y ← s.declareConst String "y"
-  let z ← s.declareConst String "z"
-  let w ← s.declareConst String "w"
-  let v ← s.declareConst String "v"
+  let x ← s.declareConstAs String "x"
+  let y ← s.declareConstAs String "y"
+  let z ← s.declareConstAs String "z"
+  let w ← s.declareConstAs String "w"
+  let v ← s.declareConstAs String "v"
 
   equal (← strConcat x y) (← lit "hello world") >>= s.assert
   equal x (← lit "hello") >>= s.assert
@@ -177,7 +177,7 @@ digit, not a digit  : unsat
 #guard_msgs in #eval Env.runIO do
   let check (name : String) (f : Solver → Term String → Env Unit) : Env Unit := do
     let s ← Solver.new
-    let x ← s.declareConst String "x"
+    let x ← s.declareConstAs String "x"
     f s x
     println! "{name} : {if ← s.checkIsSat then "sat" else "unsat"}"
   check "contains, too short" fun s x => do
@@ -208,7 +208,7 @@ fromInt    : "17"
   let s ← Solver.new
   s.setOption "produce-models" "true"
   let bind {α : Type} [ToTyp α] (name : String) (value : Term α) : Env (Term α) := do
-    let c ← s.declareConst α name
+    let c ← s.declareConstAs α name
     equal c value >>= s.assert
     return c
   let replace ← bind "replace" (← strReplace (← lit "a-b-c") (← lit "-") (← lit "+"))

@@ -59,13 +59,13 @@ abbrev ValueTermsAt [SVars S] [Ω] (k : Nat) : Type := S (Symbol.At k (Term ·))
 
 abbrev ValuesAt [SVars S] (k : Nat) : Type := S (Symbol.At k fun α => α)
 
-abbrev FunAt [ι : SVars S] (k : Nat) (α : Type) : Type := [Ω] → ι.TermsAt k → Env (Term α)
+abbrev FunAt [ι : SVars S] (k : Nat) (α : Type) : Type 1 := [Ω] → ι.TermsAt k → Env (Term α)
 
-abbrev Fun [ι : SVars S] (α : Type) : Type := [Ω] → {k : Nat} → ι.TermsAt k → Env (Term α)
+abbrev Fun [ι : SVars S] (α : Type) : Type 1 := [Ω] → {k : Nat} → ι.TermsAt k → Env (Term α)
 
-abbrev PredAt [ι : SVars S] (k : Nat) : Type := [Ω] → ι.TermsAt k → Env (Term Bool)
+abbrev PredAt [ι : SVars S] (k : Nat) : Type 1 := [Ω] → ι.TermsAt k → Env (Term Bool)
 
-abbrev Pred [ι : SVars S] : Type := [Ω] → {k : Nat} → ι.TermsAt k → Env (Term Bool)
+abbrev Pred [ι : SVars S] : Type 1 := [Ω] → {k : Nat} → ι.TermsAt k → Env (Term Bool)
 
 abbrev Fun2At [ι : SVars S] (k : Nat) (α : Type) (k' : Nat := k + 1) :=
   [Ω] → ι.TermsAt k → ι.TermsAt k' → Env (Term α)

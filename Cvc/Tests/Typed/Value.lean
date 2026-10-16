@@ -78,7 +78,7 @@ total map read back from the term itself.
 def roundTrip [Ω] (α : Type) [SrtLike α] (value : α) : Env α := do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst α "x"
+  let x ← s.declareConstAs α "x"
   Term.equal x (← Term.mkValue value) >>= s.assert
   s.checkSat (ifSat := s.getValue x)
 
@@ -122,13 +122,13 @@ xs : #[3, 4]
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let x ← s.declareConst Int "x"
+  let x ← s.declareConstAs Int "x"
   Term.equal x (← Term.mkValue (3 : Int)) >>= s.assert
 
-  let b ← s.declareConst Bool "b"
+  let b ← s.declareConstAs Bool "b"
   s.assert b
 
-  let xs ← s.declareConst (Array Int) "xs"
+  let xs ← s.declareConstAs (Array Int) "xs"
   Term.equal xs (← Term.mkValue #[(3 : Int), 4]) >>= s.assert
 
   s.checkSat (ifSat := do

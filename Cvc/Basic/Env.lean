@@ -32,7 +32,9 @@ guaranteed to agree on their manager.
 
 `Ω`'s design is heavily inspired by `ST.Ref` and `StateRefT'`, and it provides the same *scoping*
 property: it is not possible to use an `Ω`-sort/term/solver/*etc.* after its underlying manager has
-been destroyed (which would cause a runtime error); see `Env.run` for details.
+been destroyed (which would cause a runtime error); see `Env.run` for details. This holds of nested
+runs too — a sort of an outer scope is not a sort of an inner one, and an inner scope's sorts
+cannot be returned to the outer one — which is why `Ω` is a `Type` rather than a `Prop`; see `Ω`.
 
 ## Environment monad
 
@@ -73,8 +75,26 @@ end Error
 private def liftRes5 (code : Except Error5 α) : Except Error α := code.mapError Error.ofUnsafe
 
 
-/-- Argument of the `Env` monad representing a specific term manager. -/
-class Ω : Prop where private mk ::
+/-- Argument of the `Env` monad representing a specific term manager.
+
+A `Type`, deliberately not a `Prop`. Any two proofs of a `Prop` are definitionally equal, so a
+`Prop`-valued `Ω` made a sort of one scope the same type as a sort of any other, and nested
+`Env.run`s could mix, or leak into each other, their sorts and terms. Two instances of this class
+bound by two runs are distinct variables, so `@Srt ω` and `@Srt ω'` are distinct types.
+
+Its one field is a *type*, and that is load-bearing twice over. A structure with no field, or a
+field of type `Unit`, would be distinct in name only: structure eta makes all its values equal,
+as proof irrelevance did. And a field holding a type is erased by the compiler, so an instance is
+represented as a constant scalar — no allocation, no reference counting — and is dropped entirely
+from the body of every function that does not use it.
+
+`@[nospecialize]` because, as data, an instance would otherwise be a specialization candidate like
+any other: the compiler would copy bodies from this module — private helpers included, which other
+modules may not reference — into its callers, to specialize them on an argument every scope gives
+the same constant value.
+-/
+@[nospecialize]
+class Ω : Type 1 where private mk :: private scope : Type
 
 /-- What an `Env` threads.
 
@@ -200,7 +220,7 @@ end Env
 namespace EnvT
 
 def run [Monad m] [MonadLiftT BaseIO m] (code : [Ω] → EnvT m α) : m (Res α) := do
-  let _scope := Ω.mk
+  let _scope : Ω := ⟨Unit⟩
   match ← Tm.new.run with
   | .ok tm => IO.mkRef {tm} >>= code.runOn
   | .error e => return Error.ofUnsafe e |> .error

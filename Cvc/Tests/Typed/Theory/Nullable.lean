@@ -128,14 +128,14 @@ inSet : true
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst (Option Int) "x"
-  let y ← s.declareConst (Option Int) "y"
+  let x ← s.declareConstAs (Option Int) "x"
+  let y ← s.declareConstAs (Option Int) "y"
   nullableIsSome x >>= s.assert
   equal (← nullableVal x) (← mkInt 7) >>= s.assert
   nullableIsNull y >>= s.assert
 
   -- an `Option` index nests in a container, which is what a structural sort buys
-  let set ← s.declareConst (Cvc.Set (Option Int)) "set"
+  let set ← s.declareConstAs (Cvc.Set (Option Int)) "set"
   setMember x set >>= s.assert
 
   s.checkSat (ifSat := do

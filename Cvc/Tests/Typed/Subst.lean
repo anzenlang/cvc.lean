@@ -33,10 +33,10 @@ open Cvc.Typed.Term
 def setup [Ω]
 : Env (Term Int × Term Int × Term Bool × Term Bool × Term Bool) := do
   let s ← Solver.new
-  let i ← s.declareConst Int "i"
-  let j ← s.declareConst Int "j"
-  let b ← s.declareConst Bool "b"
-  let c ← s.declareConst Bool "c"
+  let i ← s.declareConstAs Int "i"
+  let j ← s.declareConstAs Int "j"
+  let b ← s.declareConstAs Bool "b"
+  let c ← s.declareConstAs Bool "c"
   return (i, j, b, c, ← and b (← lt i j))
 
 

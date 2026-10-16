@@ -90,9 +90,9 @@ end Untyped
 
 /-! ## Grammars
 
-A grammar is `Solver.Grammar s`, indexed by the solver that built it: cvc5 rejects a grammar used
-with any other solver, and the index makes that a type error. The type itself is declared beside
-`Solver`, which mentions it; what is here builds one.
+A grammar belongs to the scope, as a term does: cvc5 builds one through a solver, but any solver
+of the same term manager accepts it. The type is declared beside `Solver`, whose interpolant and
+abduct queries take one; what is here builds one.
 -/
 
 namespace Untyped.Solver open Untyped variable (s : Solver)
@@ -109,21 +109,18 @@ Handing it `#[cnd, start]` instead of `#[start, cnd]` yields a grammar containin
 nor its rules, with no error. Naming the start symbol makes that unrepresentable, and makes the
 array's non-emptiness structural rather than a side condition.
 -/
-def mkGrammar (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env s.Grammar := do
-  let raw : Cvc.Grammar ← runUnsafe' do
+def mkGrammar (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env Grammar := do
+  let raw : cvc5.Grammar ← runUnsafe' do
     s.toUnsafe.mkGrammar (boundVars.map BVar.toTerm) (#[start.toTerm] ++ others.map NT.toTerm)
   return ⟨raw, boundVars⟩
 
 end Untyped.Solver
 
-namespace Untyped.Solver.Grammar open Untyped variable {s : Solver} (g : s.Grammar)
-
-/-- The underlying cvc5 grammar. -/
-private def unsafeRaw : cvc5.Grammar := g.raw.toUnsafe
+namespace Untyped.Grammar open Untyped variable (g : Grammar)
 
 /-- The same grammar with its underlying cvc5 grammar replaced. -/
-private def withRaw (code : cvc5.Env cvc5.Grammar) : Env s.Grammar := do
-  let raw : Cvc.Grammar ← runUnsafe' code
+private def withRaw (code : cvc5.Env cvc5.Grammar) : Env Grammar := do
+  let raw ← runUnsafe' code
   return {g with raw}
 
 /-- Adds a production rule.
@@ -131,22 +128,22 @@ private def withRaw (code : cvc5.Env cvc5.Grammar) : Env s.Grammar := do
 `nt` must be one of the non-terminals this grammar was declared with, and `rule` must have its
 sort. Neither is visible in a signature, so both are checked when the rule is added.
 -/
-def addRule (nt : NT) (rule : Term) : Env s.Grammar :=
-  g.withRaw do g.unsafeRaw.addRule nt.toTerm rule
+def addRule (nt : NT) (rule : Term) : Env Grammar :=
+  g.withRaw do g.raw.addRule nt.toTerm rule
 
 @[inherit_doc addRule]
-def addRules (nt : NT) (rules : Terms) : Env s.Grammar :=
-  g.withRaw do g.unsafeRaw.addRules nt.toTerm rules
+def addRules (nt : NT) (rules : Terms) : Env Grammar :=
+  g.withRaw do g.raw.addRules nt.toTerm rules
 
 /-- Allows any constant of the non-terminal's sort. -/
-def addAnyConstant (nt : NT) : Env s.Grammar :=
-  g.withRaw do g.unsafeRaw.addAnyConstant nt.toTerm
+def addAnyConstant (nt : NT) : Env Grammar :=
+  g.withRaw do g.raw.addAnyConstant nt.toTerm
 
 /-- Allows any of the grammar's parameters that has the non-terminal's sort. -/
-def addAnyVariable (nt : NT) : Env s.Grammar :=
-  g.withRaw do g.unsafeRaw.addAnyVariable nt.toTerm
+def addAnyVariable (nt : NT) : Env Grammar :=
+  g.withRaw do g.raw.addAnyVariable nt.toTerm
 
-end Untyped.Solver.Grammar
+end Untyped.Grammar
 
 end
 
@@ -279,7 +276,7 @@ def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
   for (id, var) in ntIds.zip ntVars do
     if mentioned id then elems := elems.push (← `(doElem| let $id := ($var).toTerm))
   -- one rule per alternative
-  let grammarNs := if typed then layer.name `Grammar else layer.name `Solver.Grammar
+  let grammarNs := layer.name `Grammar
   let builder (fn : Name) : Ident := mkIdent (grammarNs.getId ++ fn)
   for (rule, var) in rules.zip ntVars do
     for alt in rule[4].getSepArgs do
@@ -306,8 +303,8 @@ def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
   let resultTy ← if typed then do
       let mut sig : Term := ⟨(rules[0]!)[2]⟩
       for (_, sort) in params.reverse do sig ← `($sort → $sig)
-      `($env ($(layer.name `Grammar) $solver $sig))
-    else `($env ($(layer.name `Solver.Grammar) $solver))
+      `($env ($(layer.name `Grammar) $sig))
+    else `($env $(layer.name `Grammar))
   `((do $[$items]* pure $g : $resultTy))
 
 end Ext

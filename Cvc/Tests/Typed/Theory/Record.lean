@@ -174,7 +174,7 @@ updated a : 9
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let p ← s.declareConst P "p"
+  let p ← s.declareConstAs P "p"
   (← Term.equal (← p.recordGet "a") (← Term.mkInt 7)) |> s.assert
   (← p.recordGet "b") |> s.assert
 
@@ -241,7 +241,7 @@ not a value: caught: `p` is not a record value
 #guard_msgs in #eval Env.runIO do
   let built ← Term.mkRecord (← fields)
   println! "built    : {← built.extractValue}"
-  let p ← (← Solver.new).declareConst P "p"
+  let p ← (← Solver.new).declareConstAs P "p"
   println! "not a value: {← caught do pure s!"{← p.extractValue}"}"
 
 /-! And out of a model, in one go rather than field by field. -/
@@ -251,7 +251,7 @@ not a value: caught: `p` is not a record value
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let p ← s.declareConst P "p"
+  let p ← s.declareConstAs P "p"
   (← Term.equal (← p.recordGet "a") (← Term.mkInt 7)) |> s.assert
   (← p.recordGet "b") |> s.assert
   s.checkSat (ifSat := do println! "model    : {← s.getValue p}")

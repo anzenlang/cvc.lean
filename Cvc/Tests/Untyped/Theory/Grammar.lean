@@ -96,7 +96,7 @@ wrong sort : caught
   let stranger ← NT.mk int "stranger"
   let g ← s.mkGrammar #[] start
 
-  let caught (code : Env s.Grammar) : Env String :=
+  let caught (code : Env Grammar) : Env String :=
     try let _ ← code ; pure "no error" catch _ => pure "caught"
 
   println! "foreign nt : {← caught (g.addRule stranger (← Term.mkInt 0))}"
@@ -109,30 +109,16 @@ section discipline
 variable [Ω] (s : Solver) (start cnd : NT)
 
 /-- A grammar always has a start symbol; there is no empty case to reject. -/
-example : Env s.Grammar := s.mkGrammar #[] start
+example : Env Grammar := s.mkGrammar #[] start
 
 /-- Auxiliary non-terminals are separate, and cannot be mistaken for the start symbol. -/
-example : Env s.Grammar := s.mkGrammar #[] start #[cnd]
+example : Env Grammar := s.mkGrammar #[] start #[cnd]
 
-/-- info: @Solver.mkGrammar : [inst : Ω] → (s : Solver) → BVars → NT → optParam NTs #[] → Env s.Grammar -/
+/-- info: @Solver.mkGrammar : [inst : Ω] → Solver → BVars → NT → optParam NTs #[] → Env Grammar -/
 #guard_msgs in #check @Cvc.Untyped.Solver.mkGrammar
 
--- a grammar belongs to the solver that built it: handing it to another does not typecheck
-/--
-error: Application type mismatch: The argument
-  g
-has type
-  s.Grammar
-but is expected to have type
-  s₂.Grammar
-in the application
-  some g
-
-Note: The following definitions were not unfolded because their definition is not exposed:
-  Solver ↦ 1
--/
-#guard_msgs in
-example (s₂ : Solver) (g : s.Grammar) (conj : Term) : Env (Option Term) :=
+-- a grammar belongs to the scope, not to the solver that built it: another solver takes it
+example (s₂ : Solver) (g : Grammar) (conj : Term) : Env (Option Term) :=
   s₂.getInterpolant conj (some g)
 
 end discipline
@@ -166,11 +152,34 @@ any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
 
 /-- error: non-terminal `start` is declared twice -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env s.Grammar := grammar! s where
+example [Ω] (s : Solver) : Env Grammar := grammar! s where
   start : Int := 0
   start : Int := 1
 
 /-- error: expected `?const` or `?var`, got `?foo` -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env s.Grammar := grammar! s where
+example [Ω] (s : Solver) : Env Grammar := grammar! s where
   start : Int := ?foo
+
+
+
+/-! ## A grammar is the scope's
+
+cvc5 builds a grammar through a solver, but any solver of the same term manager accepts it: here
+`s1` builds it and `s2` interpolates with it, and the grammar's restriction still holds.
+-/
+
+/-- info: interpolant from s2 : (< a b) -/
+#guard_msgs in #eval Env.runIO do
+  let s1 ← Solver.new
+  let s2 ← Solver.new
+  s2.setOption "produce-interpolants" "true"
+  let int ← Srt.int
+  let a ← Term.mkSymbol int "a"
+  let b ← Term.mkSymbol int "b"
+  let g ← grammar! s1 where
+    start : Bool := a < b | a = b
+  Term.lt a b >>= s2.assert
+  let goal ← Term.lt a (← Term.add b (← Term.mkInt 1))
+  let some i ← s2.getInterpolant goal g | println! "no interpolant"
+  println! "interpolant from s2 : {i}"

@@ -88,8 +88,21 @@ def nextAt (curr : sv.TermsAt k) (next : sv.TermsAt k') : Env (Term Bool) := do
 
 
 
-structure Bmc (S : SVars.Sig) [sv : SVars S] (k : Nat) extends sv.Sys where
+/-- Bounded model checking of a system, unrolled `k` steps.
+
+Holds the system's parts *at this scope* rather than the `Sys` itself: a `Sys` is written once and
+is generic in the scope, every part taking `[Ω]`, which puts it in `Type 1`, while a `Bmc` lives in
+one scope — it holds a solver and terms — and has to be returned through `Env`, whose results are
+in `Type`. `mk` instantiates the parts at the scope it runs in.
+-/
+structure Bmc (S : SVars.Sig) [sv : SVars S] (k : Nat) where
 private mk' ::
+  /-- The system's state variables. -/
+  idents : sv.Idents
+  /-- The transition relation, at this scope. -/
+  next : {k k' : Nat} → sv.TermsAt k → sv.TermsAt k' → Env (Term Bool)
+  /-- The candidate invariants not falsified yet, at this scope. -/
+  candidates : Array (String × ({k : Nat} → sv.TermsAt k → Env (Term Bool)))
   solver : Solver
   sVars : sv.TermTrace k
   falsified : List ((k : Nat) × sv.Cex k × Array String)
@@ -105,7 +118,12 @@ def mk (sys : sv.Sys) : Env (sv.Bmc S 0) := do
   let solver ← Solver.new
   solver.setOption "produce-models" "true"
   solver.assert init0
-  return { toSys := sys, solver, falsified := [], sVars := Trace.zero sVars0, actlitCounter := 0 }
+  return {
+    idents := sys.idents
+    next := fun curr next => sys.next curr next
+    candidates := sys.candidates.map fun (name, pred) => (name, fun state => pred state)
+    solver, falsified := [], sVars := Trace.zero sVars0, actlitCounter := 0
+  }
 
 def isDone (bmc : sv.Bmc S k) : Bool := bmc.candidates.isEmpty
 

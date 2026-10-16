@@ -15,9 +15,12 @@ import all Cvc.Typed.Core.Defs
 import all Cvc.Untyped.BVar
 import all Cvc.Typed.BVar
 import all Cvc.Untyped.Theory.Grammar
+-- the grammar's fields are private to the solver module that declares the type
+import all Cvc.Typed.Solver
 
 public import Cvc.Typed.BVar
 public import Cvc.Untyped.Theory.Grammar
+public import Cvc.Typed.Solver
 public meta import Cvc.Untyped.Theory.Grammar
 public meta import Cvc.Ext
 
@@ -34,12 +37,12 @@ same sort`, which `addRule` turns into a type error.
 A grammar's **parameters must be the very same variables** the `synth-fun` is declared with. In
 SyGuS they are one thing, `(synth-fun f ((x Int)) Int G)`, but two arguments in the API, so this
 `Grammar` carries its own parameters and `synthFun` takes nothing else. Its index is the *signature*
-the grammar can generate: `s.Grammar (bvs.signatureTo α)`, folded exactly as `Solver.defineFun`
+the grammar can generate: `Grammar (bvs.signatureTo α)`, folded exactly as `Solver.defineFun`
 folds its own parameters. With no parameters that is just the start symbol's sort, which is the
 shape `getInterpolant` and `getAbduct` want.
 
-A grammar is also indexed by **the solver that built it**, `s.Grammar σ`, as a proof is: cvc5
-rejects a grammar used with another solver, and the index makes that a type error.
+A grammar is built through a solver, `s.mkGrammar`, but belongs to the scope as a term does: any
+solver of the scope accepts it.
 
 **A grammar freezes once it is used**, as in the sort-erased layer: the rule builders answer a new
 `Grammar`, but the object underneath is shared and cvc5 rejects further rules after `synthFun`.
@@ -105,21 +108,29 @@ end NTs
 
 
 
-/-! ## Grammars -/
+/-! ## Grammars
 
-/-- A grammar built by solver `s`, generating terms of signature `σ`.
-
-Carries the parameters it was declared over, so that `synthFun` cannot be given different ones.
-Spelled `s.Grammar σ` on a typed solver, through the `Solver.Grammar` abbreviation beside `Solver`:
-the typed `Solver` is declared after this module, so `s` is stated at the sort-erased one here.
+The type is declared beside `Solver`, whose interpolant and abduct queries take one; what is here
+builds one. Like a term, a grammar belongs to the scope rather than to the solver that built it.
 -/
-structure Grammar (s : Untyped.Solver) (σ : Type) where
-  private mk ::
-  private toUntyped : s.Grammar
-  private boundVars : Untyped.BVars
-  private startSrt : Srt
 
-namespace Grammar variable {s : Untyped.Solver} (g : Grammar s σ)
+namespace Solver variable (s : Solver)
+
+/-- A grammar over the given parameters, starting at `start`.
+
+`boundVars` are the parameters of the `synth-fun` this grammar will constrain; the resulting index
+is the signature those parameters and `start`'s sort describe. `others` are further non-terminals
+the rules may mention.
+-/
+def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
+: Env (Grammar (boundVars.signatureTo α)) := do
+  let startSrt ← Srt.of α
+  let untyped ← Untyped.Solver.mkGrammar s boundVars.erase start.erase others.erase
+  return ⟨untyped, boundVars.erase, startSrt⟩
+
+end Solver
+
+namespace Grammar variable (g : Grammar σ)
 
 /-- Adds a production rule.
 
@@ -127,25 +138,20 @@ The rule's index is the non-terminal's, so a sort mismatch does not typecheck. T
 non-terminal belongs to *this* grammar is a property of a value rather than a type, so it is
 checked when the rule is added.
 -/
-def addRule (nt : NT α) (rule : Term α) : Env (Grammar s σ) := do
+def addRule (nt : NT α) (rule : Term α) : Env (Grammar σ) := do
   return {g with toUntyped := ← g.toUntyped.addRule nt.erase rule.erase}
 
 @[inherit_doc addRule]
-def addRules (nt : NT α) (rules : Terms α) : Env (Grammar s σ) := do
+def addRules (nt : NT α) (rules : Terms α) : Env (Grammar σ) := do
   return {g with toUntyped := ← g.toUntyped.addRules nt.erase (rules.map Term.erase)}
 
 /-- Allows any constant of the non-terminal's sort. -/
-def addAnyConstant (nt : NT α) : Env (Grammar s σ) := do
+def addAnyConstant (nt : NT α) : Env (Grammar σ) := do
   return {g with toUntyped := ← g.toUntyped.addAnyConstant nt.erase}
 
 /-- Allows any of the grammar's parameters that has the non-terminal's sort. -/
-def addAnyVariable (nt : NT α) : Env (Grammar s σ) := do
+def addAnyVariable (nt : NT α) : Env (Grammar σ) := do
   return {g with toUntyped := ← g.toUntyped.addAnyVariable nt.erase}
-
-/-- String representation, as the SyGuS pre-declaration and rule set. -/
-protected def toString : String := toString g.toUntyped
-
-instance : ToString (Grammar s σ) := ⟨Grammar.toString⟩
 
 end Grammar
 
@@ -159,7 +165,7 @@ end Cvc.Typed
 
 The syntax is declared beside the sort-erased grammar; this is the typed expansion, and the scoped
 `grammar!` that `open Cvc.Typed` selects. A sort is the Lean type of the non-terminal's or the
-parameter's index, and the result is `s.Grammar σ` with `σ` the parameters folded over the start
+parameter's index, and the result is `Grammar σ` with `σ` the parameters folded over the start
 sort, exactly what `Solver.mkGrammar` answers.
 -/
 

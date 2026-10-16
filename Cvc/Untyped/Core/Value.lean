@@ -40,18 +40,16 @@ class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
   termToValue : [Ω] → Term → Env α
 
-namespace TermToValue
-instance : TermToValue Term := ⟨pure⟩
-end TermToValue
+-- no `TermToValue Term`: the field quantifies over the scope a term comes from, while `α := Term`
+-- would be a term of the scope the instance was declared in, so the "identity" it would need maps
+-- one scope's terms to another's, which `Ω` exists to rule out
 
 /-- Builds the constant term denoting a Lean `α`. -/
 class ValueToTerm (α : Type) where
   /-- Builds the constant term denoting a value. -/
   valueToTerm : [Ω] → α → Env Term
 
-namespace ValueToTerm
-instance : ValueToTerm Term := ⟨pure⟩
-end ValueToTerm
+-- no `ValueToTerm Term`, for the same reason as `TermToValue Term`
 
 /-- A Lean type usable as a sort, in both directions. -/
 class abbrev SrtLike (α : Type) := ToTyp α, TermToValue α, ValueToTerm α

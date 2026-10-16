@@ -115,8 +115,8 @@ sat        : x = 1, y = 2
   let s ← Solver.new
   s.setOption "produce-models" "true"
 
-  let x ← s.declareConst Int "x"
-  let y ← s.declareConst Int "y"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
   let three ← Term.mkInt 3
 
   Term.equal (← Term.add x y) three >>= s.assert
@@ -133,7 +133,7 @@ sat        : x = 1, y = 2
   let s ← Solver.new
   s.setOption "produce-unsat-cores" "true"
 
-  let b ← s.declareConst Bool "b"
+  let b ← s.declareConstAs Bool "b"
   s.assert b
   Term.not b >>= s.assert
 
@@ -143,7 +143,7 @@ sat        : x = 1, y = 2
 /-- info: unexpected : caught -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
-  let b ← s.declareConst Bool "b"
+  let b ← s.declareConstAs Bool "b"
   s.assert b
   let outcome ←
     try
@@ -176,9 +176,9 @@ I → C       : true
   let s ← Solver.new
   s.setOption "produce-interpolants" "true"
 
-  let a ← s.declareConst Int "a"
-  let b ← s.declareConst Int "b"
-  let c ← s.declareConst Int "c"
+  let a ← s.declareConstAs Int "a"
+  let b ← s.declareConstAs Int "b"
+  let c ← s.declareConstAs Int "c"
   let one ← Term.mkInt 1
   let hyps := #[← Term.equal a (← Term.add b one), ← Term.equal b (← Term.add c one)]
   for h in hyps do s.assert h
@@ -195,8 +195,8 @@ I → C       : true
   let s ← Solver.new
   s.setOption "produce-interpolants" "true"
 
-  let a ← s.declareConst Int "a"
-  let c ← s.declareConst Int "c"
+  let a ← s.declareConstAs Int "a"
+  let c ← s.declareConstAs Int "c"
   Term.gt a c >>= s.assert
   println! "not entailed : {← s.getInterpolant (← Term.lt a c)}"
 
@@ -210,9 +210,9 @@ next   : (or (= y 1) (<= 1 y))
   s.setOption "produce-interpolants" "true"
   s.setOption "incremental" "true"
 
-  let x ← s.declareConst Int "x"
-  let y ← s.declareConst Int "y"
-  let z ← s.declareConst Int "z"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  let z ← s.declareConstAs Int "z"
   let zero ← Term.mkInt 0
   Term.gt (← Term.add x y) zero >>= s.assert
   Term.lt x zero >>= s.assert
@@ -242,7 +242,7 @@ variable [Ω]
 #guard_msgs in #check @Cvc.Typed.Solver.getUnsatCore
 
 /-- info: @Solver.getInterpolant : [inst : Ω] →
-  (s : Solver) → Term Bool → optParam (Option (s.Grammar Bool)) none → Env (Option (Term Bool)) -/
+  Solver → Term Bool → optParam (Option (Grammar Bool)) none → Env (Option (Term Bool)) -/
 #guard_msgs in #check @Cvc.Typed.Solver.getInterpolant
 
 /-- info: @Solver.getNextInterpolant : [inst : Ω] → Solver → Env (Option (Term Bool)) -/

@@ -62,7 +62,7 @@ abbrev Terms [Ω] : Type := sig (𝕂 Term)
 
 abbrev Values : Type := sig (fun α => α)
 
-abbrev Fun : Type := [Ω] → sig.Terms → Env Term
+abbrev Fun : Type 1 := [Ω] → sig.Terms → Env Term
 
 end Sig
 

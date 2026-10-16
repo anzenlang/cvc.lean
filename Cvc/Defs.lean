@@ -203,7 +203,6 @@ def2% Datatype ← cvc5.Datatype
 def2% Datatype.Ctor.Decl ← cvc5.DatatypeConstructorDecl
 def2% Datatype.Ctor ← cvc5.DatatypeConstructor
 def2% Datatype.Selector ← cvc5.DatatypeSelector
-def2% Grammar ← cvc5.Grammar
 
 
 

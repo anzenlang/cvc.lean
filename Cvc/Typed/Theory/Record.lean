@@ -170,7 +170,7 @@ sequences do not.
 /-- Reads a record's fields off the arguments of its constructor application. -/
 class TermToValues (fields : List (String × Type)) where
   /-- Reads one value per field, in order. -/
-  ofTerms : List Untyped.Term → Env (Values fields)
+  ofTerms : [Ω] → List Untyped.Term → Env (Values fields)
 
 /-- A sort-erased term at the index its field gives it. -/
 def ofErased (term : Untyped.Term) : Term gamma := term
@@ -191,7 +191,7 @@ instance [A : TermToValue gamma] [R : TermToValues fields]
 /-- Builds the term of each of a record's field values. -/
 class ValuesToTerm (fields : List (String × Type)) where
   /-- Builds one term per field, in order. -/
-  toTerms : Values fields → Env (List Untyped.Term)
+  toTerms : [Ω] → Values fields → Env (List Untyped.Term)
 
 instance : ValuesToTerm [] := ⟨fun _ => return []⟩
 
