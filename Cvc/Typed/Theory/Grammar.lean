@@ -161,21 +161,34 @@ end Cvc.Typed
 
 
 
-/-! ## `grammar!`
+/-! ## `smt.grammar!`
 
 The syntax is declared beside the sort-erased grammar; this is the typed expansion, and the scoped
-`grammar!` that `open Cvc.Typed` selects. A sort is the Lean type of the non-terminal's or the
+`smt.grammar!` that `open Cvc.Typed` selects. A sort is the Lean type of the non-terminal's or the
 parameter's index, and the result is `Grammar σ` with `σ` the parameters folded over the start
 sort, exactly what `Solver.mkGrammar` answers.
+
+`smt.mkGrammar!` and `smt.letGrammar!` answer the parameters as `BVar α` and the non-terminals as
+`NT α`, each at its declared index, so a rule added afterwards is checked against its non-terminal's
+sort, and a parameter passed where a non-terminal is wanted does not typecheck.
 -/
 
 namespace Cvc.Typed
 
-/-- Typed `grammar!`. -/
-scoped syntax "grammar! " smtGrammarBody : term
+/-- Typed `smt.grammar!`. -/
+scoped syntax "smt.grammar! " smtGrammarBody : term
 
 macro_rules
-  | `(grammar! $body) => `(grammarT! $body)
+  | `(smt.grammar! $body) => `(grammarT! $body)
+
+/-- Typed `smt.mkGrammar!`: the grammar together with its parameters and non-terminals. -/
+scoped syntax "smt.mkGrammar! " smtGrammarBody : term
+
+macro_rules
+  | `(smt.mkGrammar! $body) => `(mkGrammarT! $body)
+
+/-- Typed `smt.letGrammar!`: binds the grammar, its parameters and its non-terminals. -/
+scoped syntax "smt.letGrammar! " ident " ← " smtGrammarBody : doElem
 
 end Cvc.Typed
 
@@ -186,6 +199,20 @@ public meta section
 @[inherit_doc grammarT]
 macro_rules
   | `(grammarT! $body) => Ext.expandGrammar Ext.Layer.typed body
+
+@[inherit_doc mkGrammarT]
+macro_rules
+  | `(mkGrammarT! $body) => Ext.expandGrammar Ext.Layer.typed body (withParts := true)
+
+namespace Typed
+
+@[inherit_doc mkGrammarT]
+macro_rules
+  | `(doElem| smt.letGrammar! $g ← $body) => do
+    let pat ← Ext.letGrammarPattern g body
+    `(doElem| let $pat:term ← mkGrammarT! $body)
+
+end Typed
 
 end
 

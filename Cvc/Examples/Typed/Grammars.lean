@@ -140,7 +140,7 @@ so the result is indexed just the same. -/
 
 /-! ## Writing one as a block
 
-`grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
+`smt.grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
 parameters, then one line per non-terminal, the first being the start symbol. Inside the rules a
 non-terminal or a parameter stands for its term. This is the `max` grammar above again, and its
 index is the same `Int → Int → Int`.
@@ -152,7 +152,7 @@ index is the same `Int → Int → Int`.
   let s ← Solver.new
   s.setOption "sygus" "true"
 
-  let g ← grammar! s (x y : Int) where
+  let g ← smt.grammar! s (x y : Int) where
     start : Int  := x | y | if cnd then start else start
     cnd   : Bool := start ≤ start
 
@@ -166,6 +166,59 @@ index is the same `Int → Int → Int`.
 
   s.checkSynth (ifSolved := do
     println! "max := {(← s.getSynthSolution mx).erase}")
+
+
+
+/-! ## Extending one afterwards
+
+`smt.grammar!` answers the grammar alone. When part of a grammar comes from data, write the fixed
+part as a block with `smt.mkGrammar!` or `smt.letGrammar!`, which also hand back what the block
+made, and add the rest with the builders. Each comes back at its own index — a parameter as a
+`BVar`, a non-terminal as an `NT` — so the rules added afterwards are checked like any other:
+
+```
+smt.mkGrammar! s (x : Int) where …   : Env ((Grammar (Int → Int) × BVar Int) × NT Int × NT Int)
+smt.letGrammar! g ← s (x : Int) where …   -- binds `g`, `x`, `start` and `num`
+```
+
+`smt.mkGrammar!` groups the grammar with its parameters, so that one is never taken for a
+non-terminal; `smt.letGrammar!` binds them under the names the block declares, so there is no
+order to get wrong, and a name never used afterwards draws no warning.
+
+Here the constants a solution may use are a list. The block declares the non-terminal `num` with
+no alternatives at all, `num : Int` alone, and its rules are added from the list afterwards. There
+is no `1` among them, so `x + 10` has to be built out of what the list offers. A helper that
+extends a grammar takes the non-terminal at its index, so it cannot be handed the wrong one.
+-/
+
+/-- Adds each of `ks` as an alternative of `nt`. -/
+def withConstants (g : Grammar σ) (nt : NT Int) (ks : List Int) : Env (Grammar σ) :=
+  ks.foldlM (fun g k => do g.addRule nt (← Term.mkInt k)) g
+
+/-- info: f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  let g ← withConstants g num [3, 7]
+
+  let f ← s.synthFun "f" g
+  let a ← s.declareSygusVar Int "a"
+  s.addSygusConstraint (← smt! f a = a + 10)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {(← s.getSynthSolution f).erase}")
+
+/-- The same with `smt.mkGrammar!`, whose parameter is not needed here. -/
+example (s : Solver) : Env (Grammar (Int → Int)) := do
+  let ((g, _), _, num) ← smt.mkGrammar! s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  withConstants g num [3, 7]
 
 
 
@@ -206,7 +259,7 @@ I → C       : true
 
   if let some i ← s.getInterpolant goal then println! "free        : {i}"
 
-  let g ← grammar! s where
+  let g ← smt.grammar! s where
     start : Bool := atom | atom ∧ start
     atom  : Bool := y % k = r
     k     : Int  := 2 | 3 | 4 | 5

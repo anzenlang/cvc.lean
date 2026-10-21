@@ -62,7 +62,7 @@ structure Grammar [Ω] where
   /-- The parameters the grammar was built over.
 
   A `synth-fun` restricted by the grammar must be declared over these very variables, which is
-  what lets a grammar whose parameters were made out of sight, by `grammar!`, be used for one.
+  what lets a grammar whose parameters were made out of sight, by `smt.grammar!`, be used for one.
   -/
   boundVars : BVars
 

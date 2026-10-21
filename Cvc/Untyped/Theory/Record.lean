@@ -416,7 +416,7 @@ def elabSmtProj (layer : Layer) (id : Ident) (expected? : Option Lean.Expr)
   -- with no fields this *is* the identifier as written, and passing it through unchanged is what
   -- keeps its use visible: a rebuilt identifier is not one the unused-variable linter counts
   if fields.isEmpty then
-    return ← Lean.Elab.Term.elabTerm (← `(pure $id)) expected?
+    return ← elabSmtIdent layer id expected?
   -- `identComponents` splits the identifier at its own source ranges, which is what Lean's dot
   -- notation uses and what keeps the head a *reference* the unused-variable linter can see. A
   -- rebuilt identifier spanning the whole path is not one

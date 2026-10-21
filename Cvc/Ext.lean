@@ -86,6 +86,9 @@ contain a theory's form and the other way round.
 -/
 syntax (name := smtExpand) "smtExpand% " ident ppSpace smtTerm : term
 
+/-- An identifier leaf of the layer whose root is named, elaborated by `Cvc.Ext.elabSmtIdent`. -/
+syntax (name := smtIdentElab) "smtIdent% " ident ppSpace ident : term
+
 /-- Builds a sort-erased term. -/
 syntax (name := smtUStx) "smtU! " ppLine group(colGt smtTerm) : term
 /-- Builds a typed term. -/
@@ -220,7 +223,7 @@ partial def expandSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) :=
     -- `true`/`false` are `Core.Bool`'s and an identifier naming *fields* is `Theory.Record`'s;
     -- each adds an alternative of its own, so what reaches here is a plain name
     let id : Ident := ⟨stx[0]⟩
-    `(pure $id)
+    `(smtIdent% $(layer.ident) $id)
   | ``smtLet =>
     let id : Ident := ⟨stx[1]⟩
     let value ← deferSmt layer stx[3]
@@ -244,6 +247,38 @@ partial def expandSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) :=
       else
         `($applyN $fnId #[ $argIds,* ])
   | _ => Macro.throwErrorAt stx s!"unsupported SMT term (kind `{kind}`)"
+
+/-- The conversion to a term of a typed non-terminal's or bound variable's type, if it is one. -/
+def typedToTerm? (type : Expr) : Option Name :=
+  match type.consumeMData.getAppFn.constName? with
+  | some `Cvc.Typed.NT => some `Cvc.Typed.NT.toTerm
+  | some `Cvc.Typed.BVar => some `Cvc.Typed.BVar.toTerm
+  | _ => none
+
+/-- Elaborates an identifier leaf: the term it names, lifted with `pure`.
+
+Typed, a non-terminal or a bound variable is converted to its term here, by looking at its type,
+rather than left to the `NT α → Term α` coercion. The coercion needs the index it targets to be
+known, and in `smt! n * m` with no expected type nothing fixes it, so two non-terminals could not
+be combined at all. Converting by hand needs no index: it is read off the identifier's own type.
+Anything else is elaborated exactly as written, so a sort mismatch between two terms is reported
+as before.
+-/
+def elabSmtIdent (layer : Layer) (id : Ident) (expected? : Option Expr)
+: Elab.Term.TermElabM Expr := do
+  if layer == .typed then
+    let e ← Elab.Term.elabTerm id none
+    let type ← instantiateMVars (← Meta.inferType e)
+    if let some conv := typedToTerm? type then
+      let e ← Elab.Term.exprToSyntax e
+      return ← Elab.Term.elabTerm (← `(pure ($(mkIdent conv) $e))) expected?
+  -- passing the identifier through unchanged keeps its use visible to the unused-variable linter
+  Elab.Term.elabTerm (← `(pure $id)) expected?
+
+@[term_elab smtIdentElab, inherit_doc smtIdentElab]
+def elabSmtIdentTerm : Elab.Term.TermElab := fun stx expected? => do
+  let `(smtIdent% $l $id) := stx | Elab.throwUnsupportedSyntax
+  elabSmtIdent (Layer.ofIdent l) id expected?
 
 end Ext
 

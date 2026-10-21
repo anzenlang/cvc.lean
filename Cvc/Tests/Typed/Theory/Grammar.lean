@@ -173,7 +173,7 @@ constrained: (< a b)
 
 
 
-/-! ## `grammar!`
+/-! ## `smt.grammar!`
 
 The block form builds the same grammar as `mkGrammar` and the builders, with the same index: the
 parameters folded over the start symbol's sort.
@@ -186,11 +186,11 @@ any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
   s.setOption "sygus" "true"
-  let g ← grammar! s (x y : Int) where
+  let g ← smt.grammar! s (x y : Int) where
     start : Int  := x | y | if cnd then start else start
     cnd   : Bool := start ≤ start
   println! "block : {g}"
-  let g ← grammar! s (x : Int) where
+  let g ← smt.grammar! s (x : Int) where
     start : Int := 0 | ?const | ?var | start + start
   println! "any   : {g}"
 
@@ -198,10 +198,10 @@ section indices
 variable [Ω] (s : Solver)
 
 /-- With parameters, the index is the signature a `synth-fun` over the grammar has. -/
-example : Env (Grammar (Int → Bool → Int)) := grammar! s (x : Int) (b : Bool) where
+example : Env (Grammar (Int → Bool → Int)) := smt.grammar! s (x : Int) (b : Bool) where
   start : Int := x | if b then start else start
 /-- Without, it is the start sort, which is what interpolants and abducts ask for. -/
-example : Env (Grammar Bool) := grammar! s where
+example : Env (Grammar Bool) := smt.grammar! s where
   start : Bool := true | false
 
 end indices
@@ -220,7 +220,7 @@ Note: The following definitions were not unfolded because their definition is no
   Term ↦ 6
 -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env (Grammar Int) := grammar! s where
+example [Ω] (s : Solver) : Env (Grammar Int) := smt.grammar! s where
   start : Int := 0 | true
 
 /-! The interpolation of the remainders example, with the grammar written as a block: no single
@@ -234,7 +234,7 @@ remainder fact rules out both 5 and 6, so the interpolant is a conjunction. -/
   let y ← s.declareConstAs Int "y"
   smt! y = 6 * x + 3 >>= s.assert
   smt! x ≥ 0 >>= s.assert
-  let g ← grammar! s where
+  let g ← smt.grammar! s where
     start : Bool := atom | atom ∧ start
     atom  : Bool := y % k = r
     k     : Int  := 2 | 3 | 4 | 5
@@ -256,8 +256,175 @@ Built through one solver, used by another: the grammar's restriction still holds
   s2.setOption "produce-interpolants" "true"
   let a ← Term.mkSymbolAs Int "a"
   let b ← Term.mkSymbolAs Int "b"
-  let g ← grammar! s1 where
+  let g ← smt.grammar! s1 where
     start : Bool := a < b | a = b
   smt! a < b >>= s2.assert
   let some i ← s2.getInterpolant (← smt! a < b + 1) g | println! "no interpolant"
   println! "interpolant from s2 : {i}"
+
+
+
+/-! ## Extending a grammar after the fact
+
+`smt.mkGrammar!` answers the grammar together with what it was built from, at their indices:
+`Grammar σ × NT α₁ × …` without parameters, `(Grammar σ × BVar β₁ × …) × NT α₁ × …` with some.
+`smt.letGrammar! g ← …` binds the same things under the names the block declares.
+-/
+
+section parts
+variable [Ω] (s : Solver)
+
+/-- Without parameters, the grammar then the non-terminals. -/
+example : Env (Grammar Int × NT Int) := smt.mkGrammar! s where
+  start : Int := 0 | start + start
+
+/-- With parameters, the grammar grouped with them, then the non-terminals. -/
+example : Env ((Grammar (Int → Int → Int) × BVar Int × BVar Int) × NT Int × NT Bool) :=
+  smt.mkGrammar! s (x y : Int) where
+    start : Int  := x | y
+    cnd   : Bool := start ≤ start
+
+end parts
+
+/-! A grammar extended after `smt.letGrammar!`, then used for synthesis. -/
+
+/-- info:
+after : ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  smt.letGrammar! g ← s (x y : Int) where
+    start : Int  := x | y
+    cnd   : Bool := start ≤ start
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  println! "after : {g}"
+  let mx ← s.synthFun "max" g
+  let a ← s.declareSygusVar Int "a"
+  let b ← s.declareSygusVar Int "b"
+  let mab ← smt! mx a b
+  s.addSygusConstraint (← smt! mab ≥ a)
+  s.addSygusConstraint (← smt! mab ≥ b)
+  s.addSygusConstraint (← smt! mab = a ∨ mab = b)
+  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).erase}")
+
+/-! A parameter is not a non-terminal: extending a grammar "at" one does not compile. -/
+
+/--
+error: Application type mismatch: The argument
+  x
+has type
+  BVar Int
+but is expected to have type
+  NT ?m.99
+in the application
+  g.addRule x
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  BVar ↦ 2
+-/
+#guard_msgs in
+example [Ω] (s : Solver) : Env Unit := do
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x
+  discard <| g.addRule x (← smt! x + 1)
+
+/-! `smt.mkGrammar!` destructured by position, and `smt.letGrammar!` without parameters, where
+there is no group to bind: the grammar comes first, then the non-terminals. -/
+
+/-- info:
+mk  : ((start Int) )((start Int (x (+ start x))))
+let : ((start Int) (cnd Bool) )((start Int (0 (ite cnd 1 start)))(cnd Bool ((<= start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let ((g, x, _), start) ← smt.mkGrammar! s (x y : Int) where
+    start : Int := x
+  let g ← g.addRule start (← smt! start + x)
+  println! "mk  : {g}"
+  smt.letGrammar! g ← s where
+    start : Int  := 0
+    cnd   : Bool := start ≤ start
+  let g ← g.addRule start (← smt! if cnd then 1 else start)
+  println! "let : {g}"
+
+/-! Extending stops at the freeze: once a solver has used the grammar, cvc5 rejects a new rule. -/
+
+/-- info: [internal] Grammar cannot be modified after passing it as an argument to synthFun
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x | start + start
+  discard <| s.synthFun "f" g
+  try discard <| g.addRule start (← smt! start + 1); println! "no error"
+  catch e => println! "{e}"
+
+/-! A non-terminal declared without alternatives, `num : Int` alone, has its rules added afterwards:
+here they are computed from a list, which a block cannot spell. Until then it reaches nothing. -/
+
+/-- info:
+block : ((start Int) (num Int) )((start Int (x (+ start num)))(num Int ()))
+after : ((start Int) (num Int) )((start Int (x (+ start num)))(num Int (3 7)))
+f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let ((g, _), start, num) ← smt.mkGrammar! s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  println! "block : {g}"
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+  println! "after : {g}"
+  -- `start` is still extensible, alongside
+  g ← g.addRule start (← smt! num * start)
+  let f ← s.synthFun "f" g
+  let a ← s.declareSygusVar Int "a"
+  s.addSygusConstraint (← smt! f a = a + 10)
+  s.checkSynth (ifSolved := do println! "f := {(← s.getSynthSolution f).erase}")
+
+/-! `smt.grammar!` refuses a non-terminal without alternatives, the grammar it answers being closed. -/
+
+/-- error: non-terminal `num` has no alternatives, and the grammar `smt.grammar!` answers cannot be extended: give it some, or use `smt.mkGrammar!` or `smt.letGrammar!` to add its rules afterwards -/
+#guard_msgs in
+example [Ω] (s : Solver) : Env (Grammar Int) := smt.grammar! s where
+  start : Int := num
+  num   : Int
+
+/-! Outside a block, `smt!` converts a non-terminal or a bound variable to its term by its own type,
+so operands that are all non-terminals or parameters need nothing else to fix their index — a rule
+is usually built that way, inside `(← …)` where there is no expected type. -/
+
+section outside
+variable [Ω] (n m : NT Int) (x : BVar Int) (b : NT Bool)
+
+example : Env Unit := do let _ ← smt! n * m
+example : Env Unit := do let _ ← smt! n + x
+example : Env Unit := do let _ ← smt! n ≤ m
+example : Env Unit := do let _ ← smt! if b then n else x
+
+/-! A sort mismatch is still reported between the two terms, with no conversion in the message. -/
+
+/--
+error: Application type mismatch: The argument
+  smtArg1✝
+has type
+  Term Bool
+but is expected to have type
+  Term Int
+in the application
+  smtArg0✝.add smtArg1✝
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Term ↦ 6
+-/
+#guard_msgs in
+example (t : Term Bool) : Env (Term Int) := smt! n + t
+
+end outside

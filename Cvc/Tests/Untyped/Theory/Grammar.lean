@@ -125,7 +125,7 @@ end discipline
 
 
 
-/-! ## `grammar!`
+/-! ## `smt.grammar!`
 
 The block form builds the same grammar as the builders do: the first test is the hand-built one
 above, rewritten. A sort is a Lean type or a `Srt`, freely mixed. `?var` is printed as the
@@ -140,11 +140,11 @@ any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
   let s ← Solver.new
   s.setOption "sygus" "true"
   let int ← Srt.int
-  let g ← grammar! s (x : Int) (y : int) where
+  let g ← smt.grammar! s (x : Int) (y : int) where
     start : Int  := x | y | if cnd then start else start
     cnd   : Bool := start ≤ start
   println! "block : {g}"
-  let g ← grammar! s (x : Int) where
+  let g ← smt.grammar! s (x : Int) where
     start : int := 0 | ?const | ?var | start + start
   println! "any   : {g}"
 
@@ -152,13 +152,13 @@ any   : ((start Int) )((start Int (0 (Constant Int) x (+ start start))))
 
 /-- error: non-terminal `start` is declared twice -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env Grammar := grammar! s where
+example [Ω] (s : Solver) : Env Grammar := smt.grammar! s where
   start : Int := 0
   start : Int := 1
 
 /-- error: expected `?const` or `?var`, got `?foo` -/
 #guard_msgs in
-example [Ω] (s : Solver) : Env Grammar := grammar! s where
+example [Ω] (s : Solver) : Env Grammar := smt.grammar! s where
   start : Int := ?foo
 
 
@@ -177,9 +177,120 @@ cvc5 builds a grammar through a solver, but any solver of the same term manager 
   let int ← Srt.int
   let a ← Term.mkSymbol int "a"
   let b ← Term.mkSymbol int "b"
-  let g ← grammar! s1 where
+  let g ← smt.grammar! s1 where
     start : Bool := a < b | a = b
   Term.lt a b >>= s2.assert
   let goal ← Term.lt a (← Term.add b (← Term.mkInt 1))
   let some i ← s2.getInterpolant goal g | println! "no interpolant"
   println! "interpolant from s2 : {i}"
+
+
+
+/-! ## Extending a grammar after the fact
+
+`smt.mkGrammar!` answers the grammar together with what it was built from, so that rules can be
+added afterwards: `grammar × NT₁ × …` without parameters, `(grammar × PARAM₁ × …) × NT₁ × …` with
+some — grouped so that a parameter cannot be taken for a non-terminal by position.
+`smt.letGrammar! g ← …` binds the same things under the names the block declares.
+-/
+
+section parts
+variable [Ω] (s : Solver)
+
+/-- Without parameters, the grammar then the non-terminals. -/
+example : Env (Grammar × NT) := smt.mkGrammar! s where
+  start : Int := 0 | start + start
+
+/-- With parameters, the grammar grouped with them, then the non-terminals. -/
+example : Env ((Grammar × BVar × BVar) × NT × NT) := smt.mkGrammar! s (x y : Int) where
+  start : Int  := x | y
+  cnd   : Bool := start ≤ start
+
+end parts
+
+/-! A non-terminal that nothing reachable from the start symbol mentions is not printed — cvc5
+drops what is unreachable — until a rule added afterwards reaches it. Unused bindings, `never`
+here, draw no warning. -/
+
+/-- info:
+before : ((start Int) )((start Int (x y)))
+after  : ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  smt.letGrammar! g ← s (x y : Int) where
+    start : Int  := x | y
+    cnd   : Bool := start ≤ start
+    never : Int  := 0
+  println! "before : {g}"
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  println! "after  : {g}"
+
+/-! `smt.mkGrammar!` destructured by position, and `smt.letGrammar!` without parameters, where
+there is no group to bind: the grammar comes first, then the non-terminals. -/
+
+/-- info:
+mk  : ((start Int) )((start Int (x (+ start x))))
+let : ((start Int) (cnd Bool) )((start Int (0 (ite cnd 1 start)))(cnd Bool ((<= start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let ((g, x, _), start) ← smt.mkGrammar! s (x y : Int) where
+    start : Int := x
+  let g ← g.addRule start (← smt! start + x)
+  println! "mk  : {g}"
+  smt.letGrammar! g ← s where
+    start : Int  := 0
+    cnd   : Bool := start ≤ start
+  let g ← g.addRule start (← smt! if cnd then 1 else start)
+  println! "let : {g}"
+
+/-! Extending stops at the freeze: once a solver has used the grammar, cvc5 rejects a new rule. -/
+
+/-- info: [internal] Grammar cannot be modified after passing it as an argument to synthFun
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x | start + start
+  discard <| s.synthFun "f" g.boundVars int g
+  try discard <| g.addRule start (← smt! start + 1); println! "no error"
+  catch e => println! "{e}"
+
+/-! A non-terminal declared without alternatives, `num : Int` alone, has its rules added afterwards:
+here they are computed from a list, which a block cannot spell. Until then it reaches nothing. -/
+
+/-- info:
+block : ((start Int) (num Int) )((start Int (x (+ start num)))(num Int ()))
+after : ((start Int) (num Int) )((start Int (x (+ start num)))(num Int (3 7)))
+f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let ((g, _), start, num) ← smt.mkGrammar! s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  println! "block : {g}"
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+  println! "after : {g}"
+  -- `start` is still extensible, alongside
+  g ← g.addRule start (← smt! 2 * start)
+  let f ← s.synthFun "f" g.boundVars (← Srt.int) g
+  let a ← s.declareSygusVar "a" (← Srt.int)
+  s.addSygusConstraint (← smt! f a = a + 10)
+  s.checkSynth (ifSolved := do println! "f := {← s.getSynthSolution f}")
+
+/-! `smt.grammar!` refuses a non-terminal without alternatives, the grammar it answers being closed. -/
+
+/-- error: non-terminal `num` has no alternatives, and the grammar `smt.grammar!` answers cannot be extended: give it some, or use `smt.mkGrammar!` or `smt.letGrammar!` to add its rules afterwards -/
+#guard_msgs in
+example [Ω] (s : Solver) : Env Grammar := smt.grammar! s where
+  start : Int := num
+  num   : Int

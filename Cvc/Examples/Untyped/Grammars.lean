@@ -147,7 +147,7 @@ solved, but the shape of the answer is the solver's to choose. -/
 
 /-! ## Writing one as a block
 
-`grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
+`smt.grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
 parameters, then one line per non-terminal, the first being the start symbol. A sort is a Lean type
 or a `Srt`, mixed freely.
 
@@ -162,7 +162,7 @@ variables — so a grammar carries them, as `boundVars`.
   s.setOption "sygus" "true"
   let int ← Srt.int
 
-  let g ← grammar! s (x y : Int) where
+  let g ← smt.grammar! s (x y : Int) where
     start : int  := x | y | if cnd then start else start
     cnd   : Bool := start ≤ start
 
@@ -176,3 +176,69 @@ variables — so a grammar carries them, as `boundVars`.
 
   s.checkSynth (ifSolved := do
     println! "max := {← s.getSynthSolution mx}")
+
+
+
+/-! ## Extending one afterwards
+
+`smt.grammar!` answers the grammar alone. When part of a grammar comes from data, write the fixed
+part as a block with `smt.mkGrammar!`, which also answers what the block made, and add the rest
+with the builders. Without parameters that is the grammar then the non-terminals; with some, the
+grammar is grouped with its parameters, so that one is never taken for a non-terminal:
+
+```
+smt.mkGrammar! s (x : Int) where …   : Env ((Grammar × BVar) × NT × NT)
+```
+
+Here the constants a solution may use are a list. The block declares the non-terminal `num` with
+no alternatives at all, `num : Int` alone, and its rules are added from the list afterwards. There
+is no `1` among them, so `x + 10` has to be built out of what the list offers.
+-/
+
+/-- info: f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  let ((g, _), _, num) ← smt.mkGrammar! s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+
+  let f ← s.synthFun "f" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 10)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {← s.getSynthSolution f}")
+
+/-! `smt.letGrammar!` is the same thing as a `do` element, binding the grammar, its parameters and
+its non-terminals under the names the block declares, so there is no tuple to get the order of
+wrong. A name the rest of the block never mentions draws no warning. Rules can be added until a
+solver has used the grammar; after that cvc5 rejects them.
+-/
+
+/-- info: f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+
+  let f ← s.synthFun "f" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 10)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {← s.getSynthSolution f}")

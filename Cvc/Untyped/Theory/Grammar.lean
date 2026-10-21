@@ -151,17 +151,18 @@ end Cvc
 
 
 
-/-! ## `grammar!`
+/-! ## `smt.grammar!`
 
 A grammar written as one block, BNF-style, with `smt!` terms as its alternatives:
 
 ```lean
-grammar! s (x y : Int) where
+smt.grammar! s (x y : Int) where
   start : Int  := x | y | if cnd then start else start
   cnd   : Bool := start ≤ start
 ```
 
-- `s` is the solver the grammar belongs to; the binders after it are the grammar's parameters.
+- `s` is a solver to build the grammar with — any solver of the scope will do, a grammar belonging
+  to the scope rather than to a solver; the binders after it are the grammar's parameters.
 - Each line declares a non-terminal and its sort, then its alternatives separated by `|`. The first
   line's is the start symbol.
 - Inside the alternatives a non-terminal or parameter stands for its term, so rules mention one
@@ -169,14 +170,51 @@ grammar! s (x y : Int) where
 - `?const` and `?var` are cvc5's "any constant" and "any parameter" of the non-terminal's sort.
 
 A sort is written as a Lean type or a `Srt` sort-erased, and as a Lean type typed — the typed
-`grammar!` being an ordinary `Grammar` whose index is the parameters folded over the start sort.
+`smt.grammar!` being an ordinary `Grammar` whose index is the parameters folded over the start sort.
 
-`grammar!` is `scoped` in each layer, as `smt!` is: `open Cvc.Untyped` selects this one.
+### Extending a grammar afterwards
+
+`smt.grammar!` answers the grammar alone, its parameters and non-terminals being made out of sight,
+so nothing can be added to it later. Two forms with the same body answer them too:
+
+- `smt.mkGrammar! s … where …` answers `grammar × NT₁ × NT₂ × …` without parameters, and
+  `(grammar × PARAM₁ × …) × NT₁ × NT₂ × …` with some, in declaration order. The parameters are
+  grouped with the grammar so that one cannot be taken for a non-terminal by position.
+- `smt.letGrammar! g ← s … where …` is a `do` element binding `g`, the parameters and the
+  non-terminals under the names the block declares, so the order cannot be got wrong:
+
+  ```lean
+  smt.letGrammar! g ← s (x y : Int) where
+    start : Int  := x | y
+    cnd   : Bool := start ≤ start
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  ```
+
+  A parameter is bound as a `BVar` and a non-terminal as an `NT`, both converting to terms. The
+  names are bound without a source position, so one never used afterwards draws no warning.
+
+In these two forms a non-terminal may be declared without alternatives, `nt : sort` alone, for its
+rules to be added afterwards — rules computed from data, say, which a block cannot spell:
+
+```lean
+smt.letGrammar! g ← s (x : Int) where
+  start : Int := x | start + num
+  num   : Int
+let mut g := g
+for k in [3, 7] do g ← g.addRule num (← Term.mkInt k)
+```
+
+`smt.grammar!` refuses such a line, since the grammar it answers cannot be extended.
+
+A grammar can be extended until it is used for synthesis, after which cvc5 rejects new rules. A
+non-terminal unreachable from the start symbol is left out of the grammar until a rule reaches it.
+
+All three forms are `scoped` in each layer, as `smt!` is: `open Cvc.Untyped` selects this one.
 -/
 
 namespace Cvc
 
-/-- One alternative of a `grammar!` rule. -/
+/-- One alternative of a `smt.grammar!` rule. -/
 declare_syntax_cat smtGrammarAlt (behavior := symbol)
 
 /-- `?const` or `?var`: any constant, or any parameter, of the non-terminal's sort. -/
@@ -185,33 +223,48 @@ syntax (name := smtGrammarAny) "?" ident : smtGrammarAlt
 /-- An alternative that is a term. -/
 syntax (name := smtGrammarTerm) smtTerm : smtGrammarAlt
 
-/-- One line of a `grammar!`: a non-terminal, its sort, and its alternatives. -/
+/-- One line of a `smt.grammar!`: a non-terminal, its sort, and its alternatives. -/
 declare_syntax_cat smtGrammarRule (behavior := symbol)
 
-/-- `nt : sort := alt | alt | …`. -/
+/-- `nt : sort := alt | alt | …`, or `nt : sort` alone, its rules to be added afterwards. -/
 syntax (name := smtGrammarRule)
-  withPosition(ident " : " term " := " sepBy1(smtGrammarAlt, " | ")) : smtGrammarRule
+  withPosition(ident " : " term (" := " sepBy1(smtGrammarAlt, " | "))?) : smtGrammarRule
 
-/-- What follows `grammar!`: the solver, the parameters, and the rules. -/
+/-- What follows `smt.grammar!`: the solver, the parameters, and the rules. -/
 declare_syntax_cat smtGrammarBody (behavior := symbol)
 
 /-- `s (x : Int) … where` followed by the rules, one per line. -/
 syntax (name := smtGrammarBody)
   term:max (ppSpace smtQuantBinder)* " where" many1Indent(ppLine smtGrammarRule) : smtGrammarBody
 
-/-- A sort-erased grammar; `grammar!` under `open Cvc.Untyped`. -/
+/-- A sort-erased grammar; `smt.grammar!` under `open Cvc.Untyped`. -/
 syntax (name := grammarU) "grammarU! " smtGrammarBody : term
 
-/-- A typed grammar; `grammar!` under `open Cvc.Typed`. -/
+/-- A typed grammar; `smt.grammar!` under `open Cvc.Typed`. -/
 syntax (name := grammarT) "grammarT! " smtGrammarBody : term
+
+/-- A sort-erased grammar and its parts; `smt.mkGrammar!` under `open Cvc.Untyped`. -/
+syntax (name := mkGrammarU) "mkGrammarU! " smtGrammarBody : term
+
+/-- A typed grammar and its parts; `smt.mkGrammar!` under `open Cvc.Typed`. -/
+syntax (name := mkGrammarT) "mkGrammarT! " smtGrammarBody : term
 
 namespace Untyped
 
-/-- Sort-erased `grammar!`. -/
-scoped syntax "grammar! " smtGrammarBody : term
+/-- Sort-erased `smt.grammar!`. -/
+scoped syntax "smt.grammar! " smtGrammarBody : term
 
 macro_rules
-  | `(grammar! $body) => `(grammarU! $body)
+  | `(smt.grammar! $body) => `(grammarU! $body)
+
+/-- Sort-erased `smt.mkGrammar!`: the grammar together with its parameters and non-terminals. -/
+scoped syntax "smt.mkGrammar! " smtGrammarBody : term
+
+macro_rules
+  | `(smt.mkGrammar! $body) => `(mkGrammarU! $body)
+
+/-- Sort-erased `smt.letGrammar!`: binds the grammar, its parameters and its non-terminals. -/
+scoped syntax "smt.letGrammar! " ident " ← " smtGrammarBody : doElem
 
 end Untyped
 
@@ -225,14 +278,36 @@ namespace Ext
 def mentions (name : Name) (stx : Syntax) : Bool :=
   (stx.find? fun s => s.isIdent && s.getId == name).isSome
 
-/-- Expands the body of a `grammar!` for the given layer. -/
-def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
+/-- A right-nested tuple of the given terms, `(a, b, c)`; a single term stands for itself. -/
+def mkTuple : List (TSyntax `term) → MacroM (TSyntax `term)
+  | [] => Macro.throwUnsupported
+  | [t] => pure t
+  | t :: ts => do `(($t, $(← mkTuple ts)))
+
+/-- The right-nested product of the given types, `α × β × γ`; a single type stands for itself. -/
+def mkProd : List (TSyntax `term) → MacroM (TSyntax `term)
+  | [] => Macro.throwUnsupported
+  | [t] => pure t
+  | t :: ts => do `($t × $(← mkProd ts))
+
+/-- The alternatives of one `smt.grammar!` rule, none when it only declares its non-terminal. -/
+def ruleAlts (rule : Syntax) : Array Syntax :=
+  if rule[3].isNone then #[] else rule[3][1].getSepArgs
+
+/-- Expands the body of a `smt.grammar!` or `smt.mkGrammar!` for the given layer.
+
+With `withParts`, the result carries what the grammar was built from as well as the grammar, so
+that it can be extended afterwards: `grammar × NT₁ × NT₂ × …` without parameters, and
+`(grammar × PARAM₁ × …) × NT₁ × NT₂ × …` with some, the grouping keeping the two apart.
+-/
+def expandGrammar (layer : Layer) (body : Syntax) (withParts : Bool := false)
+: MacroM (TSyntax `term) := do
   let solver : Term := ⟨body[0]⟩
   let params := quantBinders body[1]
   let rules := body[3].getArgs
   let typed := layer == Layer.typed
   -- what the rules mention, so that only those names are bound and the linter stays quiet
-  let alts := rules.flatMap (·[4].getSepArgs)
+  let alts := rules.flatMap ruleAlts
   let mentioned (id : Ident) : Bool := alts.any (mentions id.getId)
   -- refuse a non-terminal declared twice, which would silently shadow the first
   let ntIds : Array Ident := rules.map (⟨·[0]⟩)
@@ -240,6 +315,13 @@ def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
     for j in [0:i] do
       if ntIds[i]!.getId == ntIds[j]!.getId then
         Macro.throwErrorAt ntIds[i]! s!"non-terminal `{ntIds[i]!.getId}` is declared twice"
+  -- a non-terminal without alternatives is only useful if its rules can be added afterwards
+  if !withParts then
+    for (id, rule) in ntIds.zip rules do
+      if ruleAlts rule |>.isEmpty then
+        Macro.throwErrorAt id s!"non-terminal `{id.getId}` has no alternatives, and the grammar \
+          `smt.grammar!` answers cannot be extended: give it some, or use `smt.mkGrammar!` or \
+          `smt.letGrammar!` to add its rules afterwards"
   let mut elems : Array (TSyntax `doElem) := #[]
   -- the parameters and the non-terminals, under names the writer never sees
   let mut paramVars := #[]
@@ -279,7 +361,7 @@ def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
   let grammarNs := layer.name `Grammar
   let builder (fn : Name) : Ident := mkIdent (grammarNs.getId ++ fn)
   for (rule, var) in rules.zip ntVars do
-    for alt in rule[4].getSepArgs do
+    for alt in ruleAlts rule do
       let add ← match alt.getKind with
         | ``smtGrammarAny =>
           match alt[1].getId with
@@ -300,18 +382,60 @@ def expandGrammar (layer : Layer) (body : Syntax) : MacroM (TSyntax `term) := do
   -- the result is ascribed: left to inference, a grammar bound over an earlier one of another
   -- index in the same `do` block leaves the inner block's type a metavariable it cannot solve
   let env := mkIdent `Cvc.Env
-  let resultTy ← if typed then do
+  let grammarTy ← if typed then do
       let mut sig : Term := ⟨(rules[0]!)[2]⟩
       for (_, sort) in params.reverse do sig ← `($sort → $sig)
-      `($env ($(layer.name `Grammar) $sig))
-    else `($env $(layer.name `Grammar))
-  `((do $[$items]* pure $g : $resultTy))
+      `($(layer.name `Grammar) $sig)
+    else `($(layer.name `Grammar))
+  if !withParts then
+    return ← `((do $[$items]* pure $g : $env $grammarTy))
+  -- the grammar with its parameters, then the non-terminals
+  let bvarTy (sort : Term) : MacroM Term :=
+    if typed then `($(layer.name `BVar) $sort) else `($(layer.name `BVar))
+  let ntTy (sort : Term) : MacroM Term :=
+    if typed then `($(layer.name `NT) $sort) else `($(layer.name `NT))
+  let paramTys ← params.toList.mapM fun (_, sort) => bvarTy sort
+  let ntTys ← rules.toList.mapM fun rule => ntTy ⟨rule[2]⟩
+  let asTerm (id : Ident) : Term := ⟨id.raw⟩
+  let headVal ← mkTuple (asTerm g :: paramVars.toList.map asTerm)
+  let headTy ← mkProd (grammarTy :: paramTys)
+  let result ← mkTuple (headVal :: ntVars.toList.map asTerm)
+  let resultTy ← mkProd (headTy :: ntTys)
+  `((do $[$items]* pure $result : $env ($resultTy)))
+
+/-- The pattern `smt.letGrammar! g ← …` binds: `g`, the parameters and the non-terminals, grouped as
+`smt.mkGrammar!` answers them and named as the block declares them.
+
+The declared names are bound without a source position: the `do` element cannot see the rest of
+its block, so it cannot tell which ones are used there, and positioned binders would trip the
+unused-variable linter for every non-terminal that is never extended.
+-/
+def letGrammarPattern (g : Ident) (body : Syntax) : MacroM (TSyntax `term) := do
+  let params := quantBinders body[1]
+  let rules := body[3].getArgs
+  let quiet (id : Syntax) : Term := ⟨(mkIdent id.getId).raw⟩
+  let head ← mkTuple (⟨g.raw⟩ :: params.toList.map (fun (id, _) => quiet id))
+  mkTuple (head :: rules.toList.map (fun rule => quiet rule[0]))
 
 end Ext
 
 @[inherit_doc grammarU]
 macro_rules
   | `(grammarU! $body) => Ext.expandGrammar Ext.Layer.untyped body
+
+@[inherit_doc mkGrammarU]
+macro_rules
+  | `(mkGrammarU! $body) => Ext.expandGrammar Ext.Layer.untyped body (withParts := true)
+
+namespace Untyped
+
+@[inherit_doc mkGrammarU]
+macro_rules
+  | `(doElem| smt.letGrammar! $g ← $body) => do
+    let pat ← Ext.letGrammarPattern g body
+    `(doElem| let $pat:term ← mkGrammarU! $body)
+
+end Untyped
 
 end
 

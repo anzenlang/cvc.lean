@@ -182,7 +182,7 @@ check-sat assuming b1 and (= i1 0)
 
 # Synthesis
 
-This example uses the `grammar!` syntax extension for grammars, but they can also be built using
+This example uses the `smt.grammar!` syntax extension for grammars, but they can also be built using
 the {lean}`Grammar` API.
 
 ```lean (name := intro_ex_synth)
@@ -190,7 +190,7 @@ the {lean}`Grammar` API.
   let s ← Solver.new
   s.setOption "sygus" "true"
 
-  let g ← grammar! s (x y : Int) where
+  let g ← smt.grammar! s (x y : Int) where
     start : Int  := x | y | if cnd then start else start
     cnd   : Bool := start ≤ start
 
@@ -241,7 +241,7 @@ elim := (and (>= y 0) (not (>= y 2)))
     | println! "no free interpolant"
   println! "free        : {i}"
 
-  let g ← grammar! s where
+  let g ← smt.grammar! s where
     start : Bool := atom | atom ∧ start
     atom  : Bool := y % k = r
     k     : Int  := 2 | 3 | 4 | 5

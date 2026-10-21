@@ -33,8 +33,8 @@ errors Lean reports at compile time.
 
 Everything cvc5 creates — sorts, terms, solvers — belongs to a *term manager*, and objects of two
 different managers must never meet. This library never shows you a term manager. In its place is the
-class `Ω`, a proposition whose instances stand for "the term manager of the current scope". Nearly
-every type and function takes one implicitly: `Term α`, `Srt` and `Solver` all mean "of the scope's
+class `Ω`, whose instances stand for "the term manager of the current scope". Nearly every type and
+function takes one implicitly: `Term α`, `Srt` and `Solver` all mean "of the scope's
 manager", and two of them can only meet when they share one.
 
 Work happens in the **environment monad** `Env`, itself (implicitly) parameterized by `Ω`. An `Env
@@ -90,7 +90,13 @@ synthesize Ω` — since there is no instance to find. The fix is never to look 
 it as a parameter. The alternative of writing everything inline, inside one `Env.runIO do …`, does
 work, but nothing in that block can be reused or tested on its own.
 
-`Ω` is a `Prop`, so carrying it everywhere costs nothing at runtime.
+Carrying an `Ω` everywhere costs nothing at runtime: its only field is a type, which the compiler
+erases, so an instance is passed as a constant scalar, with no allocation and no reference counting.
+It is not a `Prop`, and that matters. Proof irrelevance would make any two instances equal, so a
+term of one scope would also be a term of every other, and the only protection left would be that
+no instance exists outside a run, which nested runs defeat. As a `Type`, each run's `Ω` is its own:
+a term of an outer run is rejected by an inner one, and an inner term cannot be returned to the
+outer run.
 
 ## Two layers
 
