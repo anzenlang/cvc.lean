@@ -25,12 +25,3 @@ jobs:
       run: lake build
     - name: Test
       run: lake test
-    # - name: Purge Disk Cache # https://github.com/actions/runner-images/issues/2619
-    #   if: github.event_name == 'release' && runner.os == 'macOS'
-    #   run: sudo /usr/sbin/purge
-    # - name: Upload Release Artifact
-    #   if: github.event_name == 'release'
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     TAG: ${{ github.event.release.tag_name }}
-    #   run: lake upload $TAG
