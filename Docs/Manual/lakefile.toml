@@ -4,6 +4,7 @@ defaultTargets = ["CvcManual", "docs"]
 [[require]]
 scope = "leanprover"
 name = "verso"
+rev = "v4.35.0"
 
 [[require]]
 name = "cvc"

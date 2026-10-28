@@ -41,6 +41,21 @@ i1_pos := (<= 0 i1)
 ite := (ite (<= 0 i1) i1 i2)
 ```
 
+```lean
+-- using the `smt!` extension
+open Typed in #eval Env.runIO do
+  let b1 ← Term.mkSymbol "b1"
+  let b2 ← Term.mkSymbol "b2"
+  let conj ← smt! b1 ∧ b2
+  println! "conj := {conj}"
+  let i1 ← Term.mkSymbol "i1"
+  let i1_pos ← smt! 0 ≤ i1
+  println! "i1_pos := {i1_pos}"
+  let i2 ← Term.mkSymbol "i2"
+  let ite ← smt! if 0 ≤ i1 then i1 else i2
+  println! "ite := {ite}"
+```
+
 Strong-typing works with functions/function application as well.
 
 ```lean (name := terms_ex_typed_fun)
@@ -62,6 +77,21 @@ f : (-> Int Bool Int) := f
 f_i : (-> Bool Int) := (f i)
 f_i_b : Int := (f i b)
 f_i_b' : Int := (f i b)
+```
+
+```lean
+-- using the `smt!` extension
+open Typed in #eval Env.runIO do
+  let f ← Term.mkSymbolAs (Int → Bool → Int) "f"
+  let i ← Term.mkSymbol "i"
+  let f_i ← smt! f i
+  println! "f_i := {f_i}"
+  let b ← Term.mkSymbol "b"
+  let f_i_b ← smt! f_i b
+  println! "f_i_b := {f_i_b}"
+
+  let f_i_b' ← smt! f i b
+  println! "f_i_b' := {f_i_b'}"
 ```
 
 Of course, type-checking catches any invalid-sort mistake we make.
