@@ -8,10 +8,10 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped.Core.Bool
-import Cvc.Untyped.Solver
+import Cvc.Untyped.Core.Solver
 
 public meta import Cvc.Untyped.Core.Bool
-public meta import Cvc.Untyped.Solver
+public meta import Cvc.Untyped.Core.Solver
 
 
 

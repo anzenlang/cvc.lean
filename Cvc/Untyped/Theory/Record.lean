@@ -384,8 +384,12 @@ global names but cannot see the local context — so the identifier leaf expands
 elaborator below, and everything else in the DSL stays a macro.
 
 Resolution follows Lean's own order: a **local** head wins first, then the longest prefix that
-resolves as a name, and what is left over are fields. So `r.a` reads a field off a local `r` even
-where a constant `r.a` exists, and `Foo.bar.a` reads one off the constant `Foo.bar`.
+resolves as a name. What is left over is read **by type**, as Lean's dot notation does: while the
+value is not a term — a symbol structure, any Lean structure holding terms — the next component is
+a Lean projection, and from the first term on the rest are SMT record fields. So `r.a` reads a field
+off a local `r` even where a constant `r.a` exists, `Foo.bar.a` reads one off the constant `Foo.bar`,
+`vars.x` projects the Lean field `x` of a structure `vars`, and `vars.r.a` projects `r` in Lean and
+then reads the record field `a`.
 
 An identifier carrying macro scopes is never taken apart: it stands for one binding a macro
 introduced, and its components are not a path a user wrote.
@@ -420,14 +424,31 @@ def elabSmtProj (layer : Layer) (id : Ident) (expected? : Option Lean.Expr)
   -- `identComponents` splits the identifier at its own source ranges, which is what Lean's dot
   -- notation uses and what keeps the head a *reference* the unused-variable linter can see. A
   -- rebuilt identifier spanning the whole path is not one
+  let comps := id.raw.identComponents (nFields? := some fields.length)
   let headStx : Ident :=
-    match id.raw.identComponents (nFields? := some fields.length) with
+    match comps with
     | head :: _ => ⟨head⟩
     | [] => mkIdentFrom id head (canonical := true)
-  let mut body ← `(pure $headStx)
-  for field in fields do
+  let fieldStxs : List Syntax := match comps with
+    | _ :: rest => rest
+    | [] => fields.map (mkIdentFrom id ·)
+  -- Lean projections, as long as the value is not a term
+  let mut cur : TSyntax `term := headStx
+  let mut rest := fieldStxs
+  repeat
+    let some field := rest.head? | break
+    let type ← instantiateMVars (← Lean.Meta.inferType (← Lean.Elab.Term.elabTerm cur none))
+    if isSmtTermType (← Lean.Meta.whnfR type) then break
+    cur := ⟨Syntax.node .none ``Lean.Parser.Term.proj #[cur, mkAtom ".", field]⟩
+    rest := rest.drop 1
+  if rest.isEmpty then
+    return ← elabSmtIdent layer cur expected?
+  -- the rest are record fields
+  let mut body ← `(pure $cur)
+  for field in rest do
     -- the binder is hygienic, quotations in `TermElabM` adding macro scopes of their own
-    body ← `($body >>= fun arg => $(layer.op `recordGet) arg $(Syntax.mkStrLit field.toString))
+    body ← `($body >>= fun arg =>
+      $(layer.op `recordGet) arg $(Syntax.mkStrLit field.getId.toString))
   Lean.Elab.Term.elabTerm body expected?
 
 /-- Elaborates a sort-erased identifier, reading off whatever fields it names. -/

@@ -7,9 +7,9 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.BVar
 public import Cvc.Untyped.Core
-public import Cvc.Untyped.Solver
-public import Cvc.Untyped.Symbols
+public import Cvc.Untyped.Grammar
+public import Cvc.Untyped.Synth
 public import Cvc.Untyped.Theory
 public import Cvc.Untyped.Extra
+public import Cvc.Untyped.View

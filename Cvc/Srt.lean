@@ -580,6 +580,14 @@ abbrev ToTyp.srt [ToTyp α] : Env Srt := Typ.of α |>.toSrt
 abbrev Srt.of (α : Type) [A : ToTyp α] : Env Srt := A.srt
 
 
+/-- The usual order on rationals, which core does not provide.
+
+Without it a real-valued set, bag or array index cannot be spelled, `Set` and friends wanting their
+elements ordered. It is at low priority so that an order from elsewhere — Mathlib's — wins where
+both exist rather than clashing with this one.
+-/
+instance (priority := low) instOrdRat : Ord Rat := ⟨fun x y => compareOfLessAndEq x y⟩
+
 namespace ToTyp
 
 instance : ToTyp Bool := ⟨.bool⟩

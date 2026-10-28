@@ -11,6 +11,8 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 
 public import Cvc.Ext
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public import Cvc.Untyped.Core.Value
 public import Cvc.Gen.Term
 public import Cvc.Spec.Regex
@@ -28,6 +30,7 @@ open cvc5 renaming Term → T
 variable [Ω]
 
 gen_untyped% from Cvc.Spec.Regex
+gen_untyped_view% from Cvc.Spec.Regex
 
 
 

@@ -7,11 +7,11 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Typed.Symbols
+import Cvc.Typed.Core.Symbols
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
 
-public meta import Cvc.Typed.Symbols
+public meta import Cvc.Typed.Core.Symbols
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
 
@@ -72,6 +72,39 @@ ascribed and nothing re-typed.
   | some v => println! "running = {v.running}, steps = {v.steps}"
   | none => println! "no model"
 
+/-! In `smt!`, a symbol is read off the structure with Lean's own dot notation: `syms.steps` projects
+the field, the structure not being a term, and has the field's index. -/
+
+/-- info: (and running (< steps 3)) -/
+#guard_msgs in #eval Env.runIO do
+  let syms ← (Symbols.Sig.idents () : Machine.Idents).declare
+  println! ← smt! syms.running ∧ syms.steps < 3
+
+
+/-! ## Folding
+
+`foldM` belongs to the `Symbols` instance, beside `mapM`: `structure.symbols` defines it field by
+field. It visits the symbols in field order and runs in any monad; over `Terms`, each symbol comes
+at its own index.
+-/
+
+/-- info: names: #[running, steps]
+running : Bool
+steps : Int
+symbols counted from the model: 2
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let ids : Machine.Idents := Symbols.Sig.idents ()
+  println! "names: {← ids.foldM #[] fun acc name => return acc.push name}"
+  let syms ← ids.declareIn s
+  -- `t : Term α`, so the index is at hand
+  syms.foldM () fun {α} _ _ () (t : Term α) => println! "{t} : {Typ.of α}"
+  s.assert syms.running
+  let some v ← syms.findCex s | println! "no model"
+  println! "symbols counted from the model: {← v.foldM 0 fun n _ => return n + 1}"
+
 
 /-! ## The hand-written path
 
@@ -124,4 +157,74 @@ symbols to make, so the identifiers *are* the initialisation data. -/
   let terms : Vars.Terms ← idents.declare
   println! "bools: {terms.boolVars}, ints: {terms.intVars}"
 
+/-! A hand-written instance that defines no `foldM` gets one derived from its `mapM`, visiting the
+arrays' elements in order. -/
+
+/-- info: #[b0, b1, i0] -/
+#guard_msgs in #eval Env.runIO do
+  let idents : Vars.Idents := ⟨#["b0", "b1"], #["i0"], #[]⟩
+  let terms : Vars.Terms ← idents.declare
+  println! ← terms.foldM #[] fun acc t => return acc.push t.erase
+
 end ByHand
+
+
+
+/-! ## State symbols in `smt!`
+
+`smt!` reads a state symbol (`Symbols.At`) off its own type, as it does a non-terminal, so two of
+them combine with nothing else to fix the index — left to the coercion, `x + y` did not elaborate.
+A mismatch is still reported between the two terms. -/
+
+namespace AtInSmt
+
+structure.symbols Counter where
+  x : Int
+  y : Int
+
+example : Counter.RelAt' := fun {x, y} {x := x', y := y'} => smt! x' = x + y ∧ y' = y + 1
+example : Counter.PredAt' := fun {x, y} => smt! x * y ≤ x
+
+/--
+error: Application type mismatch: The argument
+  smtArg1✝
+has type
+  Term Bool
+but is expected to have type
+  Term Int
+in the application
+  smtArg0✝.add smtArg1✝
+
+Note: The following definitions were not unfolded because their definition is not exposed:
+  Term ↦ 6
+-/
+#guard_msgs in
+example (t : Term Bool) : Counter.PredAt' := fun {x, ..} => smt! x + t ≤ x
+
+end AtInSmt
+
+
+
+/-! ## Symbols at a step
+
+`TermsAt k` and `ValuesAt k` wrap every field in a `Symbols.At k`, which `get` unwraps. `declareAt`
+names a symbol `count__@__k`, in both layers, the typed one naming it through the sort-erased
+convention. -/
+
+namespace AtStep
+
+structure.symbols Counter where
+  counting : Bool
+  count : Int
+
+example (s : Counter.TermsAt 0) : Term Int := s.count.get
+example (s : Counter.ValuesAt 3) : Bool := s.counting.get
+example (s : Counter.TermsAt 0) : Env (Term Int) := smt! s.count + 1
+
+/-- info: count__@__0 count__@__2 -/
+#guard_msgs in #eval Env.runIO do
+  let at0 ← Counter.idents.declareAt 0
+  let at2 ← Counter.idents.declareAt 2
+  println! "{at0.count.get} {at2.count.get}"
+
+end AtStep

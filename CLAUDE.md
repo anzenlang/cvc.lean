@@ -40,6 +40,13 @@ common build break:
 - [Cvc/Untyped.lean](Cvc/Untyped.lean) and [Cvc/Typed.lean](Cvc/Typed.lean) re-export their
   submodules with `public import`, and [Cvc.lean](Cvc.lean) re-exports everything, so `import Cvc`
   exposes the whole surface.
+- **All of Lean is visible to users at the meta phase only.** `Basic`, `Defs`, `Ext`, `Spec/Defs`
+  and `Types/Denote` must `public meta import Lean.*`, their public meta functions having Lean types
+  in their signatures. So a name like `Std.TreeMap` *resolves* in a user's module and then fails in
+  ordinary code with "may not access declaration … imported as `meta`". `Basic/Env.lean`, the root
+  every module imports, therefore `public import`s `Std.Data.TreeMap` and `Std.Data.TreeSet`
+  normally: the library uses both and users manipulate them. Anything else a user would naturally
+  reach for and trips on this way belongs there too.
 
 ## Architecture
 
@@ -62,21 +69,32 @@ Cvc/Gen/SolverMode.lean     → `env_gen%`, the solver-mode monad generator
 Cvc/Ext.lean                → the `smtTerm` category, `smtU!`/`smtT!`, the theory-free forms, and
                               `Cvc.Ext`, the expander (each theory declares its own forms)
 Cvc/{Untyped,Typed}.lean    → layer roots
-Cvc/{Untyped,Typed}/Core.lean       → `Defs`, `Value`, `Bool` — what every theory needs
+Cvc/{Untyped,Typed}/Core.lean       → `Defs`, `Value`, `Bool`, `BVar`, `View`, `Solver`, `Symbols`
+                                      — what every theory needs
 Cvc/{Untyped,Typed}/Core/Defs.lean  → the `Term`/`Terms` types and the layer's `smt!` alias
 Cvc/{Untyped,Typed}/Core/Value.lean → `TermToValue`/`ValueToTerm` and the sort-agnostic accessors
 Cvc/{Untyped,Typed}/Theory.lean     → aggregates the theories
 Cvc/{Untyped,Typed}/Theory/*        → per-theory generation sites, one per theory per layer, plus
-                                      `Datatype`, `Record`, `Grammar`, `Synth` and hand-written
-                                      `Sep` and `Quant`. A theory also declares its own `smt!`
-                                      forms
+                                      `Datatype`, `Record` and hand-written `Sep` and `Quant`. A
+                                      theory also declares its own `smt!` forms
 Cvc/{Untyped,Typed}/Theory/Nullable/* → the lifted `<id>?` constructors, one module per theory
-Cvc/{Untyped,Typed}/Solver.lean     → `Solver`, the sat mode monads, the driving functions
-Cvc/{Untyped,Typed}/BVar.lean       → bound variables and the lambdas over them
-Cvc/{Untyped,Typed}/Symbols.lean    → the record-of-symbols API + `structure.symbols`
-Cvc/{Untyped,Typed}/Extra/SVars.lean → state variables: `Symbol.At k` + `structure.stateVars`
+Cvc/{Untyped,Typed}/Core/Solver.lean → `Solver`, the sat mode monads, the driving functions
+Cvc/{Untyped,Typed}/Grammar.lean    → grammar builders and `smt.grammar!`/`mkGrammar!`/`letGrammar!`
+Cvc/{Untyped,Typed}/Synth.lean      → syntax-guided synthesis: `checkSynth`, its mode monads
+Cvc/{Untyped,Typed}/Core/BVar.lean  → bound variables and the lambdas over them
+Cvc/{Untyped,Typed}/Core/View.lean  → what views are built from: `Kids`, `TermView`/`ViewFamily`
+Cvc/{Untyped,Typed}/Traverse.lean   → `Term.fold`, the zipper, `Term.walk`
+Cvc/{Untyped,Typed}/View.lean       → what inspecting terms takes: `Core`, the `def.term_view`
+                                      generator, and `Traverse`
+Cvc/Gen/{View,TypedView}.lean       → the view generators, their registries, `def.term_view`
+Cvc/Types/Denote.lean               → `Typ.Denote`, the Lean type a sort carried as data indexes
+Cvc/{Untyped,Typed}/Core/Symbols.lean → the record-of-symbols API, symbols at a step
+                                      (`Symbols.At k`) + `structure.symbols`
 Cvc/{Untyped,Typed}/Extra/Sys.lean  → transition systems and BMC over them
-Cvc/Gen/Symbols.lean        → what `structure.symbols`/`structure.stateVars` share
+Cvc/Gen/Symbols.lean        → what both layers' `structure.symbols` share
+Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as data, by category, with
+                              each one's value type (`argType`) and `toStrings` for `setOption`.
+                              Imported by nothing yet
 Cvc/Examples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
 Cvc/Tests/*                 → the test library (`lake test`)
 ```
@@ -113,10 +131,11 @@ Each part of the declaration rules out a specific alternative:
   `Basic/Env.lean` bodies, private `runUnsafe`/`EnvT.lift5` included, into other modules, which
   fails with "Unknown constant `_private…runUnsafe`" at compile time.
 
-Consequences of `Type 1`: an alias of a function taking the scope is in `Type 1` too (`Sig.Fun`,
-`SVars.FunAt`, …, all annotated so), and such a value cannot be returned through `Env`, whose
-results are in `Type`. That is why `Sys.Bmc` stores its system's parts *at its own scope* rather
-than extending the scope-generic `Sys`. And there is no sort-erased `TermToValue Term`/`ValueToTerm
+Consequences of `Type 1`: a type *quantifying* over the scope (`[Ω] → …` inside it) is in `Type 1`
+too, and such a value cannot be returned through `Env`, whose results are in `Type`. The symbol
+aliases avoid that by taking the scope as a *binder* instead (`Sig.Fun [Ω] : Type`), so a `Sys` or a
+constraint belongs to one scope, and code written once for every scope takes `[Ω] → …` at its own
+boundary — `LinSolve.run`'s constraints. And there is no sort-erased `TermToValue Term`/`ValueToTerm
 Term`: the class's field quantifies over the scope a term comes from, so an "identity" instance
 would map one scope's terms to another's. `Tests/Scope.lean` pins the three rejections: escaping a
 run, escaping into an enclosing run, and mixing two open scopes.
@@ -454,7 +473,7 @@ is absent does not parse, rather than parsing and failing later on an unknown co
 - **In `Theory/Arith`**: integer and real literals. In **`Core/Bool`**: `if _ then _ else _`, and
   `true`/`false`. In **`Theory/String`**: string literals. In **`Theory/Datatype`**: `match … with`.
   In **`Theory/Record`**: `{a := t}`, `{r with a := t}`, `r.a` and `e |>.a`. In **`Theory/Quant`**:
-  `∀ (x y : s), _` and `∃ …`. In **`Theory/Grammar`**: `smt.grammar!`, a term of its own rather than
+  `∀ (x y : s), _` and `∃ …`. In **`Grammar`**: `smt.grammar!`, a term of its own rather than
   an `smtTerm` form, whose alternatives are `smtTerm`s. In **`Theory/Regex`**: `regex!`, likewise a
   term of its own, over its own `smtRegex` category.
 - **Generated operators** are per-theory too: an entry's
@@ -593,10 +612,123 @@ replacement is never itself rewritten), and on a duplicated source the **earlies
 source may be any sub-term, not only a variable. Typed, a pair's two terms share an index — which is
 what keeps the result at `α` — and getting that wrong is a type error.
 
+## Building from a kind
+
+Sort-erased only, in `Untyped/Core/Defs.lean`: the escape hatch below every dedicated constructor.
+`Term.mkOfKind (kind) (kids)` applies a raw `Kind` and checks nothing itself — cvc5 catches most
+mistakes but not all, which is why every kind otherwise has its own constructor — and cannot build
+an indexed operator. `Term.replaceKids t kids` reuses `t`'s operator, through `mkTermOfOp` when it
+is indexed so the indices survive, and answers a kid-less `t` as is when `kids` is empty. The walk
+rebuilds through `replaceKids`. Pinned in `Tests/Untyped/Kind.lean`, including that an application's
+first kid is the function and a quantifier's are its variable list and body.
+
+`import Cvc.Untyped.View` / `Cvc.Typed.View` is the entry point: each re-exports its layer's `Core`,
+the generator behind `def.term_view`, and `Traverse`. A **view** takes a term apart one level — its
+operator as a constructor, its kids, indices and names as fields — and `def.term_view V` gathers the
+views of every *imported* theory into one inductive `V`. Worked examples are
+`Cvc/Examples/{Untyped,Typed}/Views.lean`.
+
+**One view per theory, generated in that theory's module.** A generation site carries
+`gen_untyped_view% from Cvc.Spec.X` / `gen_typed_view% from Cvc.Spec.X` beside its `gen_*%` line,
+which emits `Cvc.{Untyped,Typed}.View.<Theory>` and registers it in an environment extension
+(`untypedViewExt`, `typedViewExt`). `def.term_view` reads the registry, which holds exactly what the
+current module imports — so importing a theory is what makes its operators visible, as for `smt!`.
+What no specification describes is written by hand and registered with `register_untyped_view%` /
+`register_typed_view% <View> [ctor KIND, …]`: `View.Apply` (`APPLY_UF`) in `Theory/Fun`,
+`View.Quant` in `Theory/Quant`, `View.Datatype` in `Theory/Datatype`. `#untyped_views` lists the
+registry with what each view skipped and why.
+
+The aggregate has four **leaves** besides one variant `of<Theory>` per view: `value` (every
+`CONST_*` kind, `CONST_ARRAY`, `UNINTERPRETED_SORT_VALUE`), `symbol` (a `CONSTANT`'s name), `bvar`
+(a `VARIABLE`) and `other`, for a node no imported view takes apart. So an entry gets no view
+constructor if it builds a value (a `tm` constructor taking arguments, an entry with value
+parameters). Each operator also gets a `@[match_pattern] abbrev` on the aggregate, so a pattern
+reads `.lt ks` rather than `.ofArith (.lt ks)`. `def.term_view` refuses, before emitting anything, a
+kind owned by two views and a name used twice, naming both owners — pinned in both `View` tests.
+
+Records, tuples and nullables are datatypes to cvc5 and are **viewed as datatypes**, by constructor
+and field *name*; `Term.recordFields?`, `Term.pairComponents?` and `Term.nullableCases?` give back
+their typed surface when the index is known, `none` for a non-literal.
+
+### Sort-erased
+
+One flat inductive per theory and a **pure** `of? : Term → Option View.X`, so the aggregate's
+`V.of` is pure and the traversals run in any monad. The only failure would be an ill-formed term,
+which cvc5 never builds, so it is `none`/`other` rather than an error. `Kids` (≥ 2) and `Args` (≥ 1)
+are subtypes of `Terms`; `Term.indexAt?` reads an operator's indices.
+
+### Typed
+
+`View.X : Typ → Type`, indexed by the sort it takes apart, built in two layers so that dependent
+matching never gets stuck: **parts** per result-sort head (`OnBool`, `OnInt`, `OnBitVec w`,
+`OnSet γ`, `OnAny β` for a type variable…) whose constructors carry the variables the result leaves
+free and *proof fields* for everything computed (`n + m = w`, a class as its `Typ` predicate), and a
+**theory view** with one constructor per part at the part's sort. The abbreviations flatten that
+again: `@V.lt : (α : Typ) → {h0 : α.isArith = true} → Kids α.Denote → V .bool`.
+
+- **The viewer converts the sort-erased view**, adding sorts and proofs, and is in `Env`: reading a
+  kid's sort goes through `Srt.toTyp`, which consults the registry and reads record fields through
+  lean-cvc5's `BaseIO` accessors. A kid whose sort no `Typ` describes makes the typed view `none`,
+  the aggregate `other`. Raising that with lean-cvc5 is pending; **no `unsafe` workaround**.
+- **`Typ.Denote : Typ → Type`** ([Cvc/Types/Denote.lean](Cvc/Types/Denote.lean)) is the index a
+  sort carried as data gives a term. It is computed **together with an order**
+  (`denoteWithOrd : Typ → (T : Type) × Option (Ord T)`), so `.set γ` denotes `Set γ.Denote` with the
+  very instance a user's own `Set` is built with; a sort with no better denotation — declared sorts,
+  a container keyed on something unordered — denotes `Sorted τ`. Reducible and exposed, so `FieldOf`
+  and friends see through it; its delaborator `dsimp`s, since `whnf` would unfold `Set` itself.
+- **`Typed.Term.cast`** moves a term between two indices of one sort, checked by `rfl` at compile
+  time. Generic code needs it: over `γ`, a set's kids are `Term (Set (ToTyp.typ γ).Denote)`, not
+  `Term (Set γ)` — shown in the typed `Views` example.
+- **Write handlers as `match τ, v with`, as a term, not inside `do`**: matching the sort alongside
+  the view is what refines it, and only a term-level match carries the refinement to the result
+  type. Sort-erased handlers are plain matches.
+
+Traps in the generator, each found the hard way:
+
+- **Lean promotes an index to a parameter** when every constructor leaves it uniform —
+  `View.Apply`'s `τ`. The abbreviation reads its binders from the constructor's telescope, so for a
+  hand-written view it keeps non-instance parameters as implicit binders; otherwise `τ` silently
+  disappears.
+- **An order is bound `{ord : Ord …}`, not `[Ord …]`, in an abbreviation.** A pattern cannot
+  synthesize an instance; a named implicit is bound by the pattern, and a local of class type is an
+  instance in the body anyway.
+- **Abbreviations have `_` binder types and no result type**: with one, the holes are resolved
+  before the body is seen.
+- Quotation pitfalls on top of the ones under "Things to know before touching it": `$[$(e)]*` cannot
+  splice an expression (bind it first); named arguments mixed with positional ones need
+  `Syntax.mkApp`; a `do` whose items are all spliced elaborates as empty, so steps are nested
+  functions; `let some x ← e | alt` does not parse in a `doElem` quotation; an antiquotation heading
+  an application after `←`, in a `match` discriminant, or in a `do` alternative needs parentheses;
+  an identifier written literally in a quotation is hygienic, so a binder the caller must see is
+  built with `mkIdent`.
+
+### Traversals
+
+[Cvc/Untyped/Traverse.lean](Cvc/Untyped/Traverse.lean) is the engine, shared: `foldWith` takes how
+a node is presented, and `ZipperOf P` carries a payload per node — `Unit` sort-erased, the node's
+`Option Typ` typed. `Term.fold` takes optional `pre`/`post` (`FoldPre`: `descend | skip | stop`,
+`FoldPost`: `continue | stop`); `Term.walk` the same through a zipper (`WalkPre`/`WalkPost` add
+`replace` and the opt-in `replaceAndRevisit`). The typed layer adds `prePlain`/`postPlain`, called
+for a node whose sort has no `Typ` — a quantifier's variable list, a constructor head — so every
+node is visited by one pair or the other.
+
+- **Monads.** Sort-erased `fold` runs in any monad, `walk` in one `Env` lifts into (rebuilding goes
+  through the term manager). Typed, both need `MonadLiftT Env m`: presenting a node reads its sort.
+- **Rebuilding** is `mkTermOfOp` for an indexed operator, `mkTerm` on the kind otherwise, and only
+  along a path something was replaced under (dirty bits on the focus and each frame). `stop`
+  rebuilds to the root, keeping every replacement.
+- **Replacements keep the sort, so every ancestor stays well-sorted.** Sort-erased, and for a typed
+  traversal's plain nodes, it is checked (`checkSameSort`); a typed node's replacement is a
+  `Term τ.Denote`, so a wrong one does not compile.
+- The typed `Zipper ρ s` is indexed by the root's type and the focus's `Option Typ`; moving answers
+  a `Zipper.Any`, and matching `⟨some .int, z⟩` gives a focus of `Term Int`.
+
+
+
 ## The solver
 
-[Cvc/Untyped/Solver.lean](Cvc/Untyped/Solver.lean) holds the solver type, the three mode monads
-(`EnvSat`, `EnvUnsat`, `EnvUnknown`, each privately wrapping `EnvT` so a check-sat cannot be
+[Cvc/Untyped/Core/Solver.lean](Cvc/Untyped/Core/Solver.lean) holds the solver type, the three mode
+monads (`EnvSat`, `EnvUnsat`, `EnvUnknown`, each privately wrapping `EnvT` so a check-sat cannot be
 smuggled into a block that only holds because of an earlier answer), the `Result` type, and every
 function whose signature mentions no term. The typed layer is an `abbrev`, so those are inherited
 rather than restated.
@@ -639,7 +771,7 @@ Supporting types: `Result := cvc5.Result` with `Result.Sat? := Bool ⊕ Unknown.
 Two kinds of name still need restating on the typed side:
 
 - anything that must be *spelled* in a signature — the mode monads and `Result` — which is why
-  [Cvc/Typed/Solver.lean](Cvc/Typed/Solver.lean) re-exports them;
+  [Cvc/Typed/Core/Solver.lean](Cvc/Typed/Core/Solver.lean) re-exports them;
 - `new`, which has no solver value to use dot notation on. Everything else resolves through the
   abbreviation: `s.setOption`, `s.push`, `s.declareSrt` work on a typed solver unchanged.
 
@@ -649,11 +781,11 @@ kinds resist that and are spelled out: those with a **default argument** (eta-ex
 it), the `checkSat` family (it threads the mode branches), and `getValue`/`getValues` (they convert
 through `TermToValue`). `Solver.getValueAs`/`getValuesAs` are the sort-erased mirror of the typed
 `getValue`/`getValues`: the lift from `Env` into a mode monad is private, so converting a model term
-to a Lean value has to happen inside `Untyped/Solver.lean`.
+to a Lean value has to happen inside `Untyped/Core/Solver.lean`.
 
-`Typed/Solver.lean` needs `import all` on `Cvc.Typed.Core.Defs`, so the phantom index is transparent
-and the delegations typecheck, and on `Cvc.Untyped.Solver`, because the lift from `EnvT` into a mode
-monad is private — re-typing is the sanctioned use of it.
+`Typed/Core/Solver.lean` needs `import all` on `Cvc.Typed.Core.Defs`, so the phantom index is
+transparent and the delegations typecheck, and on `Cvc.Untyped.Core.Solver`, because the lift from
+`EnvT` into a mode monad is private — re-typing is the sanctioned use of it.
 
 ## Separation logic
 
@@ -758,7 +890,7 @@ supplies as `.inl h`/`.inr h`.
 
 ## Synthesis
 
-[Cvc/Untyped/Theory/Synth.lean](Cvc/Untyped/Theory/Synth.lean) and its typed twin. `checkSynth` asks
+[Cvc/Untyped/Synth.lean](Cvc/Untyped/Synth.lean) and its typed twin. `checkSynth` asks
 for a function satisfying its constraints for every input, where `checkSat` asks whether constraints
 *can* be satisfied. The order is: `declareSygusVar` for the universally quantified variables,
 `synthFun` for the functions to find, `addSygusConstraint`/`addSygusAssume` for the specification,
@@ -808,7 +940,7 @@ taking `Option Grammar`, the same shape `getInterpolant`/`getAbduct` use.
 
 ## Grammars
 
-[Cvc/Untyped/Theory/Grammar.lean](Cvc/Untyped/Theory/Grammar.lean) and its typed twin. A grammar
+[Cvc/Untyped/Grammar.lean](Cvc/Untyped/Grammar.lean) and its typed twin. A grammar
 restricts the shape of a term the solver may produce — a `synth-fun` candidate, or an interpolant or
 abduct. Its parameters and its non-terminals are both plain `mkVar` bound variables in cvc5, which
 makes them trivial to swap, so **`NT` is its own type**. It converts to a term (a non-terminal
@@ -828,11 +960,12 @@ accepts it — verified in C++ for interpolation and for `synthFun`, and pinned 
 forbid something that works. (lean-cvc5's own test of the rejection uses two term managers, which is
 easy to misread as two solvers.)
 
-`Untyped.Grammar` and `Typed.Grammar σ` are structures declared in `{Untyped,Typed}/Solver.lean`,
-since the interpolant and abduct queries there take one. The builders and `mkGrammar` live in
-`{Untyped,Typed}/Theory/Grammar.lean`, under `Grammar`, and that module imports the solver rather
-than the reverse. The sort-erased structure holds the `cvc5.Grammar` itself; there is no
-layer-neutral grammar type.
+`Untyped.Grammar` and `Typed.Grammar σ` are structures declared in
+`{Untyped,Typed}/Core/Solver.lean`, since the interpolant and abduct queries there take one. The
+builders and `mkGrammar` live in `{Untyped,Typed}/Grammar.lean`, under `Grammar`, and that module
+imports the solver rather than the reverse. It sits at the layer's root, not under `Theory/`: a
+grammar is not a theory, and neither is synthesis, so `Synth` sits beside it. The sort-erased
+structure holds the `cvc5.Grammar` itself; there is no layer-neutral grammar type.
 
 **Both layers' grammars carry their parameters.** The sort-erased `Grammar` is a structure with a
 public `boundVars`, because `synthFun` must be declared over the *very* variables the grammar was
@@ -843,6 +976,14 @@ the start symbol's sort, which is the shape `getInterpolant`/`getAbduct` want �
 (Grammar Bool)`. It is a `structure` carrying the raw grammar plus the parameters and the start
 sort, deliberately unlike the zero-cost `Term`/`BVar` wrappers: holding the parameters is what lets
 `synthFun` take nothing but the grammar, so the two cannot disagree.
+
+**Going up is a runtime check, as for terms.** The sort-erased `Grammar` also records `startSrt`,
+the start symbol's sort, because cvc5 offers no way to read a grammar's non-terminals back; with it,
+`Grammar.signatureSrt` arrows the parameters' sorts onto the start sort (flattened, as a curried
+arrow is), and `Untyped.Grammar.typeCheckAs σ` compares that with `Srt.of σ`.
+`Untyped.NT.typeCheckAs α` is the same for a non-terminal, so a grammar built sort-erased can be
+extended through the typed `addRule`. Both are declared in `Typed/Grammar.lean`, the typed
+constructors being private there.
 
 Both layers take the start symbol as its own argument — `mkGrammar boundVars start others` — rather
 than as the head of one array. cvc5 treats the *first* non-terminal as the start symbol and then
@@ -874,7 +1015,7 @@ one line per non-terminal — the first
 is the start symbol — with `|`-separated alternatives that are ordinary `smtTerm`s. `?const` and
 `?var` are `addAnyConstant`/`addAnyVariable`; cvc5 prints `?var` as the parameters it inlines.
 
-- **Syntax is declared once**, in `Untyped/Theory/Grammar.lean`, as `grammarU!`/`grammarT!` over an
+- **Syntax is declared once**, in `Untyped/Grammar.lean`, as `grammarU!`/`grammarT!` over an
   `smtGrammarBody` category; each layer adds a `scoped` `smt.grammar!` alias, as `smt!` does. The
   body is a **category, not a `syntax foo := …` abbreviation**: such an abbreviation is unresolvable
   from the rules using it ("unknown parser declaration/category/alias").
@@ -917,7 +1058,8 @@ rule's alternatives either way).
 
 **An identifier in typed `smt!` is converted by its type, not by coercion.** The core identifier
 leaf expands to `smtIdent% <layer> x`, an elaborator (`Ext.elabSmtIdent`) that elaborates `x` and,
-if its type is headed by `Cvc.Typed.NT` or `Cvc.Typed.BVar`, applies that type's `toTerm` itself.
+if its type is headed by `Cvc.Typed.NT` or `Cvc.Typed.BVar`, applies that type's `toTerm` itself
+(and `get` for a `Cvc.Typed.Symbols.At`, a symbol at a step).
 Left to the `NT α → Term α` coercion, `(← smt! n * m)` did not elaborate: the coercion's target was
 `Term ?α`, and instance resolution does not assign a metavariable outside an `outParam` — `CoeDep`
 fails identically. An `outParam` conversion class would work but would put the class in every sort
@@ -1220,8 +1362,8 @@ resolution produces it, so there is no numeral for `Fin`'s modular `OfNat` to re
 indices' trivial ones: a `Set (Record …)` keyed by a constant order would collapse every record to
 one. Each is lifted field by field through its own class — `OrdFields`, `DecidableEqFields`,
 `HashableFields`, `ToStringFields` — deliberately separate so that a record demands of its fields
-only what is asked of the record. A `Real` field costs nothing until someone wants the record
-ordered, `Ord Rat` not existing.
+only what is asked of the record. A field whose type has no order, a function's for instance,
+costs nothing until someone wants the record ordered.
 
 ### Terms
 
@@ -1275,10 +1417,15 @@ literal is expanded, since it would otherwise silently overwrite.
 **Projection is two mechanisms, and has to be.** `r.a` reaches the expander as one identifier token,
 so whether it names something or reads a field off something is a question about scope — which a
 macro cannot ask. That leaf is a term *elaborator* (`smtProjU%`/`smtProjT%`), resolving in Lean's
-order: a local head first, then the longest prefix that resolves, and what is left over are fields.
-Everything else in the DSL stays a macro. A head that is *not* an identifier (`(f x).a`, `![e].a`,
-`{…}.a`) cannot be fused by the lexer and so is an ordinary grammar rule; `smt! r .a`, with a space,
-is neither and does not parse.
+order: a local head first, then the longest prefix that resolves. What is left over is read **by
+type**, as Lean's dot notation does: while the value is not a term (`isSmtTermType`: a layer's
+`Term`, `BVar` or `NT`), the next component is a Lean projection, and from the first term on the
+rest are record fields. So `syms.steps` on a symbol structure is the Lean field, and `h.r.a`
+projects `r` in Lean then reads record field `a`; splitting by name alone sent `vars.x` to
+`recordGet`. A value whose type is unknown is read as a term, as before. Everything else in the DSL
+stays a macro. A head that is *not* an identifier (`(f x).a`, `![e].a`, `{…}.a`) cannot be fused by
+the lexer and so is an ordinary grammar rule; `smt! r .a`, with a space, is neither and does not
+parse.
 
 Two things the elaborator has to get right, both found by the unused-variable linter: an identifier
 with **no** fields is passed through *unchanged*, since a rebuilt identifier is not a reference the
@@ -1405,7 +1552,8 @@ below for why the product index cannot do any of this.
 
 The three index types carry no data, and their `DecidableEq`/`Ord`/`Hashable` are **written out
 trivially rather than derived**: `deriving` constrains the phantom parameters even though nothing
-uses them, which would demand `Ord β`, and `Ord Rat` does not exist. They exist only so a container
+uses them, which would demand `Ord β`, which not every component type has — a function's, for
+instance. They exist only so a container
 of them can be spelled — `relGroup` answers `Set (Rel α β)`.
 
 **All fifteen kinds are wrapped in both layers.** Sort-erased they are hand-written, for the reason
@@ -1508,8 +1656,14 @@ domain, while a function in *domain* position stays nested and is genuinely high
 the index is an ordinary arrow, a `Solver.defineFun` result — whose index `BVars.signatureTo` builds
 as arrows — applies directly, with no re-typing.
 
-`Cvc/{Untyped,Typed}/BVar.lean` hold `BVar.lambda`, `BVars.lambda` — typed, answering
+`Cvc/{Untyped,Typed}/Core/BVar.lean` hold `BVar.lambda`, `BVars.lambda` — typed, answering
 `Term (bvs.signatureTo β)` — and `Term.lambda`/`lambda1`.
+
+**`BVar` is in `Core` because every view needs it.** A term view's aggregate has a `bvar` leaf
+whatever theories are imported, so `def.term_view` over `Core` alone has to find `BVar` and
+`Term.asBVar`. It depends on `Core.Value` and not on `Core.Bool`: `Bool` is a view-generation site
+importing `Core.View`, which imports `BVar`, so the other way round is a cycle. `Solver` publicly
+imports `Core.Bool` itself, which it used to get through `BVar`, and which `Symbols` relies on.
 
 **A signature is shown in the form it computes to**, by a delaborator beside `signatureTo`. Without
 it a `Grammar` or a synthesized function displays as its `BVars.signatureTo` application, where
@@ -1523,8 +1677,9 @@ and the reduction is shown only when it has **no metavariables** left in it, bec
 mid-elaboration — a hover inside a `do` block, before the pushed variables' types are solved —
 `?m → ?m → Int` says less than the application it came from, that one at least naming the
 variables. `instantiateMVars` runs first, so an *assigned* metavariable resolves rather than
-suppressing the reduction. The three reducible cases are pinned in `Cvc/Tests/Typed/BVar.lean`; the
-metavariable case only arises mid-elaboration and so cannot be pinned by a build.
+suppressing the reduction. The three reducible cases are pinned in
+`Cvc/Tests/Typed/Core/BVar.lean`; the metavariable case only arises mid-elaboration and so cannot
+be pinned by a build.
 
 **`BVars` collects in reverse**:
 `BVars.push acc (BVars.push t [])` is the lambda `t → acc → _`, which is the order `signatureTo`
@@ -1548,8 +1703,10 @@ computes is the sort cvc5 gives. Two `CoeFun` instances — on `Term (α → β)
 β))` — let `f a b` be written directly, the second being what makes a chain need no parentheses.
 
 Note `setMap` needs `Ord` on the codomain as well as the element, since the result set is keyed by
-it — mapping a set into `Rat`, which has no `Ord`, is therefore not expressible. Folds have no such
-constraint: their accumulator never keys a container.
+it — mapping a set into a function type, which has no `Ord`, is therefore not expressible. Folds
+have no such constraint: their accumulator never keys a container. `Rat` has an `Ord` because
+`Srt.lean` declares one, core providing none; it is at low priority so that Mathlib's wins where
+both are present.
 
 Nested containers work because [Cvc/Types/](Cvc/Types/) provides `Ord` instances. That is what makes
 `bagPartition : (α → α → Bool) → Bag α → Bag (Bag α)` expressible: `Shape.ordVars` only constrains
@@ -1558,35 +1715,69 @@ for the result's outer layer.
 
 ## Symbols
 
-`Cvc/{Untyped,Typed}/Symbols.lean`, **both layers**. A user record is written once as
+`Cvc/{Untyped,Typed}/Core/Symbols.lean`, **both layers**. A user record is written once as
 `MySymbols (W : Symbols.Wrap)`, and `Symbols.Sig` instantiates the same record at identifiers
 (`fun _α => String`), at terms (`𝕂 Term` sort-erased, `Typed.Term ·` typed) and at values
 (`fun α => α`), with `Wrap` carrying the `ToTyp`/`TermToValue` constraints, over a `Symbols` class
-supplying `mapM`.
+supplying `mapM` and `foldM`.
+
+**`foldM` is a class field, beside `mapM`**, visiting the symbols in field order with a state, in
+any monad. `structure.symbols` defines it directly, as a chain of binds over the fields
+(`Ext.foldChain`); the field's default derives it from `mapM` through `StateT`, so a hand-written
+instance need not define it. `Idents.foldM`, `Terms.foldM` and `Values.foldM` reach it under dot
+notation — typed, `Terms.foldM` hands each symbol over at its own index, `Term α`. Those three pass
+the wrap explicitly and eta-expand `f`, binding its instances: left to inference, the wrap stays a
+metavariable and `TermToValue ?α` is stuck. Sort-erased, `foldM` takes `[Ω]` exactly as `mapM`
+does, so folding identifiers or values there needs a scope; typed, neither takes one.
 
 **`Ω` is taken only where a term is actually mentioned**, and that is what makes the API usable
 from outside a scope. `Wrap` takes none, so `Sig.Idents` and `Sig.Values` take none either — only
-`Sig.Terms [Ω]` does, along with `mapM`, `declare`/`declareIn`, `getValues` and `findCex`. So a
-caller can name a symbol structure's identifiers and its *values* outside `Env.run` and only enter
-a scope to do the solving, which is exactly the shape of the worked examples:
+`Sig.Terms [Ω]` does, along with the constraint aliases, `mapM`, `declare`/`declareIn`,
+`getValues` and `findCex`. So a caller can name a symbol structure's identifiers and its *values*
+outside `Env.run` and only enter a scope to do the solving, which is exactly the shape of the
+worked examples:
 
 ```lean
-def run [S : Symbols Syms] (symbols : S.Idents) (constraints : [Ω] → Array (String × S.Fun))
+def run [S : Symbols Syms] (symbols : Syms.Idents) (constraints : [Ω] → Array (String × Syms.Fun))
 : BaseIO (Result S)
 ```
 
-**A constraint is a function into `Env`.** `Sig.Fun` is `[Ω] → sig.Terms → Env Term` sort-erased
-and `[Ω] → sig.Terms → Env (Term α)` typed, with `Sig.Pred := [Ω] → sig.Fun Bool` typed — so a
-constraint is written against the symbols and *built* once a scope exists.
+**A constraint is a function into `Env`, at one scope.** `Sig.Fun [Ω]` is `sig.Terms → Env Term`
+sort-erased and `sig.Terms → Env (Term α)` typed, with `Sig.Pred := sig.Fun Bool` typed. The scope
+is a *binder* of the alias, not part of the type, so the aliases are in `Type` and a `Sys` holding
+them can be returned through `Env`; code written once for every scope says so at its own boundary,
+as `run` does with `[Ω] → Array …`. A top-level constraint therefore needs `variable [Ω]`.
 
-Both `Sig.X` and the class-level `Symbols.X` spellings exist: `S.Idents` where `S : Symbols Syms`
-is the same as `Syms.Idents`, which is what lets a signature quantify over the instance rather
-than the signature.
+**The aliases are spelled on the signature, never on the instance.** `Symbols` `export`s the `Sig`
+aliases, so `Symbols.Idents` is `Symbols.Sig.Idents` and takes the *signature*: `Syms.Idents`
+works, and `S.Idents` with `S : Symbols Syms` does not — dot notation finds no `Symbols` argument
+to put `S` in. A signature quantifying over the instance writes `[S : Symbols Syms]` and
+`Syms.Idents`, as `run` does.
 
 **A symbol structure's whole obligation is the `Symbols` instance.** Everything else is generic
 over the `Sig` and needs no per-structure definition: `Idents.declare`/`declareIn`,
 `Terms.getValues` (in `EnvSat`) and `Terms.findCex`, which is `checkSat?` with `getValues` in its
 sat branch.
+
+### Symbols at a step
+
+What used to be a separate state-variable framework is part of `Symbols`. `Symbols.At k W α` wraps
+a field read at step `k`, `get` unwraps it, and the step-indexed instantiations are `TermsAt k`,
+`ValuesAt k` and `TermValuesAt k`. `Idents.declareAt`/`declareAtIn` declare a step's symbols, and
+the constraint aliases come in step forms too: `FunAt k`, `Fun2At k k'` (`k'` defaulting to
+`k + 1`) and their primed forms quantifying over the steps, plus typed `PredAt`/`RelAt`.
+`Cvc/{Untyped,Typed}/Extra/Sys.lean` builds transition systems and bounded model checking on top,
+with `Sys.Trace` for a counterexample.
+
+- **In `smt!`, a state symbol needs no `get`.** Sort-erased its `CoeDep` to the term fires, the
+  target being the index-free `Term`. Typed it would target `Term ?α` and stay stuck in `x + y`
+  over two symbols, so `Ext.typedToTerm?` unwraps a `Symbols.At` by its type, as it does an `NT`
+  or a `BVar`. Outside `smt!`, write `.get`: `values.count.get`.
+- **A step's symbols are named for it**, `count__@__k`, in both layers — the typed `declareAt`
+  names them through the sort-erased `Sig.mkSymbolIdentAt` rather than restating the convention.
+  That is what lets a model or an error say which step a variable belongs to; relying on
+  `declareFun`'s `fresh := true` alone would keep the terms distinct while printing every step
+  under the same name.
 
 ### `structure.symbols`
 
@@ -1601,10 +1792,18 @@ structure.symbols MySymbols where
 ```
 
 The user writes plain Lean types and never mentions the `Wrap`; what is emitted is the structure
-the class wants — `(W : Symbols.Wrap)` added, every field's type wrapped in it — plus the
-`Idents`/`Values`/`Fun` aliases and `Terms [Ω]`, `Pred` in the typed layer, an `idents` **value**
-naming each symbol after its field, and the instance built on it. Doc comments, on the structure
-and on each field, are carried through.
+the class wants — `(W : Symbols.Wrap)` added, every field's type wrapped in it — an `idents`
+**value** naming each symbol after its field, the instance built on it, and one alias per
+`Symbols.Sig` type. Doc comments, on the structure and on each field, are carried through.
+
+**The aliases are a list, per layer.** `Ext.symbolsSharedAliases` holds the ones both layers have
+(`Idents`, `Values`, `ValuesAt`, `Terms`, `TermsAt`, `BVars`, `TermValues`, `TermValuesAt`), and
+each layer passes its own on top — `Fun`, `FunAt`, `Fun2At` and their primed forms sort-erased, and
+typed `Pred`, `PredAt`, `RelAt` and theirs besides. Each entry says whether the alias takes the
+scope, and is emitted as `abbrev MySymbols.X [Ω]? := @Symbols.Sig.X _? MySymbols`. The `@` is
+load-bearing: plain application would fill `Fun2At`'s optional `k'` with its default inside the
+alias, and `MySymbols.Fun2At 0 5` could no longer be written. Adding a `Sig` type means adding its
+name to one list. `Tests/SymbolsAliases.lean` pins every alias's signature, with no `Ω` in scope.
 
 `Cvc/Gen/Symbols.lean` holds what both layers share; each layer declares its own `scoped` spelling,
 so `open Cvc.Untyped` selects the sort-erased one exactly as it selects `smt!`.
@@ -1624,69 +1823,19 @@ Things to know before touching it:
   `declModifiers`' first slot is a null node holding the doc comment, empty when there is none.
 - **A field is rebuilt from its own node**, with only its type replaced, so the writer's doc
   comment, name and source position survive untouched.
-- **Which aliases take `[Ω]` is per alias**, not per structure: `Terms` does, `Idents` and `Values`
-  do not, which is the whole point of the split above.
-- What it refuses: a field named as something generated beside the structure (`Idents`, `Terms`,
-  `declare`, …), a field with parameters or without a type, and `extends`, which the grammar has
-  no slot for.
+- What it refuses: a field named as something generated beside the structure — any of that layer's
+  aliases, `idents`, `mapM`, `foldM`, `declare`, … (so `PredAt` is a legal field sort-erased and not
+  typed) — a field with parameters or without a type, and `extends`, which the grammar has no slot
+  for.
 - What it cannot express, and what the hand-written path is still for: a field that is a
   *collection* of symbols (`Array (W Bool)`), and an `InitData` other than the default `Unit` —
   both shown by the second example in each file.
 
 Worked examples live with the tests rather than in the module: `Cvc/Tests/{Untyped,Typed}/`
-`Symbols.lean` cover both paths, the generated one and the hand-written one, and the module
-docstring points at them. Two imports are worth knowing about when editing those modules —
-`import all Cvc.Untyped.Solver` is load-bearing sort-erased, because `Terms.getValues` runs an
-`Env` action inside an `EnvSat` block and that lift is private to `Untyped/Solver.lean`; the typed
-module needs no such thing, and neither layer needs `Theory.Arith`.
-
-## State variables
-
-`Cvc/{Untyped,Typed}/Extra/SVars.lean`. A *state variable* is a symbol read at a step:
-`Symbol.At k W α` wraps a field, `SVars S` is `Symbols S`, and the specialisations are `TermsAt k`,
-`ValueTermsAt k` and `ValuesAt k` rather than `Terms`/`Values`. `Idents.declareAt`/`declareAtIn`
-declare a step's symbols, and `Cvc/{Untyped,Typed}/Extra/Sys.lean` builds transition systems and
-bounded model checking on top, with `Sys.Trace` for a counterexample.
-
-`structure.stateVars` is `structure.symbols` for these, and differs in exactly one place, forced by
-the wrapper:
-
-```lean
-structure.stateVars Counter where
-  /-- Whether it is counting. -/
-  counting : Bool
-  count : Int
-```
-
-A field is **stored** under its `raw` name — `rawCount : W Int` — and beside it comes a projection
-under the name the writer used, which takes the `At` off:
-
-```lean
-@Counter.count : {W : Symbols.Wrap} → {k : Nat} → Counter (Symbol.At k W) → W Int
-```
-
-so a state reads `state.count`, never `state.rawCount.get`.
-
-**One projection serves every instantiation**, being generic in the wrap: at `TermsAt` it answers a
-term, at `ValuesAt` a Lean value. Per-alias projections — `TermsAt.count`, `ValuesAt.count` — look
-natural and do **not** work, for a reason worth keeping: dot notation resolves against the head
-constant of the value's type *after unfolding*, and everything that hands a state over (`Sys.init`,
-`Sys.next`, a candidate) types it as `ι.TermsAt k`, which unfolds to `Counter (Symbol.At k …)`.
-Lean therefore looks in `Counter` and never in `Counter.TermsAt`, so a per-alias projection is
-unreachable exactly where it would be used.
-
-The same rule shapes the generated `Idents`: it is stated as `SVars.Idents (S := Counter)` rather
-than `Symbols.Sig.Idents Counter`, because `ids.declareAt k` is found only if `SVars.Idents` is on
-the unfolding chain. That is why the instance is emitted *before* the alias, with its identifiers
-inlined — the alias needs the instance, and the `idents` value needs the alias.
-
-**A step's symbols are named for it**, `count__@__k`, in both layers — the typed `declareAt` names
-them through the sort-erased `identAt` rather than restating the convention. That is what lets a
-model or an error say which step a variable belongs to; relying on `declareFun`'s `fresh := true`
-alone would keep the terms distinct while printing every step under the same name.
-
-**Absent**: nothing on the symbols side now; what these APIs still lack is depth rather than
-coverage — they are deliberately simple.
+`Symbols.lean` cover both paths, the generated one and the hand-written one, plus symbols at a
+step, and the module docstring points at them. `import all Cvc.Untyped.Core.Solver` is
+load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` action inside an
+`EnvSat` block and that lift is private to the solver module; the typed module needs no such thing.
 
 ## Code-generation macros (read these before editing wrappers)
 
@@ -1699,12 +1848,14 @@ coverage — they are deliberately simple.
 | `gen_untyped%` / `gen_typed%` (`from <Spec module>`) | [Cvc/Gen/Term.lean](Cvc/Gen/Term.lean) | emit a theory's constructors into the current layer, plus the DSL grammar (untyped only) |
 | `gen_untyped_nullable%` / `gen_typed_nullable%` | [Cvc/Gen/Term.lean](Cvc/Gen/Term.lean) | emit the `<id>?` lifts of a theory's liftable entries |
 | `env_gen% EnvXT / EnvX` | [Cvc/Gen/SolverMode.lean](Cvc/Gen/SolverMode.lean) | monad instances + a module-private lift for a mode monad |
-| `def%` | [Cvc/Srt.lean](Cvc/Srt.lean), [Cvc/Typed/Solver.lean](Cvc/Typed/Solver.lean) | define a wrapper carrying `@[inherit_doc]`; on the typed side, re-type a sort-erased function |
-| `structure.symbols Id where …` | [Cvc/Gen/Symbols.lean](Cvc/Gen/Symbols.lean) | a symbol structure, its `Idents`/`Terms`/`Values` aliases and its `Symbols` instance |
-| `structure.stateVars Id where …` | [Cvc/Gen/Symbols.lean](Cvc/Gen/Symbols.lean) | the same for state variables: fields stored as `raw…`, read through generated `At`-unwrapping projections |
-| `smt.grammar! s (x : T) where nt : T := alt \| …` | [Cvc/Untyped/Theory/Grammar.lean](Cvc/Untyped/Theory/Grammar.lean) | a grammar as one BNF-style block; `scoped` per layer, expanding to `grammarU!`/`grammarT!` |
-| `smt.mkGrammar! …` / `smt.letGrammar! g ← …` | [Cvc/Untyped/Theory/Grammar.lean](Cvc/Untyped/Theory/Grammar.lean) | the same block, also answering (resp. binding, as a `do` element) its parameters and non-terminals |
+| `def%` | [Cvc/Srt.lean](Cvc/Srt.lean), [Cvc/Typed/Core/Solver.lean](Cvc/Typed/Core/Solver.lean) | define a wrapper carrying `@[inherit_doc]`; on the typed side, re-type a sort-erased function |
+| `structure.symbols Id where …` | [Cvc/Gen/Symbols.lean](Cvc/Gen/Symbols.lean) | a symbol structure, one alias per `Symbols.Sig` type (the list differs per layer) and its `Symbols` instance |
+| `smt.grammar! s (x : T) where nt : T := alt \| …` | [Cvc/Untyped/Grammar.lean](Cvc/Untyped/Grammar.lean) | a grammar as one BNF-style block; `scoped` per layer, expanding to `grammarU!`/`grammarT!` |
+| `smt.mkGrammar! …` / `smt.letGrammar! g ← …` | [Cvc/Untyped/Grammar.lean](Cvc/Untyped/Grammar.lean) | the same block, also answering (resp. binding, as a `do` element) its parameters and non-terminals |
 | `regex! "a" ['0'-'9']+ \| …` | [Cvc/Untyped/Theory/Regex.lean](Cvc/Untyped/Theory/Regex.lean) | a regex in the usual notation; `scoped` per layer, expanding to `regexU!`/`regexT!` |
+| `gen_untyped_view%` / `gen_typed_view%` (`from <Spec module>`) | [Cvc/Gen/View.lean](Cvc/Gen/View.lean), [Cvc/Gen/TypedView.lean](Cvc/Gen/TypedView.lean) | emit and register a theory's view |
+| `register_untyped_view%` / `register_typed_view% <View> [ctor KIND, …]` | same | register a hand-written view |
+| `def.term_view V` | same; `scoped` per layer over `def.untyped_term_view` / `def.typed_term_view` | the aggregate view of every imported theory, its abbreviations, `V.of` and its `TermView`/`ViewFamily` instance |
 | `srtOf% e` | [Cvc/Srt.lean](Cvc/Srt.lean) | a term elaborator: `Srt.of e` for a Lean type, `pure e` for a `Srt` — how the DSL accepts either |
 | `smtExpand% <layer> <smtTerm>` | [Cvc/Ext.lean](Cvc/Ext.lean) | the DSL's dispatch: a `macro_rules` table each theory adds its own forms to, and what `smt!`'s recursion goes through |
 
@@ -1779,7 +1930,7 @@ the `Except` form, so it is `none` on error, never `some null`. Two sources rema
 - the **find-synth** pair, `findSynth`/`findSynthNext`, which cvc5 documents as answering the null
   term when enumeration is done, and still answers a bare `Term`. The interpolant and abduct
   functions and `qeDisjunct` answer `Option Term` instead, `none` for the null term (`nonNull?` in
-  `Untyped/Solver.lean`); `findSynth*` should follow. Plain `qe` stays a `Term`, cvc5
+  `Untyped/Core/Solver.lean`); `findSynth*` should follow. Plain `qe` stays a `Term`, cvc5
   documenting no null answer for it.
 - **TODO: `Op` leaks a null through `Inhabited`.** `Defs.lean` does `export cvc5 (Kind SortKind
   Op)`, so `Op` keeps cvc5's `instance : Inhabited Op := ⟨null ()⟩` and `(default : Op)` is null.
@@ -1838,18 +1989,25 @@ namespace under test rather than its own path.
 - `Tests/{Untyped,Typed}/Theory/Quant.lean` — both spellings building the same formula, solving
   over quantified formulas, `qe`/`qeDisjunct` on them, and `smt! ∀`/`∃`; typed, the compile-time
   rejections (no variable, a non-formula body, a variable at the wrong sort).
-- `Tests/{Untyped,Typed}/Theory/{Datatype,Grammar,Synth,Sep,Record}.lean` — the theories that are
+- `Tests/{Untyped,Typed}/Grammar.lean` — grammars and the three `smt.grammar!` forms.
+- `Tests/{Untyped,Typed}/Synth.lean` — synthesis, `checkSynth`'s branches and `findSynth`.
+- `Tests/{Untyped,Typed}/Theory/{Datatype,Sep,Record}.lean` — the theories that are
   not term constructors alone. The `Record` ones cover the sort's reflection, every rejection's
   message, the `Fields` spine, and (typed) the Lean-value conversions.
 - `Tests/{Untyped,Typed}/Value.lean` — the value round trip: every scalar instance, the containers
   (through a model where a built term is not a value), nesting, a size mismatch rejected rather
   than truncated, reading a model, and the introspection accessors.
-- `Tests/{Untyped,Typed}/BVar.lean` — bound variables and the definition functions that consume
+- `Tests/{Untyped,Typed}/Core/BVar.lean` — bound variables and the definition functions that consume
   them: `mkBVar` freshness, that `BVar` stays distinct from `Term` with `toTerm` as the only way
   across, `Solver.declareFun` splitting a function index into domain and codomain, and
   `Solver.defineFun` over a `BVars` list at zero, one, two and three parameters — the two- and
   three-parameter cases with non-commutative bodies, so a reversed argument order would show.
 - `Tests/{Untyped,Typed}/{Solver,Proof,Subst}.lean` — the driving surface.
+- `Tests/{Untyped,Typed}/View.lean` — the aggregate's signatures, taking terms apart, kind
+  ownership; typed, the record/tuple/nullable helpers, wrong-sort matches as errors, containers
+  denoting their own types. `Tests/View.lean` — the two `View` modules alone, with no theory.
+- `Tests/{Untyped,Typed}/Traverse.lean` — folds, walks (bottom-up, top-down with revisit, `stop`,
+  a refused replacement) and the zipper by hand; typed, a wrong-sort replacement as an error.
 
 ## What is left
 

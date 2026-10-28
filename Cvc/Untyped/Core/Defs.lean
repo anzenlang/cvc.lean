@@ -88,6 +88,40 @@ def substitute (t : Term) (terms : Array (Term × Term)) : Env Term := do
   let ⟨src, tgt, valid⟩ := res
   t.substitute' src tgt valid
 
+/-! ## Building from a kind
+
+The escape hatch below every dedicated constructor. `mkOfKind` takes a raw `Kind` and checks
+nothing itself: arity, sorts and indices are left to cvc5, which rejects most mistakes at run time
+but not all of them, so a dedicated constructor — `Term.add`, `Term.bvExtract`, … — is the one to
+reach for wherever there is one. `replaceKids` is the safe half: it reuses an existing term's
+operator, indices included, so only the kids can be wrong.
+-/
+
+/-- Applies the operator of kind `kind` to `kids`, checked by cvc5 alone.
+
+An indexed operator cannot be built this way, its indices having nowhere to go; `replaceKids` can
+rebuild one from an existing term.
+-/
+def mkOfKind (kind : Kind) (kids : Terms) : Env Term :=
+  runUnsafe fun tm => tm.mkTerm kind kids
+
+/-- `t`'s operator applied to `kids` instead of its own kids: the same kind, and for an indexed
+operator the same indices.
+
+A term with no kids — a value, a symbol, a bound variable — is its own rebuild, so it is answered
+as is when `kids` is empty too. cvc5 checks the kids' number and sorts.
+-/
+def replaceKids (t : Term) (kids : Terms) : Env Term := do
+  if t.toUnsafe.getNumChildren == 0 && kids.isEmpty then return t
+  runUnsafe fun tm => do
+    match cvc5.Term.getOp? t.toUnsafe with
+    | some op => if op.isIndexed then tm.mkTermOfOp op kids else byKind tm
+    | none => byKind tm
+where
+  byKind (tm : cvc5.TermManager) : cvc5.Env cvc5.Term := do
+    let some kind := cvc5.Term.getKind? t.toUnsafe | throw (.error s!"`{t}` has no kind")
+    tm.mkTerm kind kids
+
 end Term
 
 namespace Terms

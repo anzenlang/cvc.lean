@@ -9,11 +9,11 @@ module
 
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 
@@ -93,6 +93,13 @@ nested : #[#[1, 2], #[3]]
   println! "empty  : {← roundTrip (Array Int) #[]}"
   println! "Set    : {← roundTrip (Cvc.Set Int) (Cvc.Set.ofArray #[1, 2, 3])}"
   println! "nested : {← roundTrip (Array (Array Int)) #[#[1, 2], #[3]]}"
+
+/-! A real-valued set: `Set` wants its elements ordered, which `Rat` is through the library's own
+`Ord` instance, core providing none. -/
+
+/-- info: Set Rat : { -1/3, 1/2, 3 } -/
+#guard_msgs in #eval Env.runIO do
+  println! "Set Rat : {← roundTrip (Cvc.Set Rat) (Cvc.Set.ofArray #[1/2, 3, -1/3])}"
 
 /-- info:
 Bag      : { 1 ↦ 2, 3 ↦ 1 }

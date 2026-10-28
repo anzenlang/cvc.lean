@@ -152,8 +152,8 @@ end Record
 A record carries its fields' values, so unlike the relation indices these comparisons are *not*
 trivial — a `Set (Record …)` keyed by a constant order would collapse every record to one. Each is
 lifted field by field through its own class, so that a record demands of its fields only what is
-actually asked of the record: a `Real` field costs nothing until someone wants the record ordered,
-`Ord Rat` not existing.
+actually asked of the record: a field whose type has no order, a function's for instance, costs
+nothing until someone wants the record ordered.
 -/
 
 /-- Lifts `Ord` over a record's fields, lexicographically. -/

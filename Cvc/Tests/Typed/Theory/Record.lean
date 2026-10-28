@@ -10,12 +10,12 @@ module
 import Cvc.Typed.Theory.Record
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Record
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 
@@ -372,6 +372,40 @@ example : Env (Term Int) := smt! r.a
 example : Env (Term (Record [("a", Int), ("b", Bool)])) := smt! {r with a := 9}
 
 end signatures
+
+/-! ### Through a Lean structure
+
+What is left after the head is read by type, as Lean's dot notation does: a component of a Lean
+value that is not a term — any structure holding terms, a symbol structure among them — is a Lean
+projection, and from the first term on the rest are record fields.
+-/
+
+/-- Terms held in a Lean structure, one of them a record. -/
+structure Holder [Ω] where
+  x : Term Int
+  r : Term (Record [("a", Int), ("b", Bool)])
+
+/-- info:
+lean field  : (+ x 1)
+then record : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+-/
+#guard_msgs in #eval Env.runIO do
+  let h : Holder := { x := ← Term.mkSymbolAs Int "x", r := ← smt! {a := 7, b := true} }
+  println! "lean field  : {← smt! h.x + 1}"
+  println! "then record : {← smt! h.r.a}"
+
+/-- A projection through a structure has the field's type. -/
+example [Ω] (h : Holder) : Env (Term Bool) := smt! h.r.b
+
+/-! A component that is neither a Lean field nor a record field gets Lean's error. -/
+
+/--
+error: Invalid field `zzz`: The environment does not contain `Cvc.Tests.Typed.Record.Holder.zzz`, so it is not possible to project the field `zzz` from an expression
+  h
+of type `Holder`
+-/
+#guard_msgs in
+example [Ω] (h : Holder) : Env (Term Int) := smt! h.zzz
 
 /-! A field that is not there does not compile, where sort-erased it is a runtime error. -/
 

@@ -7,15 +7,15 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.BVar
-public import Cvc.Typed.Core.Bool
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Typed.Core.Value
 
 -- for the delaborator below, which reduces a signature before showing it
 public meta import Lean.Meta.Basic
 public meta import Lean.PrettyPrinter.Delaborator.Basic
 
 import all Cvc.Basic.Env
-import all Cvc.Untyped.BVar
+import all Cvc.Untyped.Core.BVar
 -- `import all` and not a plain `import`: `BVar α` is `Term α` is `Untyped.Term`, and that chain is
 -- what lets a typed bound variable be built by the sort-erased constructor
 import all Cvc.Untyped.Core.Defs
@@ -29,6 +29,9 @@ namespace Cvc.Typed public section variable [Ω]
 
 /-- A bound variable. -/
 def BVar (α : Type) := Term α
+
+/-- A term as the bound variable it is. Unchecked: for a view, which has read the term's kind. -/
+def Term.asBVar (t : Term α) : BVar α := t
 
 namespace BVar
 

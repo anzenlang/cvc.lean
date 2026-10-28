@@ -12,6 +12,8 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 
 public import Cvc.Types.Array
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 public import Cvc.Untyped.Theory.Array
 public import Cvc.Typed.Core.Value
 public import Cvc.Gen.Term
@@ -27,6 +29,7 @@ open Cvc renaming Untyped.Term → T
 variable [Ω]
 
 gen_typed% from Cvc.Spec.Array
+gen_typed_view% from Cvc.Spec.Array
 
 
 

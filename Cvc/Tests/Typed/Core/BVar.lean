@@ -7,15 +7,15 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Typed.BVar
+import Cvc.Typed.Core.BVar
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
-public meta import Cvc.Typed.BVar
+public meta import Cvc.Typed.Core.BVar
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 
@@ -225,7 +225,7 @@ variable [Ω]
 /-- info: @Term.mkBVarAs : [inst : Ω] → (α : Type) → [ToTyp α] → String → Env (BVar α) -/
 #guard_msgs in #check @Cvc.Typed.Term.mkBVarAs
 
-/-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → Env (Term α) -/
+/-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → optParam Bool false → Env (Term α) -/
 #guard_msgs in #check @Cvc.Typed.Solver.declareFun
 
 /-- info: @Solver.defineFun : [inst : Ω] →

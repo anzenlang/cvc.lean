@@ -9,11 +9,11 @@ module
 
 import Cvc.Typed.Theory.Quant
 import Cvc.Typed.Theory.Arith
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Quant
 public meta import Cvc.Typed.Theory.Arith
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 

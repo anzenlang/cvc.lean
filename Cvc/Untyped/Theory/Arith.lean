@@ -12,6 +12,8 @@ import all Cvc.Untyped.Core.Defs
 -- `mkBool`/`mkInt` back the unit elements of the `N'` variants
 
 public import Cvc.Ext
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public meta import Cvc.Ext
 public import Cvc.Untyped.Core.Value
 public import Cvc.Gen.Term
@@ -25,6 +27,7 @@ namespace Cvc.Untyped.Term public section variable [Ω]
 open cvc5 renaming Term → T
 
 gen_untyped% from Cvc.Spec.Arith
+gen_untyped_view% from Cvc.Spec.Arith
 
 
 

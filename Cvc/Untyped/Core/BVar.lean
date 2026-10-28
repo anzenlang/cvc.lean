@@ -7,7 +7,7 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Core.Bool
+public import Cvc.Untyped.Core.Value
 
 import all Cvc.Basic.Env
 import all Cvc.Srt
@@ -21,9 +21,13 @@ namespace Cvc.Untyped public section variable [Ω]
 
 /-- A bound variable. -/
 def BVar := Term
+deriving BEq, Ord, Hashable, Inhabited
 
 /-- An array of bound variables. -/
 abbrev BVars := Array BVar
+
+/-- A term as the bound variable it is. Unchecked: for a view, which has read the term's kind. -/
+def Term.asBVar (t : Term) : BVar := t
 
 namespace BVar
 
@@ -46,6 +50,8 @@ def lambda (bv : BVar) (body : Term) : Env Term := runUnsafe fun tm => do
   tm.mkTerm .LAMBDA #[bvs, body]
 
 instance : Coe BVar Term := ⟨toTerm⟩
+
+instance : ToString BVar := ⟨toString ∘ toTerm⟩
 
 end BVar
 

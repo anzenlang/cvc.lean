@@ -78,4 +78,18 @@ def getNullableValue [TermToValue α] : Term (Option α) → Env (Option α) :=
 instance [ValueToTerm α] : ValueToTerm (Option α) := ⟨mkNullableValue⟩
 instance [TermToValue α] : TermToValue (Option α) := ⟨getNullableValue⟩
 
+/-- A nullable's case, if the term is a nullable literal: `some none` for `null`, `some (some x)`
+for `some x`.
+
+`none` unless the term is a construction, which its kind says. The two constructors are told apart
+by their arity, the first kid being the constructor.
+-/
+def nullableCases? (t : Term (Option α)) : Env (Option (Option (Term α))) := do
+  let raw := t.erase
+  unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
+  match raw.getKids.toList with
+  | [_] => return some none
+  | [_, x] => return some (some (x : Term α))
+  | _ => throwInternal s!"`{raw}`: not a nullable's constructor"
+
 end

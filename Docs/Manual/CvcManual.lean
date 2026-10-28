@@ -11,6 +11,7 @@ import CvcManual.Overview
 import CvcManual.Env
 import CvcManual.Sorts
 import CvcManual.Terms
+import CvcManual.Views
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
@@ -44,6 +45,8 @@ understand and use cvc.lean properly.
 {include 1 CvcManual.Sorts}
 
 {include 1 CvcManual.Terms}
+
+{include 1 CvcManual.Views}
 
 
 # Index

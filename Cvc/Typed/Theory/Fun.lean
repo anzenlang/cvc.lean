@@ -12,6 +12,8 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 
 public import Cvc.Untyped.Theory.Fun
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 public import Cvc.Typed.Core.Defs
 public import Cvc.Ext
 public import Cvc.Spec.Fun
@@ -44,6 +46,7 @@ open Cvc renaming Untyped.Term → T
 variable [Ω]
 
 gen_typed% from Cvc.Spec.Fun
+gen_typed_view% from Cvc.Spec.Fun
 
 
 
@@ -106,3 +109,62 @@ def apply2 (f : Term (α → β → γ)) (fst : Term α) (snd : Term β) : Env (
 def apply3 (f : Term (α → β → γ → δ)) (fst : Term α) (snd : Term β) (thd : Term γ)
 : Env (Term δ) :=
   applyN f (.cons fst (.cons snd (.last thd)))
+
+end
+
+end Cvc.Typed.Term
+
+
+
+/-! ## Viewing an application
+
+Hand-written, since application flattens and its arity is arbitrary: `Cvc.Spec.Fun` only specifies
+`applyHo`, whose view `View.Fun` is generated. The arguments' sorts are whatever the function's
+domain is, which the application's sort does not fix, so they are a list of `Typ`s from which the
+function's index is computed. Matching on the list refines both: `.apply [.int, .bool] f (.cons x
+(.last b))` gives `f : Term (Int → Bool → τ.Denote)`, `x : Term Int` and `b : Term Bool`.
+-/
+
+namespace Cvc.Typed public section variable [Ω]
+
+/-- An application's arguments, each at the denotation of its sort; never empty. -/
+inductive View.Apply.Args : List Typ → Type where
+  /-- The last argument. -/
+  | last (t : Term τ.Denote) : View.Apply.Args [τ]
+  /-- One more argument, in front of the others. -/
+  | cons (t : Term τ.Denote) (rest : View.Apply.Args τs) : View.Apply.Args (τ :: τs)
+
+/-- The same arguments as an application spine, so that a viewed application can be rebuilt. -/
+def View.Apply.Args.toArgs : View.Apply.Args doms → Term.Args (Typ.arrows doms β) β
+  | .last t => .last t
+  | .cons t rest => .cons t rest.toArgs
+
+/-- An uninterpreted function's application, of sort `τ`, taken apart one level. -/
+protected inductive View.Apply : Typ → Type where
+  /-- `f a₁ … aₙ`, fully applied. -/
+  | apply {τ : Typ} (doms : List Typ) (f : Term (Typ.arrows doms τ.Denote))
+    (args : View.Apply.Args doms) : View.Apply τ
+
+/-- Takes a term of sort `τ` apart one level, if it is an uninterpreted function's application whose
+arguments' sorts a `Typ` describes. -/
+def View.Apply.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Apply τ)) := do
+  let some (.apply f args) := Untyped.View.Apply.of? t.erase | return none
+  let some ⟨doms, args⟩ ← go args.val.toList | return none
+  return some (.apply doms (View.reindex f) args)
+where
+  /-- The arguments, with their sorts. -/
+  go : List Untyped.Term → Env (Option ((doms : List Typ) × View.Apply.Args doms))
+    | [] => return none
+    | [k] => do
+      let some σ ← View.typOf? k | return none
+      return some ⟨[σ], .last (View.reindex k)⟩
+    | k :: ks => do
+      let some σ ← View.typOf? k | return none
+      let some ⟨σs, rest⟩ ← go ks | return none
+      return some ⟨σ :: σs, .cons (View.reindex k) rest⟩
+
+register_typed_view% Cvc.Typed.View.Apply [apply APPLY_UF]
+
+end
+
+end Cvc.Typed

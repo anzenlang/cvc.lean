@@ -12,16 +12,16 @@ import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
-import all Cvc.Untyped.BVar
-import all Cvc.Typed.BVar
-import all Cvc.Untyped.Theory.Grammar
+import all Cvc.Untyped.Core.BVar
+import all Cvc.Typed.Core.BVar
+import all Cvc.Untyped.Grammar
 -- the grammar's fields are private to the solver module that declares the type
-import all Cvc.Typed.Solver
+import all Cvc.Typed.Core.Solver
 
-public import Cvc.Typed.BVar
-public import Cvc.Untyped.Theory.Grammar
-public import Cvc.Typed.Solver
-public meta import Cvc.Untyped.Theory.Grammar
+public import Cvc.Typed.Core.BVar
+public import Cvc.Untyped.Grammar
+public import Cvc.Typed.Core.Solver
+public meta import Cvc.Untyped.Grammar
 public meta import Cvc.Ext
 
 
@@ -95,6 +95,22 @@ def erase (nt : NT α) : Untyped.NT := nt.untyped
 
 end NT
 
+/-- Types a sort-erased non-terminal at `α`, checking its sort against `α`'s.
+
+The non-terminal counterpart of `Untyped.Term.typeCheckAs`, so that the non-terminals a sort-erased
+grammar was built with can be given rules through the typed `Grammar.addRule`.
+-/
+def _root_.Cvc.Untyped.NT.typeCheckAs (α : Type) [ToTyp α] (nt : Untyped.NT) : Env (NT α) := do
+  let srt ← nt.toTerm.getSort
+  let srt' ← Srt.of α
+  if srt != srt' then
+    throwUser s!"cannot type non-terminal `{nt}` as `{srt'}`, it has sort `{srt}`"
+  return ⟨nt⟩
+
+@[inherit_doc Untyped.NT.typeCheckAs]
+abbrev _root_.Cvc.Untyped.NT.typeCheck [ToTyp α] (nt : Untyped.NT) : Env (NT α) :=
+  nt.typeCheckAs α
+
 namespace NTs
 
 /-- Adds a non-terminal. -/
@@ -129,6 +145,26 @@ def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := []
   return ⟨untyped, boundVars.erase, startSrt⟩
 
 end Solver
+
+/-- Types a sort-erased grammar at signature `σ`, checking it against what the grammar generates.
+
+The grammar counterpart of `Untyped.Term.typeCheckAs`. `σ` is compared with the grammar's
+`Untyped.Grammar.signatureSrt`: its parameters' sorts arrowed onto its start symbol's, or the start
+symbol's sort alone when there are no parameters. Arrows flatten, so a one-parameter grammar whose
+start symbol is a function checks against the same `σ` as a grammar taking those arguments as
+parameters; that is harmless, the typed grammar keeping the parameters it was actually built with.
+-/
+def _root_.Cvc.Untyped.Grammar.typeCheckAs (σ : Type) [ToTyp σ] (g : Untyped.Grammar)
+: Env (Grammar σ) := do
+  let srt ← g.signatureSrt
+  let srt' ← Srt.of σ
+  if srt != srt' then
+    throwUser s!"cannot type the following grammar as `{srt'}`, it generates `{srt}`:\n{g}"
+  return ⟨g, g.boundVars, g.startSrt⟩
+
+@[inherit_doc Untyped.Grammar.typeCheckAs]
+abbrev _root_.Cvc.Untyped.Grammar.typeCheck [ToTyp σ] (g : Untyped.Grammar) : Env (Grammar σ) :=
+  g.typeCheckAs σ
 
 namespace Grammar variable (g : Grammar σ)
 

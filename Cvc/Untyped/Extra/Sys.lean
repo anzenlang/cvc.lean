@@ -7,20 +7,22 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.Extra.SVars
+public import Cvc.Untyped.Core.Symbols
 
 
 
 namespace Cvc.Untyped public section variable [Ω]
 
-namespace SVars
+namespace Symbols.Sig
 
-abbrev Candidates [sv : SVars S] := Array (String × sv.Fun)
+/-- An array of named predicates over `SVars`. -/
+abbrev Candidates [Symbols SVars] := Array (String × SVars.FunAt')
 
-end SVars
+end Symbols.Sig
 
 namespace Sys
 
+/-- A trace of types at decreasing depth. -/
 inductive Trace (α : Nat → Type) : (k : Nat) → Type
 | zero : α 0 → Trace α 0
 | cons : α (k + 1) → Trace α k → Trace α (k + 1)
@@ -43,76 +45,101 @@ end Trace
 
 end Sys
 
-namespace SVars variable [sv : SVars S]
+namespace Symbols variable [Symbols SVars]
 
-abbrev TermTrace := Sys.Trace (sv.TermsAt)
+namespace Sig
 
-abbrev Cex := Sys.Trace (sv.ValuesAt)
+/-- A trace of unrolled `Term`-symbols. -/
+abbrev TermTrace := Sys.Trace (SVars.TermsAt)
+/-- A trace of Lean-values for unrolled symbols. -/
+abbrev ValueTrace := Sys.Trace (SVars.ValuesAt)
+/-- A trace of `Term`-values for unrolled symbols. -/
+abbrev TermValueTrace := Sys.Trace (SVars.TermValuesAt)
 
-namespace Cex
-
-def extract {s : Solver} : sv.TermTrace k → s.EnvSat (sv.Cex k)
+/-- Extracts the Lean-values of a `TermTrace`. -/
+def ValueTrace.extract {s : Solver} : SVars.TermTrace k → s.EnvSat (SVars.ValueTrace k)
 | .zero terms => .zero <$> terms.getValues s
 | .cons terms tl => do
   let values ← terms.getValues s
   .cons values <$> extract tl
 
-end Cex
+@[inherit_doc ValueTrace.extract]
+def TermTrace.getValues := @ValueTrace.extract
+@[inherit_doc TermTrace.getValues]
+def TermTrace.getCex := @TermTrace.getValues
 
-namespace TermTrace
+/-- Extracts the `Term`-values of a `TermTrace` -/
+def TermValueTrace.extract {s : Solver} : SVars.TermTrace k → s.EnvSat (SVars.TermValueTrace k)
+| .zero terms => .zero <$> terms.getTermValues s
+| .cons terms tl => do
+  let values ← terms.getTermValues s
+  .cons values <$> extract tl
 
-def getCex := @Cex.extract
+@[inherit_doc TermValueTrace.extract]
+def TermTrace.getTermValues := @TermValueTrace.extract
+@[inherit_doc TermTrace.getTermValues]
+def TermTrace.getTermCex := @TermTrace.getTermValues
 
-end TermTrace
+end Sig
 
-end SVars
+export Sig (TermTrace ValueTrace TermValueTrace)
+
+end Symbols
 
 
 
-structure Sys (S : SVars.Sig) [sv : SVars S] where
-  idents : sv.Idents
-  init : sv.Fun
-  next : sv.Fun2
-  candidates : Array (String × sv.Fun)
+/-- A transition system over symbols `SV`. -/
+structure Sys (SVars : Symbols.Sig) [Symbols SVars] where
+  idents : SVars.Idents
+  init : SVars.FunAt'
+  next : SVars.Fun2At'
+  candidates : SVars.Candidates
 
-abbrev SVars.Sys := @Untyped.Sys
+@[inherit_doc Untyped.Sys]
+abbrev Symbols.Sys := @Untyped.Sys
+@[inherit_doc Untyped.Sys]
+abbrev Symbols.Sig.Sys := @Untyped.Sys
 
-namespace Sys variable [sv : SVars S] (sys : sv.Sys) (solver : Solver)
+namespace Sys variable [Symbols SVars] (sys : SVars.Sys) (solver : Solver)
 
+/-- Declares symbols and builds the term for the initial predicate at `k`. -/
 def initAt (solver : Solver) (k : Nat) : Env Term := do
-  let svs_k ← solver.declareSymbolsAt k sys.idents
-  sys.init svs_k
+  solver.declareSymbolsAt k sys.idents >>= sys.init
 
-def nextAt (curr : sv.TermsAt k) (next : sv.TermsAt k') : Env Term := do
+/-- Builds the term for the transition predicate between `k` and `k'`, **no symbol declaration**. -/
+def nextAt (curr : SVars.TermsAt k) (next : SVars.TermsAt k') : Env Term :=
   sys.next curr next
 
 
 
 /-- Bounded model checking of a system, unrolled `k` steps.
 
-Holds the system's parts *at this scope* rather than the `Sys` itself: a `Sys` is written once and
-is generic in the scope, every part taking `[Ω]`, which puts it in `Type 1`, while a `Bmc` lives in
-one scope — it holds a solver and terms — and has to be returned through `Env`, whose results are
-in `Type`. `mk` instantiates the parts at the scope it runs in.
+Holds what unrolling needs from the system — its identifiers, its transition relation and the
+candidates not falsified yet — beside the solver, the trace of the steps declared so far and the
+counterexamples found, each with the candidates it falsified.
 -/
-structure Bmc (S : SVars.Sig) [sv : SVars S] (k : Nat) where
+structure Bmc (SV : Symbols.Sig) [Symbols SV] (k : Nat) where
 private mk' ::
   /-- The system's state variables. -/
-  idents : sv.Idents
+  idents : SV.Idents
   /-- The transition relation, at this scope. -/
-  next : {k k' : Nat} → sv.TermsAt k → sv.TermsAt k' → Env Term
+  next : {k k' : Nat} → SV.TermsAt k → SV.TermsAt k' → Env Term
   /-- The candidate invariants not falsified yet, at this scope. -/
-  candidates : Array (String × ({k : Nat} → sv.TermsAt k → Env Term))
+  candidates : Array (String × ({k : Nat} → SV.TermsAt k → Env Term))
   solver : Solver
-  sVars : sv.TermTrace k
-  falsified : List ((k : Nat) × sv.Cex k × Array String)
+  sVars : SV.TermTrace k
+  falsified : List ((k : Nat) × SV.ValueTrace k × Array String)
   actlitCounter : Nat
 
-abbrev _root_.Cvc.Untyped.SVars.Bmc := @Cvc.Untyped.Sys.Bmc
+@[inherit_doc Cvc.Untyped.Sys.Bmc]
+abbrev _root_.Cvc.Untyped.Symbols.Bmc := @Cvc.Untyped.Sys.Bmc
+@[inherit_doc Cvc.Untyped.Sys.Bmc]
+abbrev _root_.Cvc.Untyped.Symbols.Sig.Bmc := @Cvc.Untyped.Sys.Bmc
 
-namespace Bmc variable [sv : SVars S] {k : Nat}
+namespace Bmc variable [Symbols S] {k : Nat}
 
-def mk (sys : sv.Sys) : Env (sv.Bmc S 0) := do
+/-- Constructor. -/
+def mk (sys : SVars.Sys) : Env (SVars.Bmc 0) := do
   let sVars0 ← sys.idents.declareAt 0
   let init0 ← sys.init sVars0
   let solver ← Solver.new
@@ -125,9 +152,9 @@ def mk (sys : sv.Sys) : Env (sv.Bmc S 0) := do
     solver, falsified := [], sVars := Trace.zero sVars0, actlitCounter := 0
   }
 
-def isDone (bmc : sv.Bmc S k) : Bool := bmc.candidates.isEmpty
+def isDone (bmc : SVars.Bmc k) : Bool := bmc.candidates.isEmpty
 
-def check (bmc : sv.Bmc S k) : Env (Option <| Array String × sv.Bmc S k) := do
+def check (bmc : SVars.Bmc k) : Env (Option <| Array String × SVars.Bmc k) := do
   if bmc.isDone then return none
   let state := bmc.sVars.getCurrent
   let candidates ← bmc.candidates.mapM fun (name, pred) => return (name, ← pred state)
@@ -146,7 +173,7 @@ def check (bmc : sv.Bmc S k) : Env (Option <| Array String × sv.Bmc S k) := do
     return some (falsifiedCandidates, {bmc with candidates, falsified})
   else return none
 
-def unroll (bmc : sv.Bmc S k) : Env (sv.Bmc S k.succ) := do
+def unroll (bmc : SVars.Bmc k) : Env (SVars.Bmc k.succ) := do
   let nextState ← bmc.idents.declareAt k.succ
   let next ← bmc.next bmc.sVars.getCurrent nextState
   -- println! "asserting {next}"

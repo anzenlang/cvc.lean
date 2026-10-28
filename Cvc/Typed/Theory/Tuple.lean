@@ -149,3 +149,21 @@ def snd [B : ToTyp β] (t : Term (α × β)) : Env (Term β) := do
     Untyped.Term.mkTuple terms
   -- `β` is flat, so the tuple has exactly two components and the tail is the second
   | _ => t.tupleSelect 1
+
+/-- A pair's two components, if the term is a tuple literal.
+
+`none` unless the term is a construction, which its kind says. Pairs only: a longer tuple's tail has
+no term of its own, `α × β × γ` being one three-component tuple, so it cannot come back as a
+`Term (β × γ)`. Generic code, and a longer tuple, go through the datatype view instead.
+-/
+def pairComponents? [ToTyp β] (t : Term (α × β))
+  (_isFlat : (Typ.of β).isFlat := by
+    (try simp [Typ.isFlat, Typ.of, ToTyp.typ, Srt.prod]) <;>
+      fail "the second component is a tuple, so this is not a pair")
+: Env (Option (Term α × Term β)) := do
+  let raw := t.erase
+  unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
+  -- the first kid is the constructor
+  match raw.getKids.toList with
+  | [_, a, b] => return some ((a : Term α), (b : Term β))
+  | _ => throwInternal s!"`{raw}`: not a pair"

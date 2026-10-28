@@ -11,13 +11,13 @@ import Cvc.Typed.Theory.Regex
 import Cvc.Typed.Core.Bool
 import Cvc.Typed.Theory.String
 import Cvc.Typed.Theory.Arith
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Regex
 public meta import Cvc.Typed.Core.Bool
 public meta import Cvc.Typed.Theory.String
 public meta import Cvc.Typed.Theory.Arith
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 

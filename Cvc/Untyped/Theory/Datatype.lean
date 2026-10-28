@@ -11,12 +11,14 @@ import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
-import all Cvc.Untyped.Solver
+import all Cvc.Untyped.Core.Solver
 
 public import Cvc.Srt
 public import Cvc.Untyped.Core.Value
-public import Cvc.Untyped.BVar
-public import Cvc.Untyped.Solver
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Untyped.Core.Solver
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public meta import Cvc.Ext
 
 
@@ -368,6 +370,41 @@ def mkMatch
   runUnsafe fun tm => tm.mkTerm .MATCH (#[scrutinee] ++ cases)
 
 end Untyped.Term
+
+/-! ## The view of a datatype operation
+
+Written by hand, and generic over every datatype: which constructors and fields a datatype has is a
+fact about its declaration, so they come back by name. Records, tuples and nullables are datatypes
+to cvc5 too, so this covers them, a record's fields and a tuple's components being selectors like
+any other — a record's constructor answers the name cvc5 gives it, `__cvc5_record_…`.
+
+Named apart from every specified operator, an array's `select` among them: an aggregate's
+abbreviations share one namespace across every theory.
+-/
+
+/-- A datatype operation, taken apart one level, sort-erased. -/
+protected inductive Untyped.View.Datatype where
+  /-- A constructor applied to its arguments, none for a constant constructor. -/
+  | construct (ctor : String) (args : Terms)
+  /-- A field read off a datatype term. -/
+  | selectField (field : String) (arg : Term)
+  /-- `arg` with its field replaced by `value`. -/
+  | updateField (field : String) (arg value : Term)
+  /-- Whether `arg` was built by the constructor `ctor`. -/
+  | testCtor (ctor : String) (arg : Term)
+
+/-- Takes a term apart one level, if it is a datatype operation. -/
+def Untyped.View.Datatype.of? (t : Term) : Option Untyped.View.Datatype :=
+  match t.getKind?, t.getKids.toList with
+  | some .APPLY_CONSTRUCTOR, c :: args => some (.construct (toString c) args.toArray)
+  | some .APPLY_SELECTOR, [s, arg] => some (.selectField (toString s) arg)
+  | some .APPLY_UPDATER, [u, arg, value] => some (.updateField (toString u) arg value)
+  | some .APPLY_TESTER, [tst, arg] => some (.testCtor (toString tst) arg)
+  | _, _ => none
+
+register_untyped_view% Cvc.Untyped.View.Datatype
+  [construct APPLY_CONSTRUCTOR, selectField APPLY_SELECTOR, updateField APPLY_UPDATER,
+    testCtor APPLY_TESTER]
 
 
 

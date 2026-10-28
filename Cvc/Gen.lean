@@ -9,3 +9,5 @@ module
 
 public import Cvc.Gen.Term
 public import Cvc.Gen.SolverMode
+public import Cvc.Gen.View
+public import Cvc.Gen.TypedView

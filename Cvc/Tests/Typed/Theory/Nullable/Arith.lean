@@ -9,11 +9,11 @@ module
 
 import Cvc.Typed.Theory.Nullable.Arith
 import Cvc.Typed.Theory.Arith
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Nullable.Arith
 public meta import Cvc.Typed.Theory.Arith
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 

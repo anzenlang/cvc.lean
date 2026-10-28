@@ -11,13 +11,15 @@ import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
-import all Cvc.Untyped.BVar
-import all Cvc.Untyped.Solver
+import all Cvc.Untyped.Core.BVar
+import all Cvc.Untyped.Core.Solver
+import all Cvc.Untyped.Core.Symbols
 
 public import Cvc.Basic
 public import Cvc.Basic.Env
 public import Cvc.Gen.SolverMode
-public import Cvc.Untyped.Theory.Grammar
+public import Cvc.Untyped.Grammar
+public import Cvc.Untyped.Core.Symbols
 
 
 
@@ -273,3 +275,22 @@ def findSynthNext : Env Term :=
   runUnsafe' do s.toUnsafe.findSynthNext
 
 end Solver
+
+
+
+namespace Symbols.Sig
+
+namespace Idents variable [Symbols S] [Ω]
+
+/-- Declares some identifiers as sygus-variables in `solver`. -/
+def declareSygusIn (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
+  S.mapM idents fun {α} _ _ symbol => return ⟨← solver.declareSygusVar symbol (← Srt.of α)⟩
+
+/-- Declares some identifiers as sygus-variables in `solver`. -/
+def declareSygusAtIn (k : Nat) (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
+  S.mapM idents fun {α} _ _ symbol =>
+    return ⟨← solver.declareSygusVar (Symbols.Sig.mkSymbolIdentAt k symbol) (← Srt.of α)⟩
+
+end Idents
+
+end Symbols.Sig

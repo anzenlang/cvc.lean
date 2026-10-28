@@ -7,13 +7,15 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Untyped.BVar
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public import Cvc.Ext
 public meta import Cvc.Ext
 
 import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
-import all Cvc.Untyped.BVar
+import all Cvc.Untyped.Core.BVar
 
 
 
@@ -126,6 +128,28 @@ def forallH [Binder φ] (binders : List (String × Srt)) (body : φ) : Env Term 
 def existsH [Binder φ] (binders : List (String × Srt)) (body : φ) : Env Term := do
   let (bvs, body) ← bindAll binders body
   mkQuant .EXISTS bvs body
+
+/-! ## The view of a quantifier
+
+Written by hand, as the quantifiers are: a bound variable is not something a specification
+describes. `forall` and `exists` are Lean keywords, hence the primes.
+-/
+
+/-- A quantified formula, taken apart one level, sort-erased. -/
+protected inductive _root_.Cvc.Untyped.View.Quant where
+  /-- `∀ x₁ … xₙ, body`, with cvc5's instantiation patterns if it has any. -/
+  | forall' (vars : BVars) (body : Term) (patterns : Option Term)
+  /-- `∃ x₁ … xₙ, body`, with cvc5's instantiation patterns if it has any. -/
+  | exists' (vars : BVars) (body : Term) (patterns : Option Term)
+
+/-- Takes a term apart one level, if it is a quantified formula. -/
+def _root_.Cvc.Untyped.View.Quant.of? (t : Term) : Option View.Quant :=
+  match t.getKind?, t.getKids.toList with
+  | some .FORALL, vars :: body :: rest => some (.forall' (vars.getKids.map asBVar) body rest.head?)
+  | some .EXISTS, vars :: body :: rest => some (.exists' (vars.getKids.map asBVar) body rest.head?)
+  | _, _ => none
+
+register_untyped_view% Cvc.Untyped.View.Quant [forall' FORALL, exists' EXISTS]
 
 end
 

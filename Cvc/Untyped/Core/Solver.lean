@@ -11,15 +11,17 @@ import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
-import all Cvc.Untyped.BVar
+import all Cvc.Untyped.Core.BVar
 
 public import Cvc.Basic
 public import Cvc.Basic.Env
 public import Cvc.Srt
 public import Cvc.Logic
 public import Cvc.Untyped.Core.Value
-public import Cvc.Untyped.BVar
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Untyped.Core.Bool
 public import Cvc.Gen.SolverMode
+public import Cvc.SolverOptions
 
 
 
@@ -53,11 +55,10 @@ abbrev Solver.Proofs [Ω] (solver : Solver) (pc : Proof.Component) : Type :=
 
 A grammar belongs to the scope, as a term does: cvc5 builds one through a solver
 (`Solver.mkGrammar`), but any solver of the same term manager accepts it. The rule builders live in
-`Cvc.Untyped.Theory.Grammar`; the type is declared here because the interpolant and abduct queries
+`Cvc.Untyped.Grammar`; the type is declared here because the interpolant and abduct queries
 below take one.
 -/
-structure Grammar [Ω] where
-  private mk ::
+structure Grammar [Ω] where private mk' ::
   private raw : cvc5.Grammar
   /-- The parameters the grammar was built over.
 
@@ -65,6 +66,12 @@ structure Grammar [Ω] where
   what lets a grammar whose parameters were made out of sight, by `smt.grammar!`, be used for one.
   -/
   boundVars : BVars
+  /-- The sort of the grammar's start symbol.
+
+  cvc5 offers no way to read a grammar's non-terminals back, so the sort is recorded when the
+  grammar is built; it is what lets the grammar be typed after the fact.
+  -/
+  startSrt : Srt
 
 /-- String representation, as the SyGuS pre-declaration and rule set. -/
 protected def Grammar.toString [Ω] (g : Grammar) : String := toString g.raw
@@ -187,6 +194,11 @@ def getVersion : Env String := runUnsafe' do s.toUnsafe.getVersion
 @[inherit_doc S.setOption]
 def setOption (option value : String) : Env Unit := runUnsafe' do
   s.toUnsafe.setOption option value
+
+/-- Sets an option in a solver. -/
+def setOpt (opt : Solver.Option) (val : opt.argType) : Env Unit :=
+  let (opt, val) := opt.toStrings val
+  s.setOption opt val
 
 @[inherit_doc S.getOption]
 def getOption (flag : String) : Env String := runUnsafe' do s.toUnsafe.getOption flag

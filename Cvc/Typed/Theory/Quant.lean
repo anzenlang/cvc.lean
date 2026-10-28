@@ -7,7 +7,9 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.BVar
+public import Cvc.Typed.Core.BVar
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 public import Cvc.Untyped.Theory.Quant
 public meta import Cvc.Untyped.Theory.Quant
 public meta import Cvc.Ext
@@ -15,8 +17,8 @@ public meta import Cvc.Ext
 import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
-import all Cvc.Untyped.BVar
-import all Cvc.Typed.BVar
+import all Cvc.Untyped.Core.BVar
+import all Cvc.Typed.Core.BVar
 
 
 
@@ -114,6 +116,95 @@ def existsH [Binder φ] (body : φ) (names : List String := []) : Env (Term Bool
 end
 
 end Cvc.Typed.Term
+
+
+
+/-! ## Viewing a quantifier
+
+Quantifiers are hand-written rather than specified, so their view is too. The variables' sorts are a
+list of `Typ`s, as an application's arguments are, and the body mentions the variables: walking into
+it meets them as the aggregate's `bvar` leaf.
+-/
+
+namespace Cvc.Typed public section variable [Ω]
+
+/-- A binder's variables, each at the denotation of its sort, in order; never empty. -/
+inductive View.Quant.Vars : List Typ → Type where
+  /-- The last variable. -/
+  | last (x : BVar τ.Denote) : View.Quant.Vars [τ]
+  /-- One more variable, in front of the others. -/
+  | cons (x : BVar τ.Denote) (rest : View.Quant.Vars τs) : View.Quant.Vars (τ :: τs)
+
+namespace View.Quant.Vars
+
+/-- The same variables as a `BVars` list, so that a viewed binder can be rebuilt.
+
+`BVars` collects in reverse — the variable pushed last is the binder's last — so the spine is folded
+from its head onto an accumulator.
+-/
+def toBVars (vars : Vars doms) : BVars := go vars []
+where
+  /-- Pushes the variables in order onto `acc`. -/
+  go {ds : List Typ} : Vars ds → BVars → BVars
+    | .last x, acc => BVars.push x acc
+    | .cons x rest, acc => go rest (BVars.push x acc)
+
+/-- A binder always has a variable, so its `BVars` are never empty: what `mkForall` asks for. -/
+theorem toBVars_ne_nil (vars : Vars doms) : vars.toBVars ≠ [] := by
+  suffices ∀ {ds} (v : Vars ds) acc, toBVars.go v acc ≠ [] from this vars []
+  intro ds v
+  induction v with
+  | last x => simp [toBVars.go]
+  | cons x rest ih => exact fun acc => ih _
+
+/-- The variables as cvc5 prints them, `x : Int`. -/
+def toStrings : Vars doms → List String
+  | .last (τ := τ) x => [s!"{x.toTerm} : {τ}"]
+  | .cons (τ := τ) x rest => s!"{x.toTerm} : {τ}" :: rest.toStrings
+
+end View.Quant.Vars
+
+/-- A quantified formula taken apart one level; always of sort `Bool`.
+
+`forall` and `exists` are Lean keywords, hence the primes. The instantiation patterns stay
+sort-erased, a pattern mixing sorts.
+-/
+protected inductive View.Quant : Typ → Type where
+  /-- `∀ x₁ … xₙ, body`, with cvc5's instantiation patterns if it has any. -/
+  | forall' (doms : List Typ) (vars : View.Quant.Vars doms) (body : Term Bool)
+    (patterns : Option Untyped.Term) : View.Quant .bool
+  /-- `∃ x₁ … xₙ, body`, with cvc5's instantiation patterns if it has any. -/
+  | exists' (doms : List Typ) (vars : View.Quant.Vars doms) (body : Term Bool)
+    (patterns : Option Untyped.Term) : View.Quant .bool
+
+/-- Takes a term of sort `τ` apart one level, if it is a quantified formula whose variables' sorts a
+`Typ` describes. -/
+def View.Quant.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Quant τ)) :=
+  match τ, Untyped.View.Quant.of? t.erase with
+  | .bool, some (.forall' vars body pats) => do
+    let some ⟨doms, vars⟩ ← go vars.toList | return none
+    return some (.forall' doms vars (View.reindex body) pats)
+  | .bool, some (.exists' vars body pats) => do
+    let some ⟨doms, vars⟩ ← go vars.toList | return none
+    return some (.exists' doms vars (View.reindex body) pats)
+  | _, _ => return none
+where
+  /-- The variables, with their sorts. -/
+  go : List Untyped.BVar → Env (Option ((doms : List Typ) × View.Quant.Vars doms))
+    | [] => return none
+    | [x] => do
+      let some σ ← View.typOf? x.toTerm | return none
+      return some ⟨[σ], .last (View.reindex x.toTerm).asBVar⟩
+    | x :: xs => do
+      let some σ ← View.typOf? x.toTerm | return none
+      let some ⟨σs, rest⟩ ← go xs | return none
+      return some ⟨σ :: σs, .cons (View.reindex x.toTerm).asBVar rest⟩
+
+register_typed_view% Cvc.Typed.View.Quant [forall' FORALL, exists' EXISTS]
+
+end
+
+end Cvc.Typed
 
 
 

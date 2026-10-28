@@ -432,6 +432,37 @@ plain    : (__cvc5_record_a_Int_b_Bool_ctor 7 true)
   -- an identifier naming no field is still just an identifier
   println! "plain    : {← smt! r}"
 
+/-! ### Through a Lean structure
+
+What is left after the head is read by type, as Lean's dot notation does: a component of a Lean
+value that is not a term — any structure holding terms, a symbol structure among them — is a Lean
+projection, and from the first term on the rest are record fields.
+-/
+
+/-- Terms held in a Lean structure, one of them a record. -/
+structure Holder [Ω] where
+  x : Term
+  r : Term
+
+/-- info:
+lean field  : (+ x 1)
+then record : (a (__cvc5_record_a_Int_b_Bool_ctor 7 true))
+-/
+#guard_msgs in #eval Env.runIO do
+  let h : Holder := { x := ← Term.mkSymbol (← Srt.int) "x", r := ← smt! {a := 7, b := true} }
+  println! "lean field  : {← smt! h.x + 1}"
+  println! "then record : {← smt! h.r.a}"
+
+/-! A component that is neither a Lean field nor a record field gets Lean's error. -/
+
+/--
+error: Invalid field `zzz`: The environment does not contain `Cvc.Tests.Untyped.Record.Holder.zzz`, so it is not possible to project the field `zzz` from an expression
+  h
+of type `Holder`
+-/
+#guard_msgs in
+example [Ω] (h : Holder) : Env (Term) := smt! h.zzz
+
 /-! A head that is not an identifier gets there by a different route — the lexer fuses `r.a` into
 one token but cannot fuse `).a`, so those are an ordinary grammar rule. `smt! r .a`, with a space,
 is neither and does not parse. -/

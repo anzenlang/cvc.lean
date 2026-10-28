@@ -10,6 +10,8 @@ module
 import all Cvc.Srt
 
 public import Cvc.Srt
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 
 import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
@@ -25,6 +27,7 @@ public import Cvc.Spec.Bag
 namespace Cvc.Untyped.Term public section variable [Ω]
 
 gen_untyped% from Cvc.Spec.Bag
+gen_untyped_view% from Cvc.Spec.Bag
 
 
 

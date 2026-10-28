@@ -43,6 +43,16 @@ class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
   termToValue : [Ω] → Term α → Env α
 
+namespace TermToValue
+
+instance [inst : TermToValue α] [ToTyp α] : Untyped.TermToValue α where
+  termToValue t := t.typeCheckAs α >>= inst.termToValue
+
+instance [inst : Untyped.TermToValue α] : TermToValue α where
+  termToValue t := inst.termToValue t.erase
+
+end TermToValue
+
 -- no `TermToValue (Term α)`: `TermToValue β` reads a `Term β`, so at `β := Term α` it would have to
 -- read a `Term (Term α)`. An index describes a sort, and a term is not one.
 

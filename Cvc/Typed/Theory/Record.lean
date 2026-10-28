@@ -151,6 +151,20 @@ where
     | (name, _) :: rest => do
       return Fields.cons name (← T.recordGet record.erase name) (← go rest)
 
+/-- A record's fields, if the term is a record literal: `fs.get "a"` then reads one, by a name
+checked at compile time.
+
+`none` unless the term is a construction, which its kind says: a declared constant, an update or an
+`ite` of a record sort is not one. Generic code meets records through the datatype view instead.
+-/
+def recordFields? (t : Term (Record fields)) : Env (Option (Fields fields)) := do
+  let raw := t.erase
+  unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
+  -- the first kid is the constructor
+  let args := raw.getKids.extract 1
+  if h : args.size = fields.length then return some ⟨⟨args, h⟩⟩
+  throwInternal s!"`{raw}`: {args.size} fields for a record of {fields.length}"
+
 end Term
 
 

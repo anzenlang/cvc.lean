@@ -10,6 +10,8 @@ module
 import all Cvc.Srt
 
 public import Cvc.Srt
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 
 import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
@@ -27,6 +29,7 @@ namespace Cvc.Untyped.Term public section variable [Ω]
 open cvc5 renaming Term → T
 
 gen_untyped% from Cvc.Spec.Seq
+gen_untyped_view% from Cvc.Spec.Seq
 
 
 

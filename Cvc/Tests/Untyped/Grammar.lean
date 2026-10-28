@@ -7,11 +7,13 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Theory.Grammar
+import Cvc.Untyped.Grammar
+import Cvc.Untyped.Synth
 import Cvc.Untyped.Core
 import Cvc.Untyped.Theory
 
-public meta import Cvc.Untyped.Theory.Grammar
+public meta import Cvc.Untyped.Grammar
+public meta import Cvc.Untyped.Synth
 public meta import Cvc.Untyped.Core
 public meta import Cvc.Untyped.Theory
 
@@ -294,3 +296,29 @@ f := (lambda ((x Int)) (+ (+ x 3) 7))
 example [Ω] (s : Solver) : Env Grammar := smt.grammar! s where
   start : Int := num
   num   : Int
+
+
+
+/-! ## The signature a grammar generates
+
+A grammar records its start symbol's sort, which cvc5 cannot read back, and `signatureSrt` arrows
+the parameters' sorts onto it — flattened, as a curried Lean arrow is. -/
+
+/-- info:
+no params : start Bool, generates Bool
+two params: start Int, generates (-> Int Int Int)
+flattened : start (-> Int Bool), generates (-> Int Int Bool)
+block     : start Int, generates (-> Int Int Int)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let int ← Srt.int
+  let x ← BVar.mk int "x"
+  let y ← BVar.mk int "y"
+  let show' (label : String) (g : Grammar) : Env Unit := do
+    println! "{label}: start {g.startSrt}, generates {← g.signatureSrt}"
+  show' "no params " (← Grammar.mk #[] (← NT.mk (← Srt.bool) "start"))
+  show' "two params" (← Grammar.mk #[x, y] (← NT.mk int "start"))
+  let fn ← Srt.function #[int] (← Srt.bool)
+  show' "flattened " (← Grammar.mk #[x] (← NT.mk fn "start"))
+  show' "block     " (← smt.grammar! s (a b : Int) where start : Int := a | b)

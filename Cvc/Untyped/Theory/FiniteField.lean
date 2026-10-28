@@ -12,6 +12,8 @@ import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
 
 public import Cvc.Ext
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public import Cvc.Untyped.Core.Value
 public import Cvc.Types.FiniteField
 public import Cvc.Srt
@@ -28,6 +30,7 @@ open cvc5 renaming Term → T
 variable [Ω]
 
 gen_untyped% from Cvc.Spec.FiniteField
+gen_untyped_view% from Cvc.Spec.FiniteField
 
 
 /-- An element of the finite field a sort describes.

@@ -7,11 +7,11 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Typed.Theory.Synth
+import Cvc.Typed.Synth
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
 
-public meta import Cvc.Typed.Theory.Synth
+public meta import Cvc.Typed.Synth
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
 

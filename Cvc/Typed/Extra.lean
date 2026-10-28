@@ -7,5 +7,4 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.Extra.SVars
 public import Cvc.Typed.Extra.Sys

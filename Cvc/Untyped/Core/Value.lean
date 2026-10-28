@@ -85,6 +85,11 @@ def getSort (term : Term) : Env Srt := do
   let srt ← T.getSort term.toUnsafe |>.mapError Error.ofUnsafe
   return by unfold Srt ; exact srt
 
+/-- The sort of a term, outside `Env`: cvc5's accessor is pure, and fails only on the null term,
+which this library never hands out. -/
+def getSort? (term : Term) : Option Srt :=
+  (T.getSort? term.toUnsafe).map fun srt => by unfold Srt ; exact srt
+
 @[inherit_doc T.getId]
 def getId (term : Term) : Res Nat := T.getId term.toUnsafe |>.mapError Error.ofUnsafe
 

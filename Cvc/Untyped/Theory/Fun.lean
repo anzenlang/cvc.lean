@@ -11,6 +11,8 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 
 public import Cvc.Untyped.Core.Defs
+public import Cvc.Gen.View
+public import Cvc.Untyped.Core.View
 public import Cvc.Ext
 public import Cvc.Gen.Term
 public import Cvc.Spec.Fun
@@ -44,6 +46,7 @@ namespace Cvc.Untyped.Term public section
 variable [Ω]
 
 gen_untyped% from Cvc.Spec.Fun
+gen_untyped_view% from Cvc.Spec.Fun
 
 /-- Applies a function to the given arguments, however many.
 
@@ -69,3 +72,27 @@ def apply2 (f fst snd : Term) : Env Term := applyN f #[fst, snd]
 
 /-- Applies a function to three arguments. -/
 def apply3 (f fst snd thd : Term) : Env Term := applyN f #[fst, snd, thd]
+
+/-- Applies a function to four arguments. -/
+def apply4 (f fst snd thd frth : Term) : Env Term := applyN f #[fst, snd, thd, frth]
+
+
+
+/-! ## The view of an application
+
+Written by hand, as application is: `Cvc.Spec.Fun` specifies only `applyHo`, whose view is the
+generated `View.Fun`.
+-/
+
+/-- An uninterpreted function's application, taken apart one level, sort-erased. -/
+protected inductive _root_.Cvc.Untyped.View.Apply where
+  /-- `f a₁ … aₙ`, fully applied. -/
+  | apply (f : Term) (args : Args)
+
+/-- Takes a term apart one level, if it is an uninterpreted function's application. -/
+def _root_.Cvc.Untyped.View.Apply.of? (t : Term) : Option View.Apply :=
+  match t.getKind?, t.getKids.toList with
+  | some .APPLY_UF, f :: args => (Args.of? args.toArray).map (.apply f)
+  | _, _ => none
+
+register_untyped_view% Cvc.Untyped.View.Apply [apply APPLY_UF]

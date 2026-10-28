@@ -88,7 +88,8 @@ its element ordered. No `Std.TreeSet` of relations is ever built, since these in
 conversion, so the triviality never shows.
 
 They are written out rather than derived because `deriving` constrains the type parameters even
-though nothing uses them, which would demand `Ord β` — and `Ord Rat` does not exist.
+though nothing uses them, which would demand `Ord β` — and not every component type has one, a
+function's for instance.
 -/
 
 instance : DecidableEq (Tup α β) := fun _ _ => isTrue rfl

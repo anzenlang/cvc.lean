@@ -15,6 +15,7 @@ public import Cvc.Types.Relation
 public import Cvc.Types.Record
 public import Cvc.Types.Float
 public import Cvc.Types.FiniteField
+public import Cvc.Types.Denote
 
 
 

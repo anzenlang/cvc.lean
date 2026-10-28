@@ -50,6 +50,8 @@ namespace Term
 /-- Erases its type. -/
 def erase (t : Term α) : Untyped.Term := t
 
+instance : CoeDep (Term α) t Untyped.Term := ⟨t.erase⟩
+
 /-- Types an untyped term. -/
 def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
   let srt ← t.getSort
@@ -60,6 +62,19 @@ def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
 
 @[inherit_doc ofUntypedAs]
 abbrev ofUntyped [ToTyp α] (t : Untyped.Term) : Env (Term α) := ofUntypedAs α t
+
+/-- Re-indexes a term at another Lean type of the same sort.
+
+The static counterpart of `ofUntypedAs`: the two indices must have the same `Typ`, which is checked
+at compile time, by `rfl`, so the cast costs nothing at runtime. It is sound because a term's sort
+is determined by its index's `Typ`: two Lean types with the same `Typ` index the same terms. It is
+how a term indexed by a `Typ.Denote` that cannot reduce — over a sort variable, or at the stand-in
+`Sorted` of a declared sort — is moved to the index a user works with.
+-/
+def cast [ToTyp α] [ToTyp β] (t : Term α)
+  (_sameSort : Typ.of α = Typ.of β := by
+    first | rfl | fail "cannot cast: the two types index different sorts")
+: Term β := t
 
 /-! ## Substitution
 

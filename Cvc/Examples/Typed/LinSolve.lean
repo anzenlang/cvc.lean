@@ -8,8 +8,8 @@ Authors: Adrien Champion
 module
 
 public import Cvc.Typed.Theory.Arith
-public import Cvc.Typed.Symbols
-public import Cvc.Typed.Solver
+public import Cvc.Typed.Core.Symbols
+public import Cvc.Typed.Core.Solver
 
 
 
@@ -19,19 +19,19 @@ namespace Cvc.Typed.Examples public section
 namespace LinSolve open Cvc Typed variable [Ω] {Syms : Symbols.Sig}
 
 inductive Result (S : Symbols Syms)
-| sat (values : S.Values)
+| sat (values : Syms.Values)
 | unsat (core : Array String)
 | unknown
 | error (e : Error)
 
 structure State (S : Symbols Syms) where
   solver : Solver
-  terms : S.Terms
+  terms : Syms.Terms
   constraints : Array (String × Term Bool)
 
 namespace State variable [S : Symbols Syms]
 
-def init (vars : S.Idents) (constraints : Array (String × S.Pred)) : Env (State S) := do
+def init (vars : Syms.Idents) (constraints : Array (String × Syms.Pred)) : Env (State S) := do
   let terms ← vars.declare
   let solver ← Solver.new
   solver.setOption "produce-models" "true"
@@ -68,7 +68,7 @@ end State
 
 
 def run [S : Symbols Syms]
-  (symbols : S.Idents) (constraints : Array (String × S.Pred))
+  (symbols : Syms.Idents) (constraints : [Ω] → Array (String × Syms.Pred))
 : BaseIO (Result S) := do
   let res ← Env.run do
     let state ← State.init symbols constraints
@@ -92,7 +92,7 @@ structure.symbols Syms where
   y : Rat
   z : Rat
 
-namespace Constraints
+namespace Constraints variable [Ω]
 
 def c1 : String × Syms.Pred := ("c1", fun terms =>
   smt! 2. * terms.x + terms.y + (- 1.) * terms.z ≤ 0.)

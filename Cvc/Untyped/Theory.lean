@@ -14,7 +14,6 @@ public import Cvc.Untyped.Theory.Datatype
 public import Cvc.Untyped.Theory.FiniteField
 public import Cvc.Untyped.Theory.Float
 public import Cvc.Untyped.Theory.Fun
-public import Cvc.Untyped.Theory.Grammar
 public import Cvc.Untyped.Theory.Nullable
 public import Cvc.Untyped.Theory.Quant
 public import Cvc.Untyped.Theory.Record
@@ -24,6 +23,5 @@ public import Cvc.Untyped.Theory.Sep
 public import Cvc.Untyped.Theory.Seq
 public import Cvc.Untyped.Theory.Set
 public import Cvc.Untyped.Theory.String
-public import Cvc.Untyped.Theory.Synth
 public import Cvc.Untyped.Theory.Table
 public import Cvc.Untyped.Theory.Tuple

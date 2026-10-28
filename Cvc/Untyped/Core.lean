@@ -9,4 +9,8 @@ module
 
 public import Cvc.Untyped.Core.Defs
 public import Cvc.Untyped.Core.Value
+public import Cvc.Untyped.Core.View
 public import Cvc.Untyped.Core.Bool
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Untyped.Core.Solver
+public import Cvc.Untyped.Core.Symbols

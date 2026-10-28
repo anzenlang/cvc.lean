@@ -7,11 +7,11 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Symbols
+import Cvc.Untyped.Core.Symbols
 import Cvc.Untyped.Core
 import Cvc.Untyped.Theory
 
-public meta import Cvc.Untyped.Symbols
+public meta import Cvc.Untyped.Core.Symbols
 public meta import Cvc.Untyped.Core
 public meta import Cvc.Untyped.Theory
 
@@ -77,6 +77,37 @@ example (syms : Machine.Terms) (s : Solver) : Env (Option Machine.Values) := sym
   match ← syms.findCex s with
   | some v => println! "running = {v.running}, steps = {v.steps}"
   | none => println! "no model"
+
+/-! In `smt!`, a symbol is read off the structure with Lean's own dot notation: `syms.steps` projects
+the field, the structure not being a term. -/
+
+/-- info: (and running (< steps 3)) -/
+#guard_msgs in #eval Env.runIO do
+  let syms ← (Symbols.Sig.idents () : Machine.Idents).declare
+  println! ← smt! syms.running ∧ syms.steps < 3
+
+/-! ## Folding
+
+`foldM` belongs to the `Symbols` instance, beside `mapM`: `structure.symbols` defines it field by
+field. It visits the symbols in field order and runs in any monad.
+-/
+
+/-- info: names: #[running, steps]
+running : Bool
+steps : Int
+symbols counted from the model: 2
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let ids : Machine.Idents := Symbols.Sig.idents ()
+  println! "names: {← ids.foldM #[] fun acc name => return acc.push name}"
+  let syms ← ids.declareIn s
+  -- each symbol with its sort, printed as the fold goes
+  syms.foldM () fun {α} _ _ () t => println! "{t} : {Typ.of α}"
+  s.assert syms.running
+  let some v ← syms.findCex s | println! "no model"
+  println! "symbols counted from the model: {← v.foldM 0 fun n _ => return n + 1}"
 
 /-! ## `Ω` is taken only where a term is mentioned
 
@@ -154,4 +185,39 @@ symbols to make, so the identifiers *are* the initialisation data. -/
   let terms : Vars.Terms ← idents.declare
   println! "bools: {terms.boolVars}, ints: {terms.intVars}"
 
+/-! A hand-written instance that defines no `foldM` gets one derived from its `mapM`, visiting the
+arrays' elements in order. -/
+
+/-- info: #[b0, b1, i0] -/
+#guard_msgs in #eval Env.runIO do
+  let idents : Vars.Idents := ⟨#["b0", "b1"], #["i0"], #[]⟩
+  let terms : Vars.Terms ← idents.declare
+  println! ← terms.foldM #[] fun acc t => return acc.push t
+
 end ByHand
+
+
+
+/-! ## Symbols at a step
+
+`TermsAt k` and `ValuesAt k` wrap every field in a `Symbols.At k`, which `get` unwraps. `declareAt`
+names a symbol `count__@__k`, so a step's variables are distinguishable by name and a model can say
+which step a value belongs to. -/
+
+namespace AtStep
+
+structure.symbols Counter where
+  counting : Bool
+  count : Int
+
+example (s : Counter.TermsAt 0) : Term := s.count.get
+example (s : Counter.ValuesAt 3) : Bool := s.counting.get
+example (s : Counter.TermsAt 0) : Env Term := smt! s.count + 1
+
+/-- info: count__@__0 count__@__2 -/
+#guard_msgs in #eval Env.runIO do
+  let at0 ← Counter.idents.declareAt 0
+  let at2 ← Counter.idents.declareAt 2
+  println! "{at0.count.get} {at2.count.get}"
+
+end AtStep

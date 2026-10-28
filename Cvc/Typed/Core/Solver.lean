@@ -11,10 +11,11 @@ import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
-import all Cvc.Untyped.Solver
+import all Cvc.Untyped.Core.Solver
 
-public import Cvc.Untyped.Solver
-public import Cvc.Typed.BVar
+public import Cvc.Untyped.Core.Solver
+public import Cvc.Typed.Core.BVar
+public import Cvc.Typed.Core.Bool
 
 
 
@@ -38,6 +39,8 @@ abbrev Solver [Ω] := Cvc.Untyped.Solver
 @[inherit_doc Untyped.Solver.Proof]
 abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
 
+abbrev Solver.relax [Ω] : Solver → Untyped.Solver := id
+
 /-- An array of `Solver.Proof`.
 
 Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proofs`, following
@@ -50,7 +53,7 @@ abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (S
 
 Carries the parameters it was declared over, so that `synthFun` cannot be given different ones.
 Like the sort-erased one it belongs to the scope, not to the solver that built it. Declared here
-rather than beside the builders in `Cvc.Typed.Theory.Grammar` because the interpolant and abduct
+rather than beside the builders in `Cvc.Typed.Grammar` because the interpolant and abduct
 queries below take one.
 -/
 structure Grammar [Ω] (σ : Type) where
@@ -93,17 +96,18 @@ section variable [Ω] [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 open Cvc renaming Untyped.Solver → U
 
 /-- Declares a function symbol of type `α`. -/
-def declareFun' (symbol : String) (α : Type) [ToTyp α] : Env (Term α) := do
+def declareFun' (symbol : String) (α : Type) [ToTyp α] (fresh : Bool := false) : Env (Term α) := do
   let srt ← Srt.of α
   let domCod? : Option (Array Srt × Srt) := do
     let dom ← srt.getFunctionDomainSorts?
     let cod ← srt.getFunctionCodomainSort?
     pure (dom, cod)
   let (dom, cod) := if let some domCod := domCod? then domCod else (#[], srt)
-  Untyped.Solver.declareFun s symbol dom cod
+  Untyped.Solver.declareFun s symbol dom cod (fresh := fresh)
 
 @[inherit_doc declareFun']
-abbrev declareFun [ToTyp α] (symbol : String) : Env (Term α) := s.declareFun' symbol α
+abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := false) : Env (Term α) :=
+  s.declareFun' symbol α (fresh := fresh)
 
 /-- Defines a function symbol over bound variables `bvs` defined by `body`. -/
 def defineFun [ToTyp β]

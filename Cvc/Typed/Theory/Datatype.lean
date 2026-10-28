@@ -16,7 +16,9 @@ import all Cvc.Untyped.Theory.Datatype
 
 public import Cvc.Untyped.Theory.Datatype
 public meta import Cvc.Ext
-public import Cvc.Typed.Solver
+public import Cvc.Typed.Core.Solver
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 
 
 
@@ -320,6 +322,74 @@ def update (t : Term α) (v : Term β) : Env (Term α) :=
   T.applyUpdater sel.updater t.erase v.erase
 
 end Datatype.Field
+
+
+
+/-! ## Viewing a datatype operation
+
+Generic over every datatype: which constructors and fields a datatype has is a fact about its
+declaration, so they come back by name, and only the kids' sorts are known — a list of `Typ`s
+refined by matching, as an application's arguments are. Records, tuples and nullables are datatypes to cvc5
+too, so this covers them, a record's fields and a tuple's components being selectors like any other.
+`Term.recordFields?`, `Term.pairComponents?` and `Term.nullableCases?` give back their typed surface
+when the term's index is known.
+-/
+
+/-- A constructor's arguments, each at the denotation of its sort, in order; empty for a constant
+constructor such as `nil`. -/
+inductive View.Datatype.Fields : List Typ → Type where
+  /-- No argument. -/
+  | nil : View.Datatype.Fields []
+  /-- One more argument, in front of the others. -/
+  | cons (t : Term τ.Denote) (rest : View.Datatype.Fields τs) : View.Datatype.Fields (τ :: τs)
+
+/-- The arguments as cvc5 prints them. -/
+def View.Datatype.Fields.toStrings : View.Datatype.Fields doms → List String
+  | .nil => []
+  | .cons t rest => toString t :: rest.toStrings
+
+/-- A datatype operation of sort `τ`, taken apart one level. -/
+protected inductive View.Datatype : Typ → Type where
+  /-- A constructor applied to its arguments, none for a constant constructor. -/
+  | construct {τ : Typ} (ctor : String) (doms : List Typ) (args : View.Datatype.Fields doms)
+    : View.Datatype τ
+  /-- A field read off `arg`, a term of the datatype sort `σ`. -/
+  | selectField {τ : Typ} (field : String) (σ : Typ) (arg : Term σ.Denote) : View.Datatype τ
+  /-- `arg` with its field replaced by `value`, a term of sort `σ`. -/
+  | updateField {τ : Typ} (field : String) (σ : Typ) (arg : Term τ.Denote) (value : Term σ.Denote)
+    : View.Datatype τ
+  /-- Whether `arg`, of the datatype sort `σ`, was built by the constructor `ctor`. -/
+  | testCtor (ctor : String) (σ : Typ) (arg : Term σ.Denote) : View.Datatype .bool
+
+/-- Takes a term of sort `τ` apart one level, if it is a datatype operation whose kids' sorts a
+`Typ` describes. -/
+def View.Datatype.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Datatype τ)) :=
+  match τ, Untyped.View.Datatype.of? t.erase with
+  | _, some (.construct ctor args) => do
+    let some ⟨doms, args⟩ ← go args.toList | return none
+    return some (.construct ctor doms args)
+  | _, some (.selectField field arg) => do
+    let some σ ← View.typOf? arg | return none
+    return some (.selectField field σ (View.reindex arg))
+  | _, some (.updateField field arg value) => do
+    let some σ ← View.typOf? value | return none
+    return some (.updateField field σ (View.reindex arg) (View.reindex value))
+  | .bool, some (.testCtor ctor arg) => do
+    let some σ ← View.typOf? arg | return none
+    return some (.testCtor ctor σ (View.reindex arg))
+  | _, _ => return none
+where
+  /-- A constructor's arguments, with their sorts. -/
+  go : List Untyped.Term → Env (Option ((doms : List Typ) × View.Datatype.Fields doms))
+    | [] => return some ⟨[], .nil⟩
+    | k :: ks => do
+      let some σ ← View.typOf? k | return none
+      let some ⟨σs, rest⟩ ← go ks | return none
+      return some ⟨σ :: σs, .cons (View.reindex k) rest⟩
+
+register_typed_view% Cvc.Typed.View.Datatype
+  [construct APPLY_CONSTRUCTOR, selectField APPLY_SELECTOR, updateField APPLY_UPDATER,
+    testCtor APPLY_TESTER]
 
 
 

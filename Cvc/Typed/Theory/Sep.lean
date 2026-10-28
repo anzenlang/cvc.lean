@@ -11,10 +11,12 @@ import all Cvc.Basic.Env
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 import all Cvc.Untyped.Theory.Sep
-import all Cvc.Typed.Solver
+import all Cvc.Typed.Core.Solver
 
 public import Cvc.Untyped.Theory.Sep
-public import Cvc.Typed.Solver
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
+public import Cvc.Typed.Core.Solver
 public import Cvc.Ext
 public import Cvc.Spec.Sep
 
@@ -54,6 +56,7 @@ namespace Term variable [Ω]
 open Cvc renaming Untyped.Term → T
 
 gen_typed% from Cvc.Spec.Sep
+gen_typed_view% from Cvc.Spec.Sep
 
 end Term
 

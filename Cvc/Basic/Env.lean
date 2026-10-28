@@ -11,6 +11,12 @@ import all Cvc.Basic.Error
 public import Cvc.Basic.Error
 public import cvc5
 public import Std.Data.HashMap.Basic
+-- Not used here: imported publicly at the root of the library, so that every user can manipulate
+-- tree maps and sets, as the library does, without importing them. Lean itself is visible to them
+-- only at the meta phase, through the library's macros, where `Std.TreeMap` would resolve and then
+-- refuse to be used in ordinary code.
+public import Std.Data.TreeMap
+public import Std.Data.TreeSet
 
 
 

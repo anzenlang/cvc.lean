@@ -12,6 +12,8 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 
 public import Cvc.Untyped.Theory.Regex
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 public import Cvc.Ext
 public import Cvc.Typed.Core.Value
 public import Cvc.Spec.Regex
@@ -29,6 +31,7 @@ open Cvc renaming Untyped.Term → T
 variable [Ω]
 
 gen_typed% from Cvc.Spec.Regex
+gen_typed_view% from Cvc.Spec.Regex
 
 
 

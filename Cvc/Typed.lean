@@ -7,8 +7,8 @@ Authors: Adrien Champion
 
 module
 
-public import Cvc.Typed.BVar
 public import Cvc.Typed.Core
-public import Cvc.Typed.Solver
-public import Cvc.Typed.Symbols
+public import Cvc.Typed.Grammar
+public import Cvc.Typed.Synth
 public import Cvc.Typed.Theory
+public import Cvc.Typed.View

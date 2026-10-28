@@ -10,12 +10,12 @@ module
 import Cvc.Typed.Theory.Datatype
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
-import Cvc.Typed.Solver
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Datatype
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Core.Solver
 
 
 

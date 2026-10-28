@@ -11,12 +11,12 @@ import all Cvc.Basic
 import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
-import all Cvc.Untyped.BVar
+import all Cvc.Untyped.Core.BVar
 -- `import all`: the solver's conversion to cvc5 is private
-import all Cvc.Untyped.Solver
+import all Cvc.Untyped.Core.Solver
 
-public import Cvc.Untyped.BVar
-public import Cvc.Untyped.Solver
+public import Cvc.Untyped.Core.BVar
+public import Cvc.Untyped.Core.Solver
 public import Cvc.Untyped.Theory.Quant
 public meta import Cvc.Untyped.Theory.Quant
 public import Cvc.Ext
@@ -60,6 +60,7 @@ the same type to every downstream module. One field, so it costs nothing at runt
 structure NT where
   private ofBVar ::
   private bvar : BVar
+deriving BEq, Ord, Hashable
 
 /-- An array of non-terminal symbols. -/
 abbrev NTs := Array NT
@@ -79,6 +80,8 @@ def toBVar (nt : NT) : BVar := nt.bvar
 def toTerm (nt : NT) : Term := nt.toBVar.toTerm
 
 instance : Coe NT Term := ⟨toTerm⟩
+
+instance : ToString NT := ⟨toString ∘ toTerm⟩
 
 end NT
 
@@ -112,11 +115,31 @@ array's non-emptiness structural rather than a side condition.
 def mkGrammar (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env Grammar := do
   let raw : cvc5.Grammar ← runUnsafe' do
     s.toUnsafe.mkGrammar (boundVars.map BVar.toTerm) (#[start.toTerm] ++ others.map NT.toTerm)
-  return ⟨raw, boundVars⟩
+  return ⟨raw, boundVars, ← start.toTerm.getSort⟩
 
 end Untyped.Solver
 
 namespace Untyped.Grammar open Untyped variable (g : Grammar)
+
+def mk (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env Grammar := do
+  -- need to create a solver although it will never be used
+  -- waiting for upstream to provide a solver-free constructor
+  let s ← Solver.new
+  s.mkGrammar boundVars start others
+
+/-- The sort of the functions the grammar generates.
+
+The parameters' sorts arrowed onto the start symbol's, flattened as a curried Lean arrow is, or the
+start symbol's sort alone when there are no parameters.
+-/
+def signatureSrt : Env Srt := do
+  let dom ← g.boundVars.mapM (·.toTerm.getSort)
+  if h : 0 < dom.size then
+    if g.startSrt.isFunction then
+      let dom' := dom ++ (← g.startSrt.getFunctionDomainSorts)
+      Srt.function dom' (← g.startSrt.getFunctionCodomainSort)
+    else Srt.function dom g.startSrt
+  else return g.startSrt
 
 /-- The same grammar with its underlying cvc5 grammar replaced. -/
 private def withRaw (code : cvc5.Env cvc5.Grammar) : Env Grammar := do

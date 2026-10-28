@@ -13,6 +13,8 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
 
 public import Cvc.Types.Float
+public import Cvc.Gen.TypedView
+public import Cvc.Typed.Core.View
 public import Cvc.Untyped.Theory.Float
 public import Cvc.Typed.Core.Value
 public import Cvc.Spec.Float
@@ -27,6 +29,7 @@ open Cvc renaming Untyped.Term → T
 variable [Ω]
 
 gen_typed% from Cvc.Spec.Float
+gen_typed_view% from Cvc.Spec.Float
 
 @[inherit_doc T.mkRoundingMode]
 def mkRoundingMode (rm : Cvc.Float.RoundingMode) : Env (Term Cvc.Float.RoundingMode) :=

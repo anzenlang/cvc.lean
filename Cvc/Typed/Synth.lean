@@ -12,14 +12,16 @@ import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
-import all Cvc.Typed.BVar
-import all Cvc.Typed.Theory.Grammar
-import all Cvc.Typed.Solver
-import all Cvc.Untyped.Theory.Synth
+import all Cvc.Typed.Core.BVar
+import all Cvc.Typed.Grammar
+import all Cvc.Typed.Core.Solver
+import all Cvc.Untyped.Synth
+import all Cvc.Typed.Core.Symbols
 
-public import Cvc.Untyped.Theory.Synth
-public import Cvc.Typed.Theory.Grammar
-public import Cvc.Typed.Solver
+public import Cvc.Untyped.Synth
+public import Cvc.Typed.Grammar
+public import Cvc.Typed.Core.Solver
+public import Cvc.Typed.Core.Symbols
 
 
 
@@ -165,3 +167,22 @@ state, not something a signature sees.
 def findSynthNext : Env Untyped.Term := U.findSynthNext s
 
 end Solver
+
+
+
+namespace Symbols.Sig variable [Ω] [Symbols S]
+
+namespace Idents
+
+@[inherit_doc Untyped.Symbols.Sig.Idents.declareSygusIn]
+def declareSygusIn (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
+  S.mapM idents fun {α} _ _ symbol => return ⟨← solver.declareSygusVar α symbol⟩
+
+@[inherit_doc Untyped.Symbols.Sig.Idents.declareSygusIn]
+def declareSygusAtIn (k : Nat) (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
+  S.mapM idents fun {α} _ _ symbol =>
+    return ⟨← solver.declareSygusVar α (Untyped.Symbols.Sig.mkSymbolIdentAt k symbol)⟩
+
+end Idents
+
+end Symbols.Sig

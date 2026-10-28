@@ -7,13 +7,13 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Typed.Theory.Grammar
-import Cvc.Typed.Solver
+import Cvc.Typed.Grammar
+import Cvc.Typed.Synth
 import Cvc.Typed.Core
 import Cvc.Typed.Theory
 
-public meta import Cvc.Typed.Theory.Grammar
-public meta import Cvc.Typed.Solver
+public meta import Cvc.Typed.Grammar
+public meta import Cvc.Typed.Synth
 public meta import Cvc.Typed.Core
 public meta import Cvc.Typed.Theory
 
@@ -22,7 +22,6 @@ public meta import Cvc.Typed.Theory
 /-! # SyGuS grammars, typed -/
 namespace Cvc.Tests.Typed.Grammar
 
-open Cvc
 open Cvc
 open Cvc.Typed
 
@@ -428,3 +427,81 @@ Note: The following definitions were not unfolded because their definition is no
 example (t : Term Bool) : Env (Term Int) := smt! n + t
 
 end outside
+
+
+
+/-! ## From a sort-erased grammar
+
+`Untyped.Grammar.typeCheckAs` types a grammar built sort-erased, checking the signature against what
+the grammar generates, and `Untyped.NT.typeCheckAs` does the same for its non-terminals, so the
+grammar can be extended and used through the typed API. -/
+
+/-- info:
+typed : ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let x ← Untyped.BVar.mk int "x"
+  let y ← Untyped.BVar.mk int "y"
+  let start ← Untyped.NT.mk int "start"
+  let cnd ← Untyped.NT.mk (← Srt.bool) "cnd"
+  let ug ← Untyped.Grammar.mk #[x, y] start #[cnd]
+  let ug ← ug.addRules start #[x.toTerm, y.toTerm]
+  let ug ← ug.addRule cnd (← Untyped.Term.le start.toTerm start.toTerm)
+  -- typed from here on
+  let g ← ug.typeCheckAs (Int → Int → Int)
+  let start ← start.typeCheckAs Int
+  let cnd ← cnd.typeCheckAs Bool
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  println! "typed : {g}"
+  let mx ← s.synthFun "max" g
+  let a ← s.declareSygusVar Int "a"
+  let b ← s.declareSygusVar Int "b"
+  let mab ← smt! mx a b
+  s.addSygusConstraint (← smt! mab ≥ a)
+  s.addSygusConstraint (← smt! mab ≥ b)
+  s.addSygusConstraint (← smt! mab = a ∨ mab = b)
+  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).erase}")
+
+/-! A grammar with no parameters types at its start symbol's sort. A wrong signature — a wrong
+parameter count, a wrong codomain, or parameters for a grammar that has none — is refused, as is a
+non-terminal at the wrong sort. -/
+
+/-- info:
+no params : Grammar Bool
+wrong arity:
+cannot type the following grammar as `(-> Int Int)`, it generates `(-> Int Int Int)`:
+((start Int) )((start Int (x y)))
+wrong codomain:
+cannot type the following grammar as `(-> Int Int Bool)`, it generates `(-> Int Int Int)`:
+((start Int) )((start Int (x y)))
+no parameters:
+cannot type the following grammar as `(-> Int Bool)`, it generates `Bool`:
+((start Bool) )((start Bool (true)))
+non-terminal:
+cannot type non-terminal `start` as `Bool`, it has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let bool ← Srt.bool
+  let x ← Untyped.BVar.mk int "x"
+  let y ← Untyped.BVar.mk int "y"
+  let start ← Untyped.NT.mk int "start"
+  let g ← Untyped.Grammar.mk #[x, y] start
+  let g ← g.addRules start #[x.toTerm, y.toTerm]
+  let p ← Untyped.NT.mk bool "start"
+  let gp ← Untyped.Grammar.mk #[] p
+  let gp ← gp.addRule p (← Untyped.Term.mkBool true)
+  let _ : Grammar Bool ← gp.typeCheck
+  println! "no params : Grammar Bool"
+  try discard <| g.typeCheckAs (Int → Int)
+  catch e => println! "wrong arity:\n{e}"
+  try discard <| g.typeCheckAs (Int → Int → Bool)
+  catch e => println! "wrong codomain:\n{e}"
+  try discard <| gp.typeCheckAs (Int → Bool)
+  catch e => println! "no parameters:\n{e}"
+  try discard <| start.typeCheckAs Bool
+  catch e => println! "non-terminal:\n{e}"

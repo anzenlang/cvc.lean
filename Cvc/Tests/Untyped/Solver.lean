@@ -7,10 +7,10 @@ Authors: Adrien Champion
 
 module
 
-import Cvc.Untyped.Solver
+import Cvc.Untyped.Core.Solver
 import Cvc.Untyped.Theory.Arith
 
-meta import Cvc.Untyped.Solver
+meta import Cvc.Untyped.Core.Solver
 meta import Cvc.Untyped.Theory.Arith
 
 

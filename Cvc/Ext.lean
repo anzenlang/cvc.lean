@@ -248,26 +248,43 @@ partial def expandSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) :=
         `($applyN $fnId #[ $argIds,* ])
   | _ => Macro.throwErrorAt stx s!"unsupported SMT term (kind `{kind}`)"
 
-/-- The conversion to a term of a typed non-terminal's or bound variable's type, if it is one. -/
+/-- Whether a type is one of the layers' terms, or what converts to one: where a dotted identifier
+stops being a Lean projection and starts reading SMT record fields. -/
+def isSmtTermType (type : Expr) : Bool :=
+  match type.consumeMData.getAppFn.constName? with
+  -- written out rather than resolved, this module importing neither layer
+  | some n => [`Cvc.Untyped.Term, `Cvc.Untyped.BVar, `Cvc.Untyped.NT,
+               `Cvc.Typed.Term, `Cvc.Typed.BVar, `Cvc.Typed.NT].contains n
+  -- not headed by a constant: nothing says it is a Lean structure, so it is read as a term
+  | none => true
+
+/-- The conversion to a term of a typed non-terminal's, bound variable's or state symbol's type.
+
+A state symbol is a `Symbols.At`, whose `get` answers the term it wraps when the wrap is the
+layer's terms, as it is wherever `smt!` meets one.
+-/
 def typedToTerm? (type : Expr) : Option Name :=
   match type.consumeMData.getAppFn.constName? with
   | some `Cvc.Typed.NT => some `Cvc.Typed.NT.toTerm
   | some `Cvc.Typed.BVar => some `Cvc.Typed.BVar.toTerm
+  | some `Cvc.Typed.Symbols.At => some `Cvc.Typed.Symbols.At.get
   | _ => none
 
 /-- Elaborates an identifier leaf: the term it names, lifted with `pure`.
 
-Typed, a non-terminal or a bound variable is converted to its term here, by looking at its type,
-rather than left to the `NT α → Term α` coercion. The coercion needs the index it targets to be
-known, and in `smt! n * m` with no expected type nothing fixes it, so two non-terminals could not
-be combined at all. Converting by hand needs no index: it is read off the identifier's own type.
+Typed, a non-terminal, a bound variable or a state symbol (`Symbols.At`) is converted to its term
+here, by looking at its type, rather than left to the coercion. The coercion needs the index it
+targets to be known, and in `smt! n * m` with no expected type nothing fixes it, so two
+non-terminals — or `x + y` over two state symbols — could not be combined at all. Converting by hand needs no index: it is read off the identifier's own type.
 Anything else is elaborated exactly as written, so a sort mismatch between two terms is reported
-as before.
+as before. Not only identifiers come through here: a field projection on a Lean value does too.
 -/
-def elabSmtIdent (layer : Layer) (id : Ident) (expected? : Option Expr)
+def elabSmtIdent (layer : Layer) (id : Term) (expected? : Option Expr)
 : Elab.Term.TermElabM Expr := do
   if layer == .typed then
-    let e ← Elab.Term.elabTerm id none
+    -- an error here is the user's, and is reported from here alone: recovering from it would have
+    -- the elaboration below report it a second time
+    let e ← Elab.Term.withoutErrToSorry (Elab.Term.elabTerm id none)
     let type ← instantiateMVars (← Meta.inferType e)
     if let some conv := typedToTerm? type then
       let e ← Elab.Term.exprToSyntax e
