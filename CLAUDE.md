@@ -13,7 +13,7 @@ described once rather than written twice.
 
 ```
 lake build          # default target = lean_lib Cvc   ✅ green
-lake test           # testDriver = cvcTests (globs Cvc.Tests.* and Cvc.Examples.*)   ✅ green
+lake test           # testDriver = cvcTests (globs CvcTests.* and CvcExamples.*)   ✅ green
 lake run buildManual  / serveManual    # the Verso manual, see "Documentation" below
 lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
 ```
@@ -94,9 +94,9 @@ Cvc/{Untyped,Typed}/Extra/Sys.lean  → transition systems and BMC over them
 Cvc/Gen/Symbols.lean        → what both layers' `structure.symbols` share
 Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as data, by category, with
                               each one's value type (`argType`) and `toStrings` for `setOption`.
-                              Imported by nothing yet
-Cvc/Examples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
-Cvc/Tests/*                 → the test library (`lake test`)
+                              Publicly imported by `Untyped/Core/Solver.lean`, so `Cvc` exposes it
+CvcExamples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
+CvcTests/*                 → the test library (`lake test`)
 ```
 
 ### `Ω`, the `Env` monad and the sort registry
@@ -137,8 +137,8 @@ aliases avoid that by taking the scope as a *binder* instead (`Sig.Fun [Ω] : Ty
 constraint belongs to one scope, and code written once for every scope takes `[Ω] → …` at its own
 boundary — `LinSolve.run`'s constraints. And there is no sort-erased `TermToValue Term`/`ValueToTerm
 Term`: the class's field quantifies over the scope a term comes from, so an "identity" instance
-would map one scope's terms to another's. `Tests/Scope.lean` pins the three rejections: escaping a
-run, escaping into an enclosing run, and mixing two open scopes.
+would map one scope's terms to another's. `CvcTests/Scope.lean` pins the three rejections:
+escaping a run, escaping into an enclosing run, and mixing two open scopes.
 
 The scope's state is a record rather than a bare term manager, because a *declared* sort cannot be
 rebuilt (see "Datatypes"):
@@ -216,7 +216,7 @@ Both are `partial`, `Srt` being opaque. Two orderings in `toTyp` are load-bearin
 and nullables are all *datatypes* to cvc5, so the narrower testers
 come first; and `isInstantiated` is true even of a **non**-parametric datatype, so what actually
 marks an instantiation is a non-empty `getInstantiatedParameters`. A round trip is pinned for every
-case in [Cvc/Tests/Srt.lean](Cvc/Tests/Srt.lean).
+case in [CvcTests/Srt.lean](CvcTests/Srt.lean).
 
 #### Records
 
@@ -619,14 +619,14 @@ Sort-erased only, in `Untyped/Core/Defs.lean`: the escape hatch below every dedi
 mistakes but not all, which is why every kind otherwise has its own constructor — and cannot build
 an indexed operator. `Term.replaceKids t kids` reuses `t`'s operator, through `mkTermOfOp` when it
 is indexed so the indices survive, and answers a kid-less `t` as is when `kids` is empty. The walk
-rebuilds through `replaceKids`. Pinned in `Tests/Untyped/Kind.lean`, including that an application's
-first kid is the function and a quantifier's are its variable list and body.
+rebuilds through `replaceKids`. Pinned in `CvcTests/Untyped/Kind.lean`, including that an
+application's first kid is the function and a quantifier's are its variable list and body.
 
 `import Cvc.Untyped.View` / `Cvc.Typed.View` is the entry point: each re-exports its layer's `Core`,
 the generator behind `def.term_view`, and `Traverse`. A **view** takes a term apart one level — its
 operator as a constructor, its kids, indices and names as fields — and `def.term_view V` gathers the
 views of every *imported* theory into one inductive `V`. Worked examples are
-`Cvc/Examples/{Untyped,Typed}/Views.lean`.
+`CvcExamples/{Untyped,Typed}/Views.lean`.
 
 **One view per theory, generated in that theory's module.** A generation site carries
 `gen_untyped_view% from Cvc.Spec.X` / `gen_typed_view% from Cvc.Spec.X` beside its `gen_*%` line,
@@ -1678,7 +1678,7 @@ mid-elaboration — a hover inside a `do` block, before the pushed variables' ty
 `?m → ?m → Int` says less than the application it came from, that one at least naming the
 variables. `instantiateMVars` runs first, so an *assigned* metavariable resolves rather than
 suppressing the reduction. The three reducible cases are pinned in
-`Cvc/Tests/Typed/Core/BVar.lean`; the metavariable case only arises mid-elaboration and so cannot
+`CvcTests/Typed/Core/BVar.lean`; the metavariable case only arises mid-elaboration and so cannot
 be pinned by a build.
 
 **`BVars` collects in reverse**:
@@ -1803,7 +1803,7 @@ typed `Pred`, `PredAt`, `RelAt` and theirs besides. Each entry says whether the 
 scope, and is emitted as `abbrev MySymbols.X [Ω]? := @Symbols.Sig.X _? MySymbols`. The `@` is
 load-bearing: plain application would fill `Fun2At`'s optional `k'` with its default inside the
 alias, and `MySymbols.Fun2At 0 5` could no longer be written. Adding a `Sig` type means adding its
-name to one list. `Tests/SymbolsAliases.lean` pins every alias's signature, with no `Ω` in scope.
+name to one list. `CvcTests/SymbolsAliases.lean` pins every alias's signature, with no `Ω` in scope.
 
 `Cvc/Gen/Symbols.lean` holds what both layers share; each layer declares its own `scoped` spelling,
 so `open Cvc.Untyped` selects the sort-erased one exactly as it selects `smt!`.
@@ -1831,7 +1831,7 @@ Things to know before touching it:
   *collection* of symbols (`Array (W Bool)`), and an `InitData` other than the default `Unit` —
   both shown by the second example in each file.
 
-Worked examples live with the tests rather than in the module: `Cvc/Tests/{Untyped,Typed}/`
+Worked examples live with the tests rather than in the module: `CvcTests/{Untyped,Typed}/`
 `Symbols.lean` cover both paths, the generated one and the hand-written one, plus symbols at a
 step, and the module docstring points at them. `import all Cvc.Untyped.Core.Solver` is
 load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` action inside an
@@ -1943,15 +1943,15 @@ the `Except` form, so it is `none` on error, never `some null`. Two sources rema
 ## Tests
 
 The test library is Lean lib `cvcTests`, globbed with `Glob.submodules` over **both**
-[Cvc/Tests/](Cvc/Tests/) and [Cvc/Examples/](Cvc/Examples/), with `testDriver = "cvcTests"` — so
+[CvcTests/](CvcTests/) and [CvcExamples/](CvcExamples/), with `testDriver = "cvcTests"` — so
 `lake test` builds every module under either and nothing else. The examples are therefore tests:
 a worked example that stops compiling, or whose `#guard_msgs` output drifts, fails the suite.
 
 Adding a file to either tree is enough to have it run — **there is no aggregator to keep in sync**,
-and no root `Cvc/Tests.lean`: no target would build one, so its import list could only rot.
+and no root `CvcTests.lean`: no target would build one, so its import list could only rot.
 
 `lake test` is the way in. A single module can be built directly — `lake build
-Cvc.Tests.Untyped.Theory.Set` — but the library *root* cannot be: the package sets
+CvcTests.Untyped.Theory.Set` — but the library *root* cannot be: the package sets
 `precompileModules`, so building the root of a precompiled library as a target tries to load the
 very library it belongs to, and fails with `error loading plugin, initializer not found`.
 
@@ -1959,22 +1959,22 @@ Tests are plain `#guard_msgs`: `#guard_msgs in #eval Env.runIO do …` for behav
 expected output in the docstring **above**, and `#guard_msgs in example …` to pin an *expected*
 elaboration error verbatim. There is no assertion harness.
 
-- `Tests/Signatures.lean` — pins generated signatures of both layers, plus the definitional facts
+- `CvcTests/Signatures.lean` — pins generated signatures of both layers, plus the definitional facts
   (`bvConcat`'s size arithmetic, `neg`'s generality over `IsArith`, the `Ord` binders derived from
   container shapes).
-- `Tests/Fun.lean` — function sorts: that currying flattens while a higher-order domain stays
+- `CvcTests/Fun.lean` — function sorts: that currying flattens while a higher-order domain stays
   nested, that signatures track the index through application (including *partial* application,
   which yields a function-indexed term), and that the `Ord` binders come out right.
-- `Tests/Srt.lean`, `Tests/Logic.lean` — the sort layer and the SMT-LIB logic builder.
-- `Tests/Scope.lean` — that `Ω` keeps scopes apart statically: a sort cannot leave its run, cannot
-  escape into an enclosing run, and cannot meet a sort of another open scope.
+- `CvcTests/Srt.lean`, `CvcTests/Logic.lean` — the sort layer and the SMT-LIB logic builder.
+- `CvcTests/Scope.lean` — that `Ω` keeps scopes apart statically: a sort cannot leave its run,
+  cannot escape into an enclosing run, and cannot meet a sort of another open scope.
 **The test tree mirrors the source tree**, `Core`/`Theory` split included, so a module's tests sit
-where the module does. Namespaces inside the test files were *not* renamed with it: a test in
-`Tests/Untyped/Theory/Set.lean` still opens `namespace Cvc.Tests.Untyped.Term.Set`, matching the
-namespace under test rather than its own path.
+where the module does. Namespaces inside the test files were *not* renamed with it, nor when the
+tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still opens
+`namespace Cvc.Tests.Untyped.Term.Set`, matching the namespace under test rather than its own path.
 
-- `Tests/{Untyped,Typed}/Core/Bool.lean` — the one theory `Core` still holds.
-- `Tests/{Untyped,Typed}/Theory/*.lean` — one module per theory per layer. The `Fun` ones
+- `CvcTests/{Untyped,Typed}/Core/Bool.lean` — the one theory `Core` still holds.
+- `CvcTests/{Untyped,Typed}/Theory/*.lean` — one module per theory per layer. The `Fun` ones
   additionally solve end to end: an uninterpreted function is declared, constrained and read back
   out of a model, plus functionality and congruence as unsat checks.
 - **The DSL's tests mirror the DSL's layout.** A theory's notation is declared beside that
@@ -1983,30 +1983,30 @@ namespace under test rather than its own path.
   in `Theory/Set`, `++` in `Theory/Seq`, `⊎` in `Theory/Bag`, string literals in `Theory/String`,
   `match` in `Theory/Datatype`, and `{a := t}`/`{r with …}`/`r.a`/`|>.` in `Theory/Record`. Typed,
   each of those also pins the *index* its expansion produces.
-- `Tests/{Untyped,Typed}/Theory/Ext.lean` — what is left is what `Cvc/Ext.lean` itself declares:
+- `CvcTests/{Untyped,Typed}/Theory/Ext.lean` — what is left is what `Cvc/Ext.lean` itself declares:
   parentheses, the `![…]` escape, identifiers, application and `let`. Roughly a hundred lines each,
   depending on no theory.
-- `Tests/{Untyped,Typed}/Theory/Quant.lean` — both spellings building the same formula, solving
+- `CvcTests/{Untyped,Typed}/Theory/Quant.lean` — both spellings building the same formula, solving
   over quantified formulas, `qe`/`qeDisjunct` on them, and `smt! ∀`/`∃`; typed, the compile-time
   rejections (no variable, a non-formula body, a variable at the wrong sort).
-- `Tests/{Untyped,Typed}/Grammar.lean` — grammars and the three `smt.grammar!` forms.
-- `Tests/{Untyped,Typed}/Synth.lean` — synthesis, `checkSynth`'s branches and `findSynth`.
-- `Tests/{Untyped,Typed}/Theory/{Datatype,Sep,Record}.lean` — the theories that are
+- `CvcTests/{Untyped,Typed}/Grammar.lean` — grammars and the three `smt.grammar!` forms.
+- `CvcTests/{Untyped,Typed}/Synth.lean` — synthesis, `checkSynth`'s branches and `findSynth`.
+- `CvcTests/{Untyped,Typed}/Theory/{Datatype,Sep,Record}.lean` — the theories that are
   not term constructors alone. The `Record` ones cover the sort's reflection, every rejection's
   message, the `Fields` spine, and (typed) the Lean-value conversions.
-- `Tests/{Untyped,Typed}/Value.lean` — the value round trip: every scalar instance, the containers
-  (through a model where a built term is not a value), nesting, a size mismatch rejected rather
-  than truncated, reading a model, and the introspection accessors.
-- `Tests/{Untyped,Typed}/Core/BVar.lean` — bound variables and the definition functions that consume
-  them: `mkBVar` freshness, that `BVar` stays distinct from `Term` with `toTerm` as the only way
-  across, `Solver.declareFun` splitting a function index into domain and codomain, and
+- `CvcTests/{Untyped,Typed}/Value.lean` — the value round trip: every scalar instance, the
+  containers (through a model where a built term is not a value), nesting, a size mismatch rejected
+  rather than truncated, reading a model, and the introspection accessors.
+- `CvcTests/{Untyped,Typed}/Core/BVar.lean` — bound variables and the definition functions that
+  consume them: `mkBVar` freshness, that `BVar` stays distinct from `Term` with `toTerm` as the
+  only way across, `Solver.declareFun` splitting a function index into domain and codomain, and
   `Solver.defineFun` over a `BVars` list at zero, one, two and three parameters — the two- and
   three-parameter cases with non-commutative bodies, so a reversed argument order would show.
-- `Tests/{Untyped,Typed}/{Solver,Proof,Subst}.lean` — the driving surface.
-- `Tests/{Untyped,Typed}/View.lean` — the aggregate's signatures, taking terms apart, kind
+- `CvcTests/{Untyped,Typed}/{Solver,Proof,Subst}.lean` — the driving surface.
+- `CvcTests/{Untyped,Typed}/View.lean` — the aggregate's signatures, taking terms apart, kind
   ownership; typed, the record/tuple/nullable helpers, wrong-sort matches as errors, containers
-  denoting their own types. `Tests/View.lean` — the two `View` modules alone, with no theory.
-- `Tests/{Untyped,Typed}/Traverse.lean` — folds, walks (bottom-up, top-down with revisit, `stop`,
+  denoting their own types. `CvcTests/View.lean` — the two `View` modules alone, with no theory.
+- `CvcTests/{Untyped,Typed}/Traverse.lean` — folds, walks (bottom-up, top-down with revisit, `stop`,
   a refused replacement) and the zipper by hand; typed, a wrong-sort replacement as an error.
 
 ## What is left

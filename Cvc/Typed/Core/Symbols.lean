@@ -49,7 +49,7 @@ one step or two. In `smt!` a state symbol is read off its own type, so `x + y` o
 needs no `get`. `Cvc.Typed.Extra.Sys` builds transition systems and bounded model checking on top.
 
 Worked examples, including the hand-written path for what `structure.symbols` cannot express, are
-in `Cvc.Tests.Typed.Symbols`.
+in `CvcTests.Typed.Symbols`.
 -/
 namespace Cvc.Typed public section
 

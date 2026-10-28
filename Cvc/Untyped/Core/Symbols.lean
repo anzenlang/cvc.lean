@@ -48,7 +48,7 @@ one step or two. `Cvc.Untyped.Extra.Sys` builds transition systems and bounded m
 on top.
 
 Worked examples, including the hand-written path for what `structure.symbols` cannot express, are
-in `Cvc.Tests.Untyped.Symbols`.
+in `CvcTests.Untyped.Symbols`.
 -/
 namespace Cvc.Untyped public section
 
