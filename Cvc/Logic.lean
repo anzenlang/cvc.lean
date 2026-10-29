@@ -450,25 +450,25 @@ theorem arith_valid {l : Logic} {a : Arith} : (l.arith a).valid := by
 
 /-! ### Convenient `Logic` constructors for `Arith` -/
 
-def lia := mk |>.arith .lia
-def lra := mk |>.arith .lra
-def lira := mk |>.arith .lira
+def lia := mk |>.arith .lia |>.toLogic
+def lra := mk |>.arith .lra |>.toLogic
+def lira := mk |>.arith .lira |>.toLogic
 
-def nia := mk |>.arith .nia
-def nra := mk |>.arith .nra
-def nira := mk |>.arith .nira
+def nia := mk |>.arith .nia |>.toLogic
+def nra := mk |>.arith .nra |>.toLogic
+def nira := mk |>.arith .nira |>.toLogic
 
-def liat := mk |>.arith .liat
-def lrat := mk |>.arith .lrat
-def lirat := mk |>.arith .lirat
+def liat := mk |>.arith .liat |>.toLogic
+def lrat := mk |>.arith .lrat |>.toLogic
+def lirat := mk |>.arith .lirat |>.toLogic
 
-def niat := mk |>.arith .niat
-def nrat := mk |>.arith .nrat
-def nirat := mk |>.arith .nirat
+def niat := mk |>.arith .niat |>.toLogic
+def nrat := mk |>.arith .nrat |>.toLogic
+def nirat := mk |>.arith .nirat |>.toLogic
 
-def idl := mk |>.arith .idl
-def rdl := mk |>.arith .rdl
-def irdl := mk |>.arith .irdl
+def idl := mk |>.arith .idl |>.toLogic
+def rdl := mk |>.arith .rdl |>.toLogic
+def irdl := mk |>.arith .irdl |>.toLogic
 
 /-! ### Ubiquitous logics -/
 
@@ -503,6 +503,11 @@ def toSmtLib : Logic → String
     if let some arith := arith? then
       s := s ++ arith.toSmtLib
     s
+
+@[inherit_doc toSmtLib]
+protected abbrev toString := toSmtLib
+
+instance : ToString Logic := ⟨Logic.toString⟩
 
 open Std.Internal.Parsec.String in
 private def parseSmtLib (thenEoi : Bool := false) : Parser Logic := do
