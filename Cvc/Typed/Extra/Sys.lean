@@ -54,7 +54,7 @@ abbrev TermTrace := Sys.Trace (SVars.TermsAt)
 /-- A trace of Lean-values for some unrolled symbols. -/
 abbrev ValueTrace := Sys.Trace (SVars.ValuesAt)
 /-- A trace of `Term`-values for some unrolled symbols. -/
-abbrev TermValueTrace := Sys.Trace (SVars.TermValuesAt)
+abbrev ValueTermTrace := Sys.Trace (SVars.ValueTermsAt)
 
 /-- Extracts the Lean-values of a `TermTrace`. -/
 def ValueTrace.extract {s : Solver} : SVars.TermTrace k → s.EnvSat (SVars.ValueTrace k)
@@ -69,20 +69,20 @@ def TermTrace.getValues := @ValueTrace.extract
 def TermTrace.getCex := @TermTrace.getValues
 
 /-- Extracts the `Term`-values of a `TermTrace` -/
-def TermValueTrace.extract {s : Solver} : SVars.TermTrace k → s.EnvSat (SVars.TermValueTrace k)
-| .zero terms => .zero <$> terms.getTermValues s
+def ValueTermTrace.extract {s : Solver} : SVars.TermTrace k → s.EnvSat (SVars.ValueTermTrace k)
+| .zero terms => .zero <$> terms.getValueTerms s
 | .cons terms tl => do
-  let values ← terms.getTermValues s
+  let values ← terms.getValueTerms s
   .cons values <$> extract tl
 
-@[inherit_doc TermValueTrace.extract]
-def TermTrace.getTermValues := @TermValueTrace.extract
-@[inherit_doc TermTrace.getTermValues]
-def TermTrace.getTermCex := @TermTrace.getTermValues
+@[inherit_doc ValueTermTrace.extract]
+def TermTrace.getValueTerms := @ValueTermTrace.extract
+@[inherit_doc TermTrace.getValueTerms]
+def TermTrace.getTermCex := @TermTrace.getValueTerms
 
 end Sig
 
-export Sig (TermTrace ValueTrace TermValueTrace)
+export Sig (TermTrace ValueTrace ValueTermTrace)
 
 end Symbols
 

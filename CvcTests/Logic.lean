@@ -68,10 +68,10 @@ HO_QF_LIA → HO_QF_LIA
   roundTrip "QF_ALL   " Cvc.Logic.all.qf
   roundTrip "HO_QF_ALL" Cvc.Logic.all.ho.qf
   -- an ordinary logic takes the same prefixes, and must not have regressed
-  roundTrip "LIA      " Cvc.Logic.lia.toLogic
-  roundTrip "QF_LIA   " Cvc.Logic.qf_lia.toLogic
-  roundTrip "HO_LIA   " Cvc.Logic.lia.ho.toLogic
-  roundTrip "HO_QF_LIA" Cvc.Logic.qf_lia.ho.toLogic
+  roundTrip "LIA      " Cvc.Logic.lia
+  roundTrip "QF_LIA   " Cvc.Logic.qf_lia
+  roundTrip "HO_LIA   " Cvc.Logic.lia.ho
+  roundTrip "HO_QF_LIA" Cvc.Logic.qf_lia.ho
 
 /-! The prefixes print in a fixed order — `HO_` before `QF_` — whichever order they were added in.
 -/

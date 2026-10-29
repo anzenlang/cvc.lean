@@ -60,7 +60,7 @@ parsed : QF_LIA
 #guard_msgs in #eval Env.runIO do
   let s ← Cvc.Untyped.Solver.new
   println! "before : {← s.isLogicSet}"
-  s.setLogic Cvc.Logic.qf_lia.toLogic
+  s.setLogic Cvc.Logic.qf_lia
   println! "after  : {← s.isLogicSet}"
   println! "name   : {← s.getLogicString}"
   println! "parsed : {(← s.getLogic).toSmtLib}"

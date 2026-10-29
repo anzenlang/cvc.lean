@@ -39,6 +39,7 @@ abbrev Solver [Ω] := Cvc.Untyped.Solver
 @[inherit_doc Untyped.Solver.Proof]
 abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
 
+/-- Turns a `Solver` into an `Untyped.Solver`. -/
 abbrev Solver.relax [Ω] : Solver → Untyped.Solver := id
 
 /-- An array of `Solver.Proof`.
@@ -89,9 +90,6 @@ export Cvc.Untyped.Solver (EnvSatT EnvSat EnvUnsatT EnvUnsat EnvUnknownT EnvUnkn
 
 /-- Creates a new solver. -/
 def new : Env Solver := Cvc.Untyped.Solver.new
-
-/-- Turns a `Solver` into an `Untyped.Solver`. -/
-def erase (s : Solver) : Untyped.Solver := s
 
 section variable [Ω] [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 
@@ -237,6 +235,11 @@ def getValue [TermToValue α] (term : Term α) : s.EnvSat α := do
 @[inherit_doc getValue]
 abbrev _root_.Cvc.Typed.Term.getValue [TermToValue α] {s : Solver} (term : Term α) : s.EnvSat α :=
   s.getValue term
+
+@[inherit_doc getValue]
+abbrev _root_.Cvc.Typed.Term.getValueTerm [TermToValue α] {s : Solver} (term : Term α)
+: s.EnvSat (Term α) :=
+  s.getValueTerm term
 
 /-- The values the model gives some terms, as the Lean values their index describes. -/
 def getValues [TermToValue α] (terms : Terms α) : s.EnvSat (Array α) := do

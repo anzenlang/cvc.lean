@@ -41,10 +41,10 @@ structure.symbols Machine where
 #guard_msgs in #check @Machine.TermsAt
 /-- info: @Machine.BVars : [Ω] → Type -/
 #guard_msgs in #check @Machine.BVars
-/-- info: @Machine.TermValues : [Ω] → Type -/
-#guard_msgs in #check @Machine.TermValues
-/-- info: @Machine.TermValuesAt : [Ω] → Nat → Type -/
-#guard_msgs in #check @Machine.TermValuesAt
+/-- info: @Machine.ValueTerms : [Ω] → Type -/
+#guard_msgs in #check @Machine.ValueTerms
+/-- info: @Machine.ValueTermsAt : [Ω] → Nat → Type -/
+#guard_msgs in #check @Machine.ValueTermsAt
 /-- info: @Machine.Fun : [Ω] → Type -/
 #guard_msgs in #check @Machine.Fun
 /-- info: @Machine.FunAt : [Ω] → Nat → Type -/
@@ -86,10 +86,10 @@ structure.symbols Machine where
 #guard_msgs in #check @Machine.TermsAt
 /-- info: @Machine.BVars : [Ω] → Type -/
 #guard_msgs in #check @Machine.BVars
-/-- info: @Machine.TermValues : [Ω] → Type -/
-#guard_msgs in #check @Machine.TermValues
-/-- info: @Machine.TermValuesAt : [Ω] → Nat → Type -/
-#guard_msgs in #check @Machine.TermValuesAt
+/-- info: @Machine.ValueTerms : [Ω] → Type -/
+#guard_msgs in #check @Machine.ValueTerms
+/-- info: @Machine.ValueTermsAt : [Ω] → Nat → Type -/
+#guard_msgs in #check @Machine.ValueTermsAt
 /-- info: @Machine.Fun : [Ω] → Type → Type -/
 #guard_msgs in #check @Machine.Fun
 /-- info: @Machine.FunAt : [Ω] → Type → Nat → Type -/

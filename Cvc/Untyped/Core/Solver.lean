@@ -111,21 +111,21 @@ solver which answered. cvc5 still refuses some queries made in the wrong state, 
 namespace Solver variable [Ω] [Monad m]
 
 
-/-- Code running where the solver last answered sat. -/
+/-- Sat-specific modal environment. -/
 structure EnvSatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvSatT / EnvSat
 
-/-- Code running where the solver last answered unsat. -/
+/-- Unsat-specific modal environment. -/
 structure EnvUnsatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvUnsatT / EnvUnsat
 
-/-- Code running where the solver last answered unknown. -/
+/-- Unknown-specific modal environment. -/
 structure EnvUnknownT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α

@@ -93,7 +93,8 @@ Cvc/{Untyped,Typed}/Core/Symbols.lean → the record-of-symbols API, symbols at 
 Cvc/{Untyped,Typed}/Extra/Sys.lean  → transition systems and BMC over them
 Cvc/Gen/Symbols.lean        → what both layers' `structure.symbols` share
 Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as data, by category, with
-                              each one's value type (`argType`) and `toStrings` for `setOption`.
+                              each one's value type (`argType`) and `toStrings` for `setOption`,
+                              plus a flat `abbrev` per option (`.smt_produceModels`).
                               Publicly imported by `Untyped/Core/Solver.lean`, so `Cvc` exposes it
 CvcExamples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
 CvcTests/*                 → the test library (`lake test`)
@@ -759,6 +760,12 @@ let x ← solver.checkSat (ifSat := do …) (ifUnsat := do …) (ifUnknown := fu
 
 Defaults for the unused branches are `unexpectedSat`/`unexpectedUnsat`/`unexpectedUnknown`, which
 throw a user error (optionally dumping all assertions via `dumpAssertions`).
+
+**Every modal query has an unchecked twin in `Env`, named with a trailing `!`** — `getValue!`,
+`getUnsatCore!`, `getTimeoutCore!`, `getValueSepHeap!` — defined as the modal one unwrapped through
+the private `toEnv`, so the two cannot drift. It gives up both guarantees (when, and which
+solver); cvc5 still refuses some wrong-state queries at run time. `Term.getValue!` takes the solver
+explicitly, there being no expected mode monad to infer it from. `unexpected*` have no twin.
 
 The lift from `EnvT` is private, but each mode monad also has a *public* `liftIO` / `MonadLift IO`,
 so a branch can print or otherwise do IO directly — `println!` inside `ifSat` works, and a branch
@@ -1763,7 +1770,7 @@ sat branch.
 
 What used to be a separate state-variable framework is part of `Symbols`. `Symbols.At k W α` wraps
 a field read at step `k`, `get` unwraps it, and the step-indexed instantiations are `TermsAt k`,
-`ValuesAt k` and `TermValuesAt k`. `Idents.declareAt`/`declareAtIn` declare a step's symbols, and
+`ValuesAt k` and `ValueTermsAt k`. `Idents.declareAt`/`declareAtIn` declare a step's symbols, and
 the constraint aliases come in step forms too: `FunAt k`, `Fun2At k k'` (`k'` defaulting to
 `k + 1`) and their primed forms quantifying over the steps, plus typed `PredAt`/`RelAt`.
 `Cvc/{Untyped,Typed}/Extra/Sys.lean` builds transition systems and bounded model checking on top,
@@ -1797,7 +1804,7 @@ the class wants — `(W : Symbols.Wrap)` added, every field's type wrapped in it
 `Symbols.Sig` type. Doc comments, on the structure and on each field, are carried through.
 
 **The aliases are a list, per layer.** `Ext.symbolsSharedAliases` holds the ones both layers have
-(`Idents`, `Values`, `ValuesAt`, `Terms`, `TermsAt`, `BVars`, `TermValues`, `TermValuesAt`), and
+(`Idents`, `Values`, `ValuesAt`, `Terms`, `TermsAt`, `BVars`, `ValueTerms`, `ValueTermsAt`), and
 each layer passes its own on top — `Fun`, `FunAt`, `Fun2At` and their primed forms sort-erased, and
 typed `Pred`, `PredAt`, `RelAt` and theirs besides. Each entry says whether the alias takes the
 scope, and is emitted as `abbrev MySymbols.X [Ω]? := @Symbols.Sig.X _? MySymbols`. The `@` is
@@ -2080,6 +2087,12 @@ serveApiDocs 8001`) so that both can be served at once.
   once. The manual is not: every manual build recompiles the library under `v4.35.0-rc4`, and the
   next root build recompiles it back. Pinning Verso to a revision for the library's toolchain would
   end that.
+- **The manual links code into the published API reference**, `apiTargets` in
+  `Docs/Manual/Main.lean`, rooted at `apiRoot` (`https://adrienchampion.github.io/cvc.lean/api`). A
+  constant goes through doc-gen4's `find/?pattern=<name>#doc`, since rendering does not know its
+  module. The links are appended after Verso's own, so a constant whose docstring the manual shows
+  links there first and to the API from the hover menu. A definition made in a manual example gets
+  no API link.
 - **Docstrings need `import all`** — under the module system a docstring travels with a module's
   non-exported data, public declaration or not — and `import all` exposes `Term α`'s definition,
   which erases the typed layer's errors. So a manual page showing docstrings cannot also show sort

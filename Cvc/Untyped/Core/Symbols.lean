@@ -41,7 +41,7 @@ are generic over the `Sig`, so they need no per-structure definition either.
 read terms. A caller can therefore name a structure's identifiers and read its values outside a
 scope, entering one only to solve.
 
-**Symbols at a step.** `TermsAt k`, `ValuesAt k` and `TermValuesAt k` wrap every field in a
+**Symbols at a step.** `TermsAt k`, `ValuesAt k` and `ValueTermsAt k` wrap every field in a
 `Symbols.At k`, read with `get`, for the symbols of step `k` of a transition system: `declareAt k`
 names a symbol `count__@__k`, and `FunAt`, `Fun2At` and their primed forms are the constraints over
 one step or two. `Cvc.Untyped.Extra.Sys` builds transition systems and bounded model checking
@@ -87,11 +87,11 @@ abbrev BVars : Type := S (𝕂 BVar)
 /-- Lean-value specialization for a `Sig`. -/
 abbrev Values : Type := S (fun α => α)
 /-- `Term`-value specialization for a `Sig`. -/
-abbrev TermValues : Type := S (𝕂 Term)
+abbrev ValueTerms : Type := S (𝕂 Term)
 /-- Lean-value at `k` specialization for a `Sig`. -/
 abbrev ValuesAt (k : Nat) : Type := S (Symbols.At k fun α => α)
 /-- `Term`-value specialization for a `Sig`. -/
-abbrev TermValuesAt (k : Nat) : Type := S (Symbols.At k (𝕂 Term))
+abbrev ValueTermsAt (k : Nat) : Type := S (Symbols.At k (𝕂 Term))
 /-- Function from `Term`-symbols to a `Term`. -/
 abbrev Fun : Type := S.Terms → Env Term
 /-- Function from `Term`-symbols at `k` to a `Term`. -/
@@ -141,12 +141,12 @@ abbrev TermsAt (k : Nat) := S.TermsAt k
 abbrev BVars := S.BVars
 @[inherit_doc Sig.Values]
 abbrev Values := S.Values
-@[inherit_doc Sig.TermValues]
-abbrev TermValues := S.TermValues
+@[inherit_doc Sig.ValueTerms]
+abbrev ValueTerms := S.ValueTerms
 @[inherit_doc Sig.ValuesAt]
 abbrev ValuesAt (k : Nat) := S.ValuesAt k
-@[inherit_doc Sig.TermValuesAt]
-abbrev TermValuesAt (k : Nat) := S.TermValuesAt k
+@[inherit_doc Sig.ValueTermsAt]
+abbrev ValueTermsAt (k : Nat) := S.ValueTermsAt k
 @[inherit_doc Sig.Fun]
 abbrev Fun := S.Fun
 @[inherit_doc Sig.FunAt]
@@ -238,7 +238,7 @@ def getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values :=
     valueTerm.extractValue
 
 /-- The `Term`-values of some `Term`-symbols in a satisfiable instance. -/
-def getTermValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.TermValues :=
+def getValueTerms (terms : S.Terms) (solver : Solver) : solver.EnvSat S.ValueTerms :=
   S.mapM terms fun term => solver.getValue term
 
 /-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
@@ -260,7 +260,7 @@ def getValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValuesA
   S.mapM terms fun {α} _ _ term => return ⟨← solver.getValueAs α term⟩
 
 /-- The `Term`-values of some `Term`-symbols at depth `k`. -/
-def getTermValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.TermValuesAt k) :=
+def getValueTerms (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValueTermsAt k) :=
   S.mapM terms fun term => return ⟨← solver.getValue term⟩
 
 end TermsAt
@@ -280,8 +280,8 @@ def declareSymbols := @Symbols.Sig.Idents.declareIn
 def declareSymbolsAt := @Symbols.Sig.Idents.declareAtIn
 @[inherit_doc Symbols.Sig.Terms.getValues]
 def getSymbolValues := @Symbols.Sig.Terms.getValues
-@[inherit_doc Symbols.Sig.Terms.getTermValues]
-def getSymbolTermValues := @Symbols.Sig.Terms.getTermValues
+@[inherit_doc Symbols.Sig.Terms.getValueTerms]
+def getSymbolValueTerms := @Symbols.Sig.Terms.getValueTerms
 
 end Solver
 

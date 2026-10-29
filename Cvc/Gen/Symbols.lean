@@ -56,7 +56,7 @@ def symbolsReserved : Array Name :=
 parameters in both, each with whether it takes the scope. A layer's own aliases are its `extras`. -/
 def symbolsSharedAliases : Array (Name × Bool) :=
   #[(`Idents, false), (`Values, false), (`ValuesAt, false),
-    (`Terms, true), (`TermsAt, true), (`BVars, true), (`TermValues, true), (`TermValuesAt, true)]
+    (`Terms, true), (`TermsAt, true), (`BVars, true), (`ValueTerms, true), (`ValueTermsAt, true)]
 
 /-- The body of a generated `foldM syms acc f`: `f acc syms.a >>= fun acc => f acc syms.b >>= …`,
 over the given fields in order.

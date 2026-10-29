@@ -42,7 +42,7 @@ are generic over the `Sig`, so they need no per-structure definition either.
 read terms. A caller can therefore name a structure's identifiers and read its values outside a
 scope, entering one only to solve.
 
-**Symbols at a step.** `TermsAt k`, `ValuesAt k` and `TermValuesAt k` wrap every field in a
+**Symbols at a step.** `TermsAt k`, `ValuesAt k` and `ValueTermsAt k` wrap every field in a
 `Symbols.At k`, read with `get`, for the symbols of step `k` of a transition system: `declareAt k`
 names a symbol `count__@__k`, and `FunAt`, `Fun2At` and their primed forms are the constraints over
 one step or two. In `smt!` a state symbol is read off its own type, so `x + y` over two of them
@@ -87,12 +87,12 @@ abbrev TermsAt (k : Nat) : Type := S (Symbols.At k (Term ·))
 abbrev BVars : Type := S (Typed.BVar ·)
 @[inherit_doc Untyped.Symbols.Values]
 abbrev Values : Type := S (fun α => α)
-@[inherit_doc Untyped.Symbols.TermValues]
-abbrev TermValues : Type := S (Term ·)
+@[inherit_doc Untyped.Symbols.ValueTerms]
+abbrev ValueTerms : Type := S (Term ·)
 @[inherit_doc Untyped.Symbols.ValuesAt]
 abbrev ValuesAt (k : Nat) : Type := S (Symbols.At k fun α => α)
-@[inherit_doc Untyped.Symbols.TermValuesAt]
-abbrev TermValuesAt (k : Nat) : Type := S (Symbols.At k (Term ·))
+@[inherit_doc Untyped.Symbols.ValueTermsAt]
+abbrev ValueTermsAt (k : Nat) : Type := S (Symbols.At k (Term ·))
 @[inherit_doc Untyped.Symbols.Fun]
 abbrev Fun (α : Type) : Type := S.Terms → Env (Term α)
 @[inherit_doc Untyped.Symbols.FunAt]
@@ -142,7 +142,7 @@ section variable [Ω] [inst : Symbols S]
 namespace Symbols
 
 export Sig
-  ( Idents Terms TermsAt BVars Values TermValues ValuesAt TermValuesAt
+  ( Idents Terms TermsAt BVars Values ValueTerms ValuesAt ValueTermsAt
     Fun FunAt FunAt' Pred PredAt PredAt' Fun2At Fun2At' RelAt RelAt' )
 
 namespace Sig
@@ -217,7 +217,7 @@ def getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values :=
   S.mapM terms solver.getValue
 
 /-- The `Term`-values of some `Term`-symbols in a satisfiable instance. -/
-def getTermValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.TermValues :=
+def getValueTerms (terms : S.Terms) (solver : Solver) : solver.EnvSat S.ValueTerms :=
   S.mapM terms solver.getValueTerm
 
 /-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
@@ -239,7 +239,7 @@ def getValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValuesA
   S.mapM terms fun term => return ⟨← solver.getValue term⟩
 
 /-- The `Term`-values of some `Term`-symbols at depth `k`. -/
-def getTermValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.TermValuesAt k) :=
+def getValueTerms (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValueTermsAt k) :=
   S.mapM terms fun term => return ⟨← solver.getValueTerm term⟩
 
 end TermsAt
@@ -259,8 +259,8 @@ def declareSymbols := @Symbols.Sig.Idents.declareIn
 def declareSymbolsAt := @Symbols.Sig.Idents.declareAtIn
 @[inherit_doc Symbols.Sig.Terms.getValues]
 def getSymbolValues := @Symbols.Sig.Terms.getValues
-@[inherit_doc Symbols.Sig.Terms.getTermValues]
-def getSymbolTermValues := @Symbols.Sig.Terms.getTermValues
+@[inherit_doc Symbols.Sig.Terms.getValueTerms]
+def getSymbolValueTerms := @Symbols.Sig.Terms.getValueTerms
 
 end Solver
 
