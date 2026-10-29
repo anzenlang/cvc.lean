@@ -41,8 +41,9 @@ i1_pos := (<= 0 i1)
 ite := (ite (<= 0 i1) i1 i2)
 ```
 
+Using the `smt!` extension:
+
 ```lean
--- using the `smt!` extension
 open Typed in #eval Env.runIO do
   let b1 ← Term.mkSymbol "b1"
   let b2 ← Term.mkSymbol "b2"
@@ -79,8 +80,9 @@ f_i_b : Int := (f i b)
 f_i_b' : Int := (f i b)
 ```
 
+Using the `smt!` extension:
+
 ```lean
--- using the `smt!` extension
 open Typed in #eval Env.runIO do
   let f ← Term.mkSymbolAs (Int → Bool → Int) "f"
   let i ← Term.mkSymbol "i"

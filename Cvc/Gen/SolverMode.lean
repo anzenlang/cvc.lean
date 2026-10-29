@@ -48,10 +48,8 @@ macro "env_gen% " envT:ident " / " env:ident : command =>
   let tryCatchId := Lean.mkIdent `tryCatch
   let baseIOIdent := Lean.mkIdent ``BaseIO
   let solverIdent := Lean.mkIdent `Solver
-  let envDocString := s!"Non-transformer `{envT}`."
-  let envDoc := Cvc.mkDocComment envDocString
   `(
-$envDoc:docComment
+@[inherit_doc $envT]
 abbrev $env (s : $solverIdent) := $envT s $baseIOIdent
 
 namespace $envT variable {α β : Type} {m : Type → Type} [Monad m] {s : $solverIdent}
