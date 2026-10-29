@@ -135,4 +135,10 @@ def getValueSepHeap : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepHeap
 @[inherit_doc S.getValueSepNil]
 def getValueSepNil : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValueSepNil
 
+/-- `getValueSepHeap` in `Env`, not checked to follow a sat answer. -/
+def getValueSepHeap! : Env Term := s.getValueSepHeap.toEnv
+
+/-- `getValueSepNil` in `Env`, not checked to follow a sat answer. -/
+def getValueSepNil! : Env Term := s.getValueSepNil.toEnv
+
 end Solver

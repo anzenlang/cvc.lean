@@ -112,4 +112,10 @@ def getValueSepHeap : s.EnvSat (Term Bool) := U.getValueSepHeap s
 @[inherit_doc U.getValueSepNil]
 def getValueSepNil : s.EnvSat (Term Bool) := U.getValueSepNil s
 
+@[inherit_doc U.getValueSepHeap!]
+def getValueSepHeap! : Env (Term Bool) := U.getValueSepHeap! s
+
+@[inherit_doc U.getValueSepNil!]
+def getValueSepNil! : Env (Term Bool) := U.getValueSepNil! s
+
 end Solver

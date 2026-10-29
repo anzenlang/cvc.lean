@@ -102,6 +102,11 @@ be written, the index about *what* it may be written against.
 
 `env_gen%` comes from `Cvc.Gen.SolverMode`; the private lift it generates is private to *this*
 module, which is what lets `checkSat` below enter these monads and nothing else.
+
+**Every modal query also has an unchecked twin in `Env`**, named with a trailing `!` —
+`getValue!`, `getUnsatCore!` — for code that knows the answer by other means. It gives up both
+guarantees: nothing checks that the solver last answered as the query needs, or that it is the
+solver which answered. cvc5 still refuses some queries made in the wrong state, at run time.
 -/
 namespace Solver variable [Ω] [Monad m]
 
@@ -327,6 +332,14 @@ def declareFun (symbol : String) (sorts : Srts) (sort : Srt) (fresh : Bool := tr
 def declareConst (symbol : String) (sort : Srt) (fresh : Bool := true) : Env Term :=
   s.declareFun symbol #[] sort fresh
 
+/-- Declares a function symbol of the sort `α` denotes. -/
+def declareFunAs (α : Type) [ToTyp α] (symbol : String) (fresh : Bool := true) : Env Term := do
+  let srt ← Srt.of α
+  if let (some dom, some cod) := (srt.getFunctionDomainSorts?, srt.getFunctionCodomainSort?) then
+    s.declareFun symbol dom cod fresh
+  else
+    s.declareConst symbol srt fresh
+
 @[inherit_doc S.defineFun]
 def defineFun (symbol : String) (bvs : BVars) (sort : Srt) (body : Term)
   (global : Bool := false)
@@ -503,6 +516,41 @@ def blockModel (mode : Model.BlockMode) : s.EnvSat Unit :=
 def blockModelValues (terms : Terms) : s.EnvSat Unit :=
   runUnsafe' do s.toUnsafe.blockModelValues terms
 
+/-- `getValue` in `Env`, not checked to follow a sat answer. -/
+def getValue! (term : Term) : Env Term := (s.getValue term).toEnv
+
+/-- `getValue` in `Env`, not checked to follow a sat answer.
+
+The solver is explicit, there being no expected mode monad to infer it from.
+-/
+abbrev _root_.Cvc.Untyped.Term.getValueIn! (term : Term) (s : Solver) : Env Term := s.getValue! term
+
+/-- `getValues` in `Env`, not checked to follow a sat answer. -/
+def getValues! (terms : Terms) : Env Terms := (s.getValues terms).toEnv
+
+/-- `getValueAs` in `Env`, not checked to follow a sat answer. -/
+def getValueAs! (α : Type) [TermToValue α] (term : Term) : Env α := (s.getValueAs α term).toEnv
+
+/-- `getValuesAs` in `Env`, not checked to follow a sat answer. -/
+def getValuesAs! (α : Type) [TermToValue α] (terms : Terms) : Env (Array α) :=
+  (s.getValuesAs α terms).toEnv
+
+/-- `getModelDomainElements` in `Env`, not checked to follow a sat answer. -/
+def getModelDomainElements! (sort : Srt) : Env Terms := (s.getModelDomainElements sort).toEnv
+
+/-- `isModelCoreSymbol` in `Env`, not checked to follow a sat answer. -/
+def isModelCoreSymbol! (term : Term) : Env Bool := (s.isModelCoreSymbol term).toEnv
+
+/-- `getModelAsString` in `Env`, not checked to follow a sat answer. -/
+def getModelAsString! (sorts : Srts) (consts : Terms) : Env String :=
+  (s.getModelAsString sorts consts).toEnv
+
+/-- `blockModel` in `Env`, not checked to follow a sat answer. -/
+def blockModel! (mode : Model.BlockMode) : Env Unit := (s.blockModel mode).toEnv
+
+/-- `blockModelValues` in `Env`, not checked to follow a sat answer. -/
+def blockModelValues! (terms : Terms) : Env Unit := (s.blockModelValues terms).toEnv
+
 
 
 /-! ### Where the answer was unsat -/
@@ -520,6 +568,19 @@ def getUnsatCoreLemmas : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCo
 def getUnsatProof (pc : Proof.Component := .full) : s.EnvUnsat (s.Proofs pc) :=
   runUnsafe' do s.toUnsafe.getProof pc.toUnsafe
 
+/-- `getUnsatAssumptions` in `Env`, not checked to follow an unsat answer. -/
+def getUnsatAssumptions! : Env Terms := s.getUnsatAssumptions.toEnv
+
+/-- `getUnsatCore` in `Env`, not checked to follow an unsat answer. -/
+def getUnsatCore! : Env Terms := s.getUnsatCore.toEnv
+
+/-- `getUnsatCoreLemmas` in `Env`, not checked to follow an unsat answer. -/
+def getUnsatCoreLemmas! : Env Terms := s.getUnsatCoreLemmas.toEnv
+
+/-- `getUnsatProof` in `Env`, not checked to follow an unsat answer. -/
+def getUnsatProof! (pc : Proof.Component := .full) : Env (s.Proofs pc) :=
+  (s.getUnsatProof pc).toEnv
+
 
 
 /-! ### Where the answer was unknown -/
@@ -533,6 +594,13 @@ def getTimeoutCore : s.EnvUnknown (Result × Terms) := runUnsafe' do
 def getTimeoutCoreAssuming (assumptions : Terms) : s.EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCoreAssuming assumptions
   return (Result.ofUnsafe res, terms)
+
+/-- `getTimeoutCore` in `Env`, not checked to follow an unknown answer. -/
+def getTimeoutCore! : Env (Result × Terms) := s.getTimeoutCore.toEnv
+
+/-- `getTimeoutCoreAssuming` in `Env`, not checked to follow an unknown answer. -/
+def getTimeoutCoreAssuming! (assumptions : Terms) : Env (Result × Terms) :=
+  (s.getTimeoutCoreAssuming assumptions).toEnv
 
 end
 

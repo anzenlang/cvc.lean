@@ -90,13 +90,16 @@ export Cvc.Untyped.Solver (EnvSatT EnvSat EnvUnsatT EnvUnsat EnvUnknownT EnvUnkn
 /-- Creates a new solver. -/
 def new : Env Solver := Cvc.Untyped.Solver.new
 
+/-- Turns a `Solver` into an `Untyped.Solver`. -/
+def erase (s : Solver) : Untyped.Solver := s
+
 section variable [Ω] [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 
 
 open Cvc renaming Untyped.Solver → U
 
 /-- Declares a function symbol of type `α`. -/
-def declareFun' (symbol : String) (α : Type) [ToTyp α] (fresh : Bool := false) : Env (Term α) := do
+def declareFunAs (α : Type) (symbol : String) [ToTyp α] (fresh : Bool := false) : Env (Term α) := do
   let srt ← Srt.of α
   let domCod? : Option (Array Srt × Srt) := do
     let dom ← srt.getFunctionDomainSorts?
@@ -105,9 +108,9 @@ def declareFun' (symbol : String) (α : Type) [ToTyp α] (fresh : Bool := false)
   let (dom, cod) := if let some domCod := domCod? then domCod else (#[], srt)
   Untyped.Solver.declareFun s symbol dom cod (fresh := fresh)
 
-@[inherit_doc declareFun']
+@[inherit_doc declareFunAs]
 abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := false) : Env (Term α) :=
-  s.declareFun' symbol α (fresh := fresh)
+  s.declareFunAs α symbol (fresh := fresh)
 
 /-- Defines a function symbol over bound variables `bvs` defined by `body`. -/
 def defineFun [ToTyp β]
@@ -245,6 +248,28 @@ def getModelDomainElements (α : Type) [ToTyp α] : s.EnvSat (Terms α) := do
   let srt ← (Srt.of α : Env Srt)
   U.getModelDomainElements s srt
 
+def% getValueTerm! : (s : Solver) → (term : Term α) → Env (Term α) ← getValue!
+def% getValueTerms! : (s : Solver) → (terms : Terms α) → Env (Terms α) ← getValues!
+def% isModelCoreSymbol! : (s : Solver) → (term : Term α) → Env Bool ← isModelCoreSymbol!
+def% blockModelValues! : (s : Solver) → (terms : Terms α) → Env Unit ← blockModelValues!
+
+/-- `getValue` in `Env`, not checked to follow a sat answer. -/
+def getValue! [TermToValue α] (term : Term α) : Env α := (s.getValue term).toEnv
+
+/-- `getValue` in `Env`, not checked to follow a sat answer.
+
+The solver is explicit, there being no expected mode monad to infer it from.
+-/
+abbrev _root_.Cvc.Typed.Term.getValueIn! [TermToValue α] (term : Term α) (s : Solver) : Env α :=
+  s.getValue! term
+
+/-- `getValues` in `Env`, not checked to follow a sat answer. -/
+def getValues! [TermToValue α] (terms : Terms α) : Env (Array α) := (s.getValues terms).toEnv
+
+/-- `getModelDomainElements` in `Env`, not checked to follow a sat answer. -/
+def getModelDomainElements! (α : Type) [ToTyp α] : Env (Terms α) :=
+  (s.getModelDomainElements α).toEnv
+
 
 
 /-! ## Where the answer was unsat -/
@@ -264,6 +289,14 @@ where an inherited one would answer a sort-erased term.
 def getUnsatProof (pc : Proof.Component := Proof.Component.full) : s.EnvUnsat (s.Proofs pc) :=
   U.getUnsatProof s pc
 
+def% getUnsatAssumptions! : (s : Solver) → Env (Terms Bool) ← getUnsatAssumptions!
+def% getUnsatCore! : (s : Solver) → Env (Terms Bool) ← getUnsatCore!
+def% getUnsatCoreLemmas! : (s : Solver) → Env (Terms Bool) ← getUnsatCoreLemmas!
+
+/-- `getUnsatProof` in `Env`, not checked to follow an unsat answer. -/
+def getUnsatProof! (pc : Proof.Component := Proof.Component.full) : Env (s.Proofs pc) :=
+  (s.getUnsatProof pc).toEnv
+
 
 
 /-! ## Where the answer was unknown -/
@@ -272,6 +305,11 @@ def% getTimeoutCore : (s : Solver) → s.EnvUnknown (Result × Terms Bool) ← g
 def% getTimeoutCoreAssuming :
   (s : Solver) → (assumptions : Terms Bool) → s.EnvUnknown (Result × Terms Bool)
 ← getTimeoutCoreAssuming
+
+def% getTimeoutCore! : (s : Solver) → Env (Result × Terms Bool) ← getTimeoutCore!
+def% getTimeoutCoreAssuming! :
+  (s : Solver) → (assumptions : Terms Bool) → Env (Result × Terms Bool)
+← getTimeoutCoreAssuming!
 
 end
 
