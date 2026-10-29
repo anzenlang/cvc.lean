@@ -17,6 +17,9 @@ the value an option expects: `Bool` for a flag, `Nat` or `Int` for a number, and
 inductive for an option taking one of a fixed set of modes. `Solver.Option.toStrings` produces the
 flag and value cvc5's string-based `setOption` wants.
 
+Each option is also an abbreviation on `Solver.Option` named after its category and itself, so
+`.smt_produceModels` can be written for `.smt .produceModels`.
+
 The options are cvc5's own, minus three kinds:
 
 - those cvc5 reserves for experts;
@@ -2607,5 +2610,370 @@ def valueString : (opt : Option) → opt.argType → String
 /-- The flag and the value to hand cvc5's string-based `setOption`. -/
 def toStrings (opt : Option) (v : opt.argType) : String × String :=
   (opt.name, opt.valueString v)
+
+/-! ### Every option at the top level
+
+One abbreviation per option, named after its category and itself, so that `.smt_produceModels`
+stands for `.smt .produceModels` wherever an `Option` is expected, patterns included.
+-/
+
+@[match_pattern, inherit_doc Option.Base.incremental]
+abbrev base_incremental : Option := .base .incremental
+@[match_pattern, inherit_doc Option.Base.output]
+abbrev base_output : Option := .base .output
+@[match_pattern, inherit_doc Option.Base.parseOnly]
+abbrev base_parseOnly : Option := .base .parseOnly
+@[match_pattern, inherit_doc Option.Base.preprocessOnly]
+abbrev base_preprocessOnly : Option := .base .preprocessOnly
+@[match_pattern, inherit_doc Option.Base.rlimit]
+abbrev base_rlimit : Option := .base .rlimit
+@[match_pattern, inherit_doc Option.Base.rlimitPer]
+abbrev base_rlimitPer : Option := .base .rlimitPer
+@[match_pattern, inherit_doc Option.Base.stats]
+abbrev base_stats : Option := .base .stats
+@[match_pattern, inherit_doc Option.Base.statsAll]
+abbrev base_statsAll : Option := .base .statsAll
+@[match_pattern, inherit_doc Option.Base.statsInternal]
+abbrev base_statsInternal : Option := .base .statsInternal
+@[match_pattern, inherit_doc Option.Base.tlimit]
+abbrev base_tlimit : Option := .base .tlimit
+@[match_pattern, inherit_doc Option.Base.tlimitPer]
+abbrev base_tlimitPer : Option := .base .tlimitPer
+@[match_pattern, inherit_doc Option.Base.verbosity]
+abbrev base_verbosity : Option := .base .verbosity
+@[match_pattern, inherit_doc Option.Base.seed]
+abbrev base_seed : Option := .base .seed
+@[match_pattern, inherit_doc Option.Base.statsEveryQuery]
+abbrev base_statsEveryQuery : Option := .base .statsEveryQuery
+
+@[match_pattern, inherit_doc Option.Smt.decision]
+abbrev smt_decision : Option := .smt .decision
+@[match_pattern, inherit_doc Option.Smt.checkAbducts]
+abbrev smt_checkAbducts : Option := .smt .checkAbducts
+@[match_pattern, inherit_doc Option.Smt.checkInterpolants]
+abbrev smt_checkInterpolants : Option := .smt .checkInterpolants
+@[match_pattern, inherit_doc Option.Smt.checkModelSubsolver]
+abbrev smt_checkModelSubsolver : Option := .smt .checkModelSubsolver
+@[match_pattern, inherit_doc Option.Smt.checkModels]
+abbrev smt_checkModels : Option := .smt .checkModels
+@[match_pattern, inherit_doc Option.Smt.checkProofs]
+abbrev smt_checkProofs : Option := .smt .checkProofs
+@[match_pattern, inherit_doc Option.Smt.checkSynthSol]
+abbrev smt_checkSynthSol : Option := .smt .checkSynthSol
+@[match_pattern, inherit_doc Option.Smt.checkUnsatCores]
+abbrev smt_checkUnsatCores : Option := .smt .checkUnsatCores
+@[match_pattern, inherit_doc Option.Smt.debugCheckModels]
+abbrev smt_debugCheckModels : Option := .smt .debugCheckModels
+@[match_pattern, inherit_doc Option.Smt.produceModels]
+abbrev smt_produceModels : Option := .smt .produceModels
+@[match_pattern, inherit_doc Option.Smt.produceProofs]
+abbrev smt_produceProofs : Option := .smt .produceProofs
+@[match_pattern, inherit_doc Option.Smt.produceUnsatCores]
+abbrev smt_produceUnsatCores : Option := .smt .produceUnsatCores
+@[match_pattern, inherit_doc Option.Smt.interpolantsMode]
+abbrev smt_interpolantsMode : Option := .smt .interpolantsMode
+@[match_pattern, inherit_doc Option.Smt.learnedRewrite]
+abbrev smt_learnedRewrite : Option := .smt .learnedRewrite
+@[match_pattern, inherit_doc Option.Smt.modelCores]
+abbrev smt_modelCores : Option := .smt .modelCores
+@[match_pattern, inherit_doc Option.Smt.printCoresFull]
+abbrev smt_printCoresFull : Option := .smt .printCoresFull
+@[match_pattern, inherit_doc Option.Smt.produceAbducts]
+abbrev smt_produceAbducts : Option := .smt .produceAbducts
+@[match_pattern, inherit_doc Option.Smt.produceAssertions]
+abbrev smt_produceAssertions : Option := .smt .produceAssertions
+@[match_pattern, inherit_doc Option.Smt.produceAssignments]
+abbrev smt_produceAssignments : Option := .smt .produceAssignments
+@[match_pattern, inherit_doc Option.Smt.produceDifficulty]
+abbrev smt_produceDifficulty : Option := .smt .produceDifficulty
+@[match_pattern, inherit_doc Option.Smt.produceInterpolants]
+abbrev smt_produceInterpolants : Option := .smt .produceInterpolants
+@[match_pattern, inherit_doc Option.Smt.produceLearnedLiterals]
+abbrev smt_produceLearnedLiterals : Option := .smt .produceLearnedLiterals
+@[match_pattern, inherit_doc Option.Smt.produceUnsatAssumptions]
+abbrev smt_produceUnsatAssumptions : Option := .smt .produceUnsatAssumptions
+@[match_pattern, inherit_doc Option.Smt.simplification]
+abbrev smt_simplification : Option := .smt .simplification
+@[match_pattern, inherit_doc Option.Smt.solveBvAsInt]
+abbrev smt_solveBvAsInt : Option := .smt .solveBvAsInt
+@[match_pattern, inherit_doc Option.Smt.solveIntAsBv]
+abbrev smt_solveIntAsBv : Option := .smt .solveIntAsBv
+@[match_pattern, inherit_doc Option.Smt.solveRealAsInt]
+abbrev smt_solveRealAsInt : Option := .smt .solveRealAsInt
+@[match_pattern, inherit_doc Option.Smt.staticLearning]
+abbrev smt_staticLearning : Option := .smt .staticLearning
+
+@[match_pattern, inherit_doc Option.Printing.printSuccess]
+abbrev printing_printSuccess : Option := .printing .printSuccess
+@[match_pattern, inherit_doc Option.Printing.dagThresh]
+abbrev printing_dagThresh : Option := .printing .dagThresh
+@[match_pattern, inherit_doc Option.Printing.exprDepth]
+abbrev printing_exprDepth : Option := .printing .exprDepth
+@[match_pattern, inherit_doc Option.Printing.outputLang]
+abbrev printing_outputLang : Option := .printing .outputLang
+@[match_pattern, inherit_doc Option.Printing.bvPrintConstsAsIndexedSymbols]
+abbrev printing_bvPrintConstsAsIndexedSymbols : Option := .printing .bvPrintConstsAsIndexedSymbols
+@[match_pattern, inherit_doc Option.Printing.modelUPrint]
+abbrev printing_modelUPrint : Option := .printing .modelUPrint
+
+@[match_pattern, inherit_doc Option.Proof.check]
+abbrev proof_check : Option := .proof .check
+@[match_pattern, inherit_doc Option.Proof.granularity]
+abbrev proof_granularity : Option := .proof .granularity
+@[match_pattern, inherit_doc Option.Proof.printConclusion]
+abbrev proof_printConclusion : Option := .proof .printConclusion
+@[match_pattern, inherit_doc Option.Proof.printReference]
+abbrev proof_printReference : Option := .proof .printReference
+@[match_pattern, inherit_doc Option.Proof.optResReconstructionSize]
+abbrev proof_optResReconstructionSize : Option := .proof .optResReconstructionSize
+@[match_pattern, inherit_doc Option.Proof.chainMRes]
+abbrev proof_chainMRes : Option := .proof .chainMRes
+@[match_pattern, inherit_doc Option.Proof.rewriteRconsRecLimit]
+abbrev proof_rewriteRconsRecLimit : Option := .proof .rewriteRconsRecLimit
+@[match_pattern, inherit_doc Option.Proof.rewriteRconsStepLimit]
+abbrev proof_rewriteRconsStepLimit : Option := .proof .rewriteRconsStepLimit
+@[match_pattern, inherit_doc Option.Proof.propProofMode]
+abbrev proof_propProofMode : Option := .proof .propProofMode
+
+@[match_pattern, inherit_doc Option.Sat.preregisterMode]
+abbrev sat_preregisterMode : Option := .sat .preregisterMode
+@[match_pattern, inherit_doc Option.Sat.randomSeed]
+abbrev sat_randomSeed : Option := .sat .randomSeed
+
+@[match_pattern, inherit_doc Option.Theory.condenseFunctionValues]
+abbrev theory_condenseFunctionValues : Option := .theory .condenseFunctionValues
+@[match_pattern, inherit_doc Option.Theory.defaultFunctionValueMode]
+abbrev theory_defaultFunctionValueMode : Option := .theory .defaultFunctionValueMode
+@[match_pattern, inherit_doc Option.Theory.eeMode]
+abbrev theory_eeMode : Option := .theory .eeMode
+
+@[match_pattern, inherit_doc Option.Arith.brab]
+abbrev arith_brab : Option := .arith .brab
+@[match_pattern, inherit_doc Option.Arith.rewriteEqualities]
+abbrev arith_rewriteEqualities : Option := .arith .rewriteEqualities
+@[match_pattern, inherit_doc Option.Arith.staticLearning]
+abbrev arith_staticLearning : Option := .arith .staticLearning
+@[match_pattern, inherit_doc Option.Arith.nlCov]
+abbrev arith_nlCov : Option := .arith .nlCov
+@[match_pattern, inherit_doc Option.Arith.nlCovLinearModel]
+abbrev arith_nlCovLinearModel : Option := .arith .nlCovLinearModel
+@[match_pattern, inherit_doc Option.Arith.nlExt]
+abbrev arith_nlExt : Option := .arith .nlExt
+@[match_pattern, inherit_doc Option.Arith.nlExtFactor]
+abbrev arith_nlExtFactor : Option := .arith .nlExtFactor
+@[match_pattern, inherit_doc Option.Arith.nlExtFlattenMon]
+abbrev arith_nlExtFlattenMon : Option := .arith .nlExtFlattenMon
+@[match_pattern, inherit_doc Option.Arith.nlExtRewrite]
+abbrev arith_nlExtRewrite : Option := .arith .nlExtRewrite
+@[match_pattern, inherit_doc Option.Arith.nlExtTfTplanes]
+abbrev arith_nlExtTfTplanes : Option := .arith .nlExtTfTplanes
+@[match_pattern, inherit_doc Option.Arith.nlExtTplanes]
+abbrev arith_nlExtTplanes : Option := .arith .nlExtTplanes
+@[match_pattern, inherit_doc Option.Arith.nlExtTplanesInterleave]
+abbrev arith_nlExtTplanesInterleave : Option := .arith .nlExtTplanesInterleave
+
+@[match_pattern, inherit_doc Option.Arrays.eagerIndex]
+abbrev arrays_eagerIndex : Option := .arrays .eagerIndex
+
+@[match_pattern, inherit_doc Option.Bv.bitblast]
+abbrev bv_bitblast : Option := .bv .bitblast
+@[match_pattern, inherit_doc Option.Bv.boolToBv]
+abbrev bv_boolToBv : Option := .bv .boolToBv
+@[match_pattern, inherit_doc Option.Bv.eagerEval]
+abbrev bv_eagerEval : Option := .bv .eagerEval
+@[match_pattern, inherit_doc Option.Bv.satSolver]
+abbrev bv_satSolver : Option := .bv .satSolver
+@[match_pattern, inherit_doc Option.Bv.solver]
+abbrev bv_solver : Option := .bv .solver
+@[match_pattern, inherit_doc Option.Bv.toBool]
+abbrev bv_toBool : Option := .bv .toBool
+
+@[match_pattern, inherit_doc Option.Strings.reElim]
+abbrev strings_reElim : Option := .strings .reElim
+@[match_pattern, inherit_doc Option.Strings.checkEntailLen]
+abbrev strings_checkEntailLen : Option := .strings .checkEntailLen
+@[match_pattern, inherit_doc Option.Strings.deqExt]
+abbrev strings_deqExt : Option := .strings .deqExt
+@[match_pattern, inherit_doc Option.Strings.eagerEval]
+abbrev strings_eagerEval : Option := .strings .eagerEval
+@[match_pattern, inherit_doc Option.Strings.eagerLenRe]
+abbrev strings_eagerLenRe : Option := .strings .eagerLenRe
+@[match_pattern, inherit_doc Option.Strings.eagerSolver]
+abbrev strings_eagerSolver : Option := .strings .eagerSolver
+@[match_pattern, inherit_doc Option.Strings.exp]
+abbrev strings_exp : Option := .strings .exp
+@[match_pattern, inherit_doc Option.Strings.fmf]
+abbrev strings_fmf : Option := .strings .fmf
+@[match_pattern, inherit_doc Option.Strings.lazyPp]
+abbrev strings_lazyPp : Option := .strings .lazyPp
+@[match_pattern, inherit_doc Option.Strings.mbr]
+abbrev strings_mbr : Option := .strings .mbr
+@[match_pattern, inherit_doc Option.Strings.processLoopMode]
+abbrev strings_processLoopMode : Option := .strings .processLoopMode
+@[match_pattern, inherit_doc Option.Strings.regexpInclusion]
+abbrev strings_regexpInclusion : Option := .strings .regexpInclusion
+
+@[match_pattern, inherit_doc Option.Uf.eagerArithBvConv]
+abbrev uf_eagerArithBvConv : Option := .uf .eagerArithBvConv
+@[match_pattern, inherit_doc Option.Uf.symmetryBreaker]
+abbrev uf_symmetryBreaker : Option := .uf .symmetryBreaker
+@[match_pattern, inherit_doc Option.Uf.lazyLl]
+abbrev uf_lazyLl : Option := .uf .lazyLl
+@[match_pattern, inherit_doc Option.Uf.ss]
+abbrev uf_ss : Option := .uf .ss
+@[match_pattern, inherit_doc Option.Uf.ssAbortCard]
+abbrev uf_ssAbortCard : Option := .uf .ssAbortCard
+@[match_pattern, inherit_doc Option.Uf.ssFair]
+abbrev uf_ssFair : Option := .uf .ssFair
+
+@[match_pattern, inherit_doc Option.Quant.enumInst]
+abbrev quant_enumInst : Option := .quant .enumInst
+@[match_pattern, inherit_doc Option.Quant.fullSaturateQuant]
+abbrev quant_fullSaturateQuant : Option := .quant .fullSaturateQuant
+@[match_pattern, inherit_doc Option.Quant.printInst]
+abbrev quant_printInst : Option := .quant .printInst
+@[match_pattern, inherit_doc Option.Quant.cbqi]
+abbrev quant_cbqi : Option := .quant .cbqi
+@[match_pattern, inherit_doc Option.Quant.cbqiAllConflict]
+abbrev quant_cbqiAllConflict : Option := .quant .cbqiAllConflict
+@[match_pattern, inherit_doc Option.Quant.cbqiMode]
+abbrev quant_cbqiMode : Option := .quant .cbqiMode
+@[match_pattern, inherit_doc Option.Quant.cegqi]
+abbrev quant_cegqi : Option := .quant .cegqi
+@[match_pattern, inherit_doc Option.Quant.cegqiBv]
+abbrev quant_cegqiBv : Option := .quant .cegqiBv
+@[match_pattern, inherit_doc Option.Quant.cegqiInnermost]
+abbrev quant_cegqiInnermost : Option := .quant .cegqiInnermost
+@[match_pattern, inherit_doc Option.Quant.cegqiMidpoint]
+abbrev quant_cegqiMidpoint : Option := .quant .cegqiMidpoint
+@[match_pattern, inherit_doc Option.Quant.cegqiNestedQe]
+abbrev quant_cegqiNestedQe : Option := .quant .cegqiNestedQe
+@[match_pattern, inherit_doc Option.Quant.eMatching]
+abbrev quant_eMatching : Option := .quant .eMatching
+@[match_pattern, inherit_doc Option.Quant.elimTautQuant]
+abbrev quant_elimTautQuant : Option := .quant .elimTautQuant
+@[match_pattern, inherit_doc Option.Quant.enumInstInterleave]
+abbrev quant_enumInstInterleave : Option := .quant .enumInstInterleave
+@[match_pattern, inherit_doc Option.Quant.enumInstSum]
+abbrev quant_enumInstSum : Option := .quant .enumInstSum
+@[match_pattern, inherit_doc Option.Quant.extRewriteQuant]
+abbrev quant_extRewriteQuant : Option := .quant .extRewriteQuant
+@[match_pattern, inherit_doc Option.Quant.finiteModelFind]
+abbrev quant_finiteModelFind : Option := .quant .finiteModelFind
+@[match_pattern, inherit_doc Option.Quant.fmfBound]
+abbrev quant_fmfBound : Option := .quant .fmfBound
+@[match_pattern, inherit_doc Option.Quant.fmfTypeCompletionThresh]
+abbrev quant_fmfTypeCompletionThresh : Option := .quant .fmfTypeCompletionThresh
+@[match_pattern, inherit_doc Option.Quant.ieval]
+abbrev quant_ieval : Option := .quant .ieval
+@[match_pattern, inherit_doc Option.Quant.instLocal]
+abbrev quant_instLocal : Option := .quant .instLocal
+@[match_pattern, inherit_doc Option.Quant.instMaxRounds]
+abbrev quant_instMaxRounds : Option := .quant .instMaxRounds
+@[match_pattern, inherit_doc Option.Quant.instNoEntail]
+abbrev quant_instNoEntail : Option := .quant .instNoEntail
+@[match_pattern, inherit_doc Option.Quant.instWhen]
+abbrev quant_instWhen : Option := .quant .instWhen
+@[match_pattern, inherit_doc Option.Quant.iteLiftQuant]
+abbrev quant_iteLiftQuant : Option := .quant .iteLiftQuant
+@[match_pattern, inherit_doc Option.Quant.macrosQuant]
+abbrev quant_macrosQuant : Option := .quant .macrosQuant
+@[match_pattern, inherit_doc Option.Quant.macrosQuantMode]
+abbrev quant_macrosQuantMode : Option := .quant .macrosQuantMode
+@[match_pattern, inherit_doc Option.Quant.mbqi]
+abbrev quant_mbqi : Option := .quant .mbqi
+@[match_pattern, inherit_doc Option.Quant.mbqiCheckTimeout]
+abbrev quant_mbqiCheckTimeout : Option := .quant .mbqiCheckTimeout
+@[match_pattern, inherit_doc Option.Quant.mbqiEnum]
+abbrev quant_mbqiEnum : Option := .quant .mbqiEnum
+@[match_pattern, inherit_doc Option.Quant.mbqiOneInstPerRound]
+abbrev quant_mbqiOneInstPerRound : Option := .quant .mbqiOneInstPerRound
+@[match_pattern, inherit_doc Option.Quant.miniscopeQuant]
+abbrev quant_miniscopeQuant : Option := .quant .miniscopeQuant
+@[match_pattern, inherit_doc Option.Quant.miniscopeQuantUser]
+abbrev quant_miniscopeQuantUser : Option := .quant .miniscopeQuantUser
+@[match_pattern, inherit_doc Option.Quant.multiTriggerCache]
+abbrev quant_multiTriggerCache : Option := .quant .multiTriggerCache
+@[match_pattern, inherit_doc Option.Quant.multiTriggerLinear]
+abbrev quant_multiTriggerLinear : Option := .quant .multiTriggerLinear
+@[match_pattern, inherit_doc Option.Quant.multiTriggerPriority]
+abbrev quant_multiTriggerPriority : Option := .quant .multiTriggerPriority
+@[match_pattern, inherit_doc Option.Quant.multiTriggerWhenSingle]
+abbrev quant_multiTriggerWhenSingle : Option := .quant .multiTriggerWhenSingle
+@[match_pattern, inherit_doc Option.Quant.preSkolemQuant]
+abbrev quant_preSkolemQuant : Option := .quant .preSkolemQuant
+@[match_pattern, inherit_doc Option.Quant.prenexQuantUser]
+abbrev quant_prenexQuantUser : Option := .quant .prenexQuantUser
+@[match_pattern, inherit_doc Option.Quant.printInstFull]
+abbrev quant_printInstFull : Option := .quant .printInstFull
+@[match_pattern, inherit_doc Option.Quant.alphaEquiv]
+abbrev quant_alphaEquiv : Option := .quant .alphaEquiv
+@[match_pattern, inherit_doc Option.Quant.dsplit]
+abbrev quant_dsplit : Option := .quant .dsplit
+@[match_pattern, inherit_doc Option.Quant.relevantTriggers]
+abbrev quant_relevantTriggers : Option := .quant .relevantTriggers
+@[match_pattern, inherit_doc Option.Quant.subCbqi]
+abbrev quant_subCbqi : Option := .quant .subCbqi
+@[match_pattern, inherit_doc Option.Quant.termDbMode]
+abbrev quant_termDbMode : Option := .quant .termDbMode
+@[match_pattern, inherit_doc Option.Quant.triggerSel]
+abbrev quant_triggerSel : Option := .quant .triggerSel
+@[match_pattern, inherit_doc Option.Quant.userPat]
+abbrev quant_userPat : Option := .quant .userPat
+@[match_pattern, inherit_doc Option.Quant.varElimQuant]
+abbrev quant_varElimQuant : Option := .quant .varElimQuant
+@[match_pattern, inherit_doc Option.Quant.varEntEqElimQuant]
+abbrev quant_varEntEqElimQuant : Option := .quant .varEntEqElimQuant
+@[match_pattern, inherit_doc Option.Quant.varIneqElimQuant]
+abbrev quant_varIneqElimQuant : Option := .quant .varIneqElimQuant
+
+@[match_pattern, inherit_doc Option.Sygus.abortSize]
+abbrev sygus_abortSize : Option := .sygus .abortSize
+@[match_pattern, inherit_doc Option.Sygus.fair]
+abbrev sygus_fair : Option := .sygus .fair
+@[match_pattern, inherit_doc Option.Sygus.rewriter]
+abbrev sygus_rewriter : Option := .sygus .rewriter
+@[match_pattern, inherit_doc Option.Sygus.simpleSymBreak]
+abbrev sygus_simpleSymBreak : Option := .sygus .simpleSymBreak
+@[match_pattern, inherit_doc Option.Sygus.symBreakPbe]
+abbrev sygus_symBreakPbe : Option := .sygus .symBreakPbe
+@[match_pattern, inherit_doc Option.Sygus.cegisSample]
+abbrev sygus_cegisSample : Option := .sygus .cegisSample
+@[match_pattern, inherit_doc Option.Sygus.sygus]
+abbrev sygus_sygus : Option := .sygus .sygus
+@[match_pattern, inherit_doc Option.Sygus.addConstGrammar]
+abbrev sygus_addConstGrammar : Option := .sygus .addConstGrammar
+@[match_pattern, inherit_doc Option.Sygus.coreConnective]
+abbrev sygus_coreConnective : Option := .sygus .coreConnective
+@[match_pattern, inherit_doc Option.Sygus.enum]
+abbrev sygus_enum : Option := .sygus .enum
+@[match_pattern, inherit_doc Option.Sygus.evalUnfold]
+abbrev sygus_evalUnfold : Option := .sygus .evalUnfold
+@[match_pattern, inherit_doc Option.Sygus.grammarCons]
+abbrev sygus_grammarCons : Option := .sygus .grammarCons
+@[match_pattern, inherit_doc Option.Sygus.inst]
+abbrev sygus_inst : Option := .sygus .inst
+@[match_pattern, inherit_doc Option.Sygus.invTempl]
+abbrev sygus_invTempl : Option := .sygus .invTempl
+@[match_pattern, inherit_doc Option.Sygus.minGrammar]
+abbrev sygus_minGrammar : Option := .sygus .minGrammar
+@[match_pattern, inherit_doc Option.Sygus.out]
+abbrev sygus_out : Option := .sygus .out
+@[match_pattern, inherit_doc Option.Sygus.pbe]
+abbrev sygus_pbe : Option := .sygus .pbe
+@[match_pattern, inherit_doc Option.Sygus.repairConst]
+abbrev sygus_repairConst : Option := .sygus .repairConst
+@[match_pattern, inherit_doc Option.Sygus.si]
+abbrev sygus_si : Option := .sygus .si
+@[match_pattern, inherit_doc Option.Sygus.siAbort]
+abbrev sygus_siAbort : Option := .sygus .siAbort
+@[match_pattern, inherit_doc Option.Sygus.siRcons]
+abbrev sygus_siRcons : Option := .sygus .siRcons
+@[match_pattern, inherit_doc Option.Sygus.stream]
+abbrev sygus_stream : Option := .sygus .stream
+@[match_pattern, inherit_doc Option.Sygus.unifPi]
+abbrev sygus_unifPi : Option := .sygus .unifPi
+@[match_pattern, inherit_doc Option.Sygus.verifyTimeout]
+abbrev sygus_verifyTimeout : Option := .sygus .verifyTimeout
 
 end Option
