@@ -48,11 +48,37 @@ def codeStyle : CSS := r#"
 }
 "#
 
+/-- Where the API reference built by doc-gen4 is published. -/
+def apiRoot : String := "https://adrienchampion.github.io/cvc.lean/api"
+
+/-- Links into the API reference, for every constant and module the manual's code mentions.
+
+A constant goes through doc-gen4's `find` page, which redirects to the declaration's own page: its
+URL needs the module the constant is declared in, which rendering does not know. The API reference
+documents the library together with everything it imports, core and the standard library included,
+so only a definition the manual itself makes in an example has no page there, and gets no link.
+-/
+def apiTargets (state : TraverseState) : Code.LinkTargets Manual.TraverseContext where
+  const x ctxt? :=
+    if (state.exampleLinks x.toString ctxt?).isEmpty then
+      #[{
+        shortDescription := "api"
+        description := s!"API documentation for {x}"
+        href := s!"{apiRoot}/find/?pattern={System.Uri.escapeUri x.toString}#doc"
+      }]
+    else #[]
+  moduleName m _ := #[{
+    shortDescription := "api"
+    description := s!"API documentation for module {m}"
+    href := s!"{apiRoot}/{"/".intercalate (m.components.map toString)}.html"
+  }]
+
 def config : RenderConfig where
   emitTeX := false
   emitHtmlSingle := .no
   emitHtmlMulti := .immediately
   extraCss := {codeStyle}
   htmlDepth := 2
+  linkTargets state remotes := state.localTargets ++ remotes.remoteTargets ++ apiTargets state
 
 def main := manualMain (%doc CvcManual) (config := config)
