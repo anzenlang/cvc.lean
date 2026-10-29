@@ -72,6 +72,28 @@ argument, exactly as in Lean.
 -/
 syntax:lead (name := smtApp) smtTerm:max (ppSpace colGt smtTerm:max)+ : smtTerm
 
+/-! ### Binders
+
+A lambda and a quantifier bind their variables the way Lean's do, in parentheses with a sort after
+the colon: `(x y : s)`. What the sort is depends on the layer: a Lean type (`Int`) or a `Srt` value
+(`int`) sort-erased, the Lean type of the variable's index typed. Declared here, being shared by
+`fun` and by the quantifiers of `Cvc.Untyped.Theory.Quant`.
+-/
+
+/-- Binders of an `smt!` lambda or quantifier. -/
+declare_syntax_cat smtQuantBinder (behavior := symbol)
+
+/-- Variables sharing a sort: `(x y : s)`. -/
+syntax (name := smtQuantBinder) "(" ident+ " : " term ")" : smtQuantBinder
+
+/-- A lambda, `fun (x y : s) => body`, spelled as Lean spells it.
+
+The body extends as far right as it can, as in Lean, so a lambda in argument position needs
+parentheses. Each layer expands it beside its own `Term.lambdaH`, through which the variables are
+bound under the names the writer gave them, which are also the names cvc5 prints.
+-/
+syntax:lead (name := smtFun) ("fun" <|> "λ") (ppSpace smtQuantBinder)+ " => " smtTerm : smtTerm
+
 
 /-- Expands one `smtTerm` of the layer whose root is named, deferring its sub-terms to itself.
 
@@ -296,6 +318,18 @@ def elabSmtIdent (layer : Layer) (id : Term) (expected? : Option Expr)
 def elabSmtIdentTerm : Elab.Term.TermElab := fun stx expected? => do
   let `(smtIdent% $l $id) := stx | Elab.throwUnsupportedSyntax
   elabSmtIdent (Layer.ofIdent l) id expected?
+
+/-- The variables of a lambda's or quantifier's binders, in order, each with the sort it was written
+with. -/
+def quantBinders (binders : Syntax) : Array (Ident × Term) := Id.run do
+  let mut acc := #[]
+  for binder in binders.getArgs do
+    for id in binder[1].getArgs do
+      acc := acc.push ((⟨id⟩ : Ident), (⟨binder[3]⟩ : Term))
+  return acc
+
+/-- The name cvc5 gives a bound variable: the one the writer gave it. -/
+def quantName (id : Ident) : StrLit := Syntax.mkStrLit id.getId.eraseMacroScopes.toString
 
 end Ext
 

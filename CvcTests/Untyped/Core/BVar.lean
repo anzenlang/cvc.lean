@@ -103,3 +103,42 @@ example : bv.toTerm = bv := rfl
 #guard_msgs in #check @Cvc.Untyped.Term.mkBVar
 
 end discipline
+
+
+
+/-! ## Lambdas through Lean functions
+
+`Term.lambdaH` takes the body as a Lean function of the variables, each named and given its sort
+beside it, and `smt! fun` expands to it. A lambda applies like any function: cvc5 prints the
+application as `@`, and reduces it even in a first-order logic.
+-/
+
+/-- info:
+lambdaH : (lambda ((x Int) (y Int)) (- x y)) : (-> Int Int Int)
+smt     : (lambda ((x Int) (y Int) (b Bool) (c Int)) (ite b (- x y) c))
+λ       : (lambda ((x Int)) (+ x 1))
+nested  : (lambda ((x Int)) (lambda ((y Int)) (- x y)))
+applied : (@ (lambda ((x Int)) (+ x 1)) 2)
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.of Int
+  let l ← Term.lambdaH [("x", int), ("y", int)] fun x y => Term.sub x y
+  println! "lambdaH : {l} : {← l.getSort}"
+  -- a binder's sort is a Lean type or a `Srt`, mixed freely
+  println! "smt     : {← smt! fun (x y : Int) (b : Bool) (c : int) => if b then x - y else c}"
+  println! "λ       : {← smt! λ (x : Int) => x + 1}"
+  println! "nested  : {← smt! fun (x : Int) => fun (y : Int) => x - y}"
+  println! "applied : {← smt! (fun (x : Int) => x + 1) 2}"
+
+/-- info: sat : true -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setLogic Logic.qf_lia
+  s.assert (← smt! (fun (x y : Int) => x - y) 5 2 = 3)
+  println! "sat : {← s.checkIsSat}"
+
+-- how many sorts are given is a runtime fact, checked before any variable is made
+/-- error: the body binds 2 variables, but 1 binder was given -/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.of Int
+  discard <| Term.lambdaH [("x", int)] fun x y => Term.sub x y

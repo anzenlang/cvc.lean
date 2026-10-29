@@ -45,14 +45,14 @@ open Cvc renaming Untyped.Term → T
 /-- Universal quantification of `body` over `bvs`. -/
 def mkForall (bvs : BVars) (body : Term Bool)
   (_nonEmpty : bvs ≠ [] := by
-    (try simp) <;> fail "failed to prove a quantifier binds at least one variable")
+    (try simp) <;> fail "failed to prove this quantifier binds at least one variable")
 : Env (Term Bool) :=
   T.mkForall bvs.erase body (by cases bvs <;> simp_all [BVars.erase])
 
 /-- Existential quantification of `body` over `bvs`. -/
 def mkExists (bvs : BVars) (body : Term Bool)
   (_nonEmpty : bvs ≠ [] := by
-    (try simp) <;> fail "failed to prove a quantifier binds at least one variable")
+    (try simp) <;> fail "failed to prove this quantifier binds at least one variable")
 : Env (Term Bool) :=
   T.mkExists bvs.erase body (by cases bvs <;> simp_all [BVars.erase])
 
@@ -77,8 +77,8 @@ class Binder (φ : Type) where
   -/
   bind : List String → Nat → φ → Env (Untyped.BVars × Term Bool)
 
-/-- The name of the `i`-th bound variable: `names[i]`, or `x{i}` when there is none. -/
-def Binder.nameAt (names : List String) (i : Nat) : String := names[i]?.getD s!"x{i}"
+@[inherit_doc LambdaBinder.nameAt]
+abbrev Binder.nameAt := LambdaBinder.nameAt
 
 /-- The binder for a body taking the last bound variable. -/
 instance [ToTyp α] : Binder (Term α → Env (Term Bool)) where

@@ -58,7 +58,7 @@ default : (exists ((x0 Int) (x1 Bool)) (and x1 (> x0 y)))
 /--
 error: could not synthesize default value for parameter '_nonEmpty' using tactics
 ---
-error: failed to prove a quantifier binds at least one variable
+error: failed to prove this quantifier binds at least one variable
 inst✝ : Ω
 body : Term Bool
 ⊢ False

@@ -292,3 +292,61 @@ delaborator round in circles. -/
 #guard_msgs in
 #check fun [Ω] (x : BVar Int) (bvs : BVars) =>
   (sorry : Term (BVars.signatureTo Int (BVars.push x bvs)))
+
+
+
+/-! ## Lambdas through Lean functions
+
+`Term.lambdaH` takes the body as a Lean function of the variables, and the lambda's index is the
+arguments' indices arrowed onto the body's. Names are optional, `x{i}` by position. `smt! fun`
+expands to it, binding each variable under the name the writer gave it.
+-/
+
+/-- info:
+lambdaH : (lambda ((x0 Int) (x1 Int)) (- x0 x1)) : (-> Int Int Int)
+names   : (lambda ((a Int) (x1 Bool)) (ite x1 a a))
+smt     : (lambda ((x Int) (y Int) (b Bool)) (ite b (- x y) y))
+nested  : (lambda ((x Int)) (lambda ((y Int)) (- x y)))
+applied : (@ (lambda ((x Int)) (+ x 1)) 2)
+-/
+#guard_msgs in #eval Env.runIO do
+  let l ← Term.lambdaH fun (x y : Term Int) => Term.sub x y
+  println! "lambdaH : {l} : {← l.getSort}"
+  let l' ← Term.lambdaH (names := ["a"]) fun (x : Term Int) (b : Term Bool) => Term.ite b x x
+  println! "names   : {l'}"
+  println! "smt     : {← smt! fun (x y : Int) (b : Bool) => if b then x - y else y}"
+  println! "nested  : {← smt! fun (x : Int) => fun (y : Int) => x - y}"
+  println! "applied : {← smt! (fun (x : Int) => x + 1) 2}"
+
+/-- info: sat : true -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setLogic Logic.qf_lia
+  s.assert (← smt! (fun (x y : Int) => x - y) 5 2 = 3)
+  println! "sat : {← s.checkIsSat}"
+
+section lambdaIndex
+variable [Ω]
+
+/-- The index is the binders' types arrowed onto the body's. -/
+example : Env (Term (Int → Bool → Int)) := smt! fun (x : Int) (b : Bool) => if b then x else 0
+
+/-- A lambda returning a lambda has the curried index, the sort being the same. -/
+example : Env (Term (Int → Int → Int)) := smt! fun (x : Int) => fun (y : Int) => x + y
+
+/-- Applying one answers the body's index. -/
+example : Env (Term Int) := smt! (fun (x : Int) => x + 1) 2
+
+/-- info: @Term.lambdaH : [inst : Ω] → {φ σ : Type} → [Term.LambdaBinder φ σ] → φ → optParam (List String) [] → Env (Term σ) -/
+#guard_msgs in #check @Term.lambdaH
+
+end lambdaIndex
+
+/--
+error: failed to synthesize instance of type class
+  Term.LambdaBinder (Term Int → Env (Term Int)) (Int → Bool)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example [Ω] : Env (Term (Int → Bool)) := smt! fun (x : Int) => x + 1

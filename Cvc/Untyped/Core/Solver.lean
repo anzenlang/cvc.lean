@@ -364,7 +364,11 @@ def defineFunRecTerm (fn : Term) (bvs : BVars) (body : Term) (global : Bool := f
 @[inherit_doc S.defineFunsRec]
 def defineFunsRec (funs : Terms) (bvs : Array BVars) (bodies : Terms)
   (global : Bool := false)
-: (valid : bvs.size = bodies.size := by grind) → Env Unit := fun _ =>
+  (_oneBodyPerFun : funs.size = bodies.size := by
+    (try grind) <;> fail "failed to prove there are as many bodies as functions")
+  (_oneBvsPerBody : bvs.size = bodies.size := by
+    (try grind) <;> fail "failed to prove there are as many bound-variable lists as bodies")
+: Env Unit :=
   runUnsafe' do s.toUnsafe.defineFunsRec funs bvs bodies global
 
 
