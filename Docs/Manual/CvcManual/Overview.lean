@@ -32,19 +32,13 @@ htmlSplit := .never
 namespace Section.Overview
 ```
 
-This section showcases various features of cvc.lean for new users to get an idea of what it can do.
-It is light on technical details which are provided in the rest of this manual. For now just know
-that cvc.lean has two APIs that differ in how `Term`s (and a few other types) are encoded and the
-static guarantees they provide:
+This section showcases various features of cvc.lean for new users to get an idea of what it can do. It is light on technical details which are provided in the rest of this manual. For now just know that cvc.lean has two APIs that differ in how `Term`s (and a few other types) are encoded and the static guarantees they provide:
 
-- `Cvc.Typed` strongly-types terms so that the cvc5-level sort of a term appears in its type, making
-  ill-formed terms (and most solver queries) fail at compile-times. For instance:
+- `Cvc.Typed` strongly-types terms so that the cvc5-level sort of a term appears in its type, making ill-formed terms (and most solver queries) fail at compile-times. For instance:
   - `Term Bool`, `Term String`, *etc.*
   - asserting a formula in a solver takes a `Term Bool`.
 
-- `Cvc.Untyped` just has a simple type `Term` for terms and you are responsible for creating
-  well-formed terms and querying the solver correctly; failure to do so will result in a runtime
-  error.
+- `Cvc.Untyped` just has a simple type `Term` for terms and you are responsible for creating well-formed terms and querying the solver correctly; failure to do so will result in a runtime error.
 
 The examples below use the typed API.
 
@@ -52,15 +46,13 @@ The examples below use the typed API.
 open Cvc Typed
 ```
 
-Also, we need an instance of type-class {lean}`Ω` in scope to manipulate sorts, terms, solvers,
-*etc.*
+Also, we need an instance of type-class {lean}`Ω` in scope to manipulate sorts, terms, solvers, *etc.*
 
 ```lean
 variable [Ω]
 ```
 
-Think of it as a *"cvc5 world"* which we need to do anything, in particular to write code in
-cvc.lean's {lean}`Env` monad.
+Think of it as a *"cvc5 world"* which we need to do anything, in particular to write code in cvc.lean's {lean}`Env` monad.
 
 
 
@@ -118,9 +110,7 @@ assertions:
 
 # Simple check-sat
 
-The result of a check-sat is either _sat_, _unsat_, or _unknown_. The `Solver.checkSat` function
-takes a optional continuation for each (`ifSat`, `ifUnsat`, `ifUnknown`); the defaults fail and
-report the result as unexpected.
+The result of a check-sat is either _sat_, _unsat_, or _unknown_. The `Solver.checkSat` function takes a optional continuation for each (`ifSat`, `ifUnsat`, `ifUnknown`); the defaults fail and report the result as unexpected.
 
 ```lean (name := intro_ex_checksat)
 #eval Env.runIO do
@@ -151,9 +141,7 @@ check-sat
 
 # Check-sat with assumptions
 
-`Solver.checkSat` actually has a fourth optional parameter `assuming` that accepts
-{lean}`Array (Term Bool)` values. It adds constraints to that check-sat without changing the
-solver's actual assertions.
+`Solver.checkSat` actually has a fourth optional parameter `assuming` that accepts {lean}`Array (Term Bool)` values. It adds constraints to that check-sat without changing the solver's actual assertions.
 
 ```lean (name := intro_ex_assuming)
 #eval Env.runIO do
@@ -182,8 +170,7 @@ check-sat assuming b1 and (= i1 0)
 
 # Synthesis
 
-This example uses the `smt.grammar!` syntax extension for grammars, but they can also be built using
-the {lean}`Grammar` API.
+This example uses the `smt.grammar!` syntax extension for grammars, but they can also be built using the {lean}`Grammar` API.
 
 ```lean (name := intro_ex_synth)
 #eval Env.runIO do
@@ -296,8 +283,7 @@ unsat
 
 # Bit-vectors
 
-A bit-vector's width is part of its type, `Term (BitVec 8)`, and its model value is Lean's own
-`BitVec 8`. Operations that change the width say so in their types.
+A bit-vector's width is part of its type, `Term (BitVec 8)`, and its model value is Lean's own `BitVec 8`. Operations that change the width say so in their types.
 
 ```lean (name := intro_ex_bitvec)
 #eval Env.runIO do
@@ -342,8 +328,7 @@ y + 1 < y for y = 0xff#8
 
 # Floating-point
 
-`Cvc.Float exp sig` is SMT-LIB's `(_ FloatingPoint exp sig)`, so `Cvc.Float 11 53` is double
-precision. Arithmetic takes a rounding mode, and floating-point equality `fpEq` is not `=`.
+`Cvc.Float exp sig` is SMT-LIB's `(_ FloatingPoint exp sig)`, so `Cvc.Float 11 53` is double precision. Arithmetic takes a rounding mode, and floating-point equality `fpEq` is not `=`.
 
 ```lean (name := intro_ex_float)
 abbrev Double := Cvc.Float 11 53
@@ -390,8 +375,7 @@ n is NaN: true
 
 # Arrays
 
-An SMT array is total, so its Lean counterpart is `Cvc.TotalMap ι κ`: a default element plus the
-indices that differ from it. Constant arrays need cvc5's `arrays-exp` option.
+An SMT array is total, so its Lean counterpart is `Cvc.TotalMap ι κ`: a default element plus the indices that differ from it. Constant arrays need cvc5's `arrays-exp` option.
 
 ```lean (name := intro_ex_array)
 abbrev IntArray := TotalMap Int Int
@@ -429,10 +413,8 @@ a := { 3 ↦ 17, _ ↦ 0 }
 
 # Separation logic
 
-A solver's heap is declared once, at the Lean types of its locations and data, and `pto` (points-to)
-hangs off the handle that declaration returns, so a mismatched location or datum is a type error.
-The separating conjunction `sepStar` splits the heap into disjoint parts, which is what sets it apart
-from `∧`.
+A solver's heap is declared once, at the Lean types of its locations and data, and `pto` (points-to) hangs off the handle that declaration returns, so a mismatched location or datum is a type error.
+The separating conjunction `sepStar` splits the heap into disjoint parts, which is what sets it apart from `∧`.
 
 ```lean (name := intro_ex_sep)
 /-- Runs `query` on a fresh solver with an `Int ↦ Int` heap.
@@ -491,13 +473,9 @@ heap : (sep (pto 0 1) (pto 1 2))
 
 # Relations and tables: verifying query rewrites
 
-A relation is a set of tuples and a table a bag of them, typed by their columns: `Rel [String] Int`
-holds `(String, Int)` rows. That makes the solver a tool for checking query rewrites against every
-possible database, and for producing one where a rewrite is wrong.
+A relation is a set of tuples and a table a bag of them, typed by their columns: `Rel [String] Int` holds `(String, Int)` rows. That makes the solver a tool for checking query rewrites against every possible database, and for producing one where a rewrite is wrong.
 
-Take a company whose staff, `(employee, project)`, is sharded between a `paris` and a `berlin`
-database, and whose `budgets` are `(project, budget)`. The query maps each employee to the budget
-of their project: a join, which composes the two relations.
+Take a company whose staff, `(employee, project)`, is sharded between a `paris` and a `berlin` database, and whose `budgets` are `(project, budget)`. The query maps each employee to the budget of their project: a join, which composes the two relations.
 
 ```lean (name := intro_ex_rel)
 #eval Env.runIO do
@@ -545,11 +523,9 @@ of their project: a join, which composes the two relations.
   budgets = (set.union (set.singleton (tuple "A" 0)) (set.singleton (tuple "" 0)))
 ```
 
-Employee `""` works on a different project in each office, so the offices share no staff row; but
-both projects have budget `0`, so both answers map `""` to `0`.
+Employee `""` works on a different project in each office, so the offices share no staff row; but both projects have budget `0`, so both answers map `""` to `0`.
 
-Tables count rows, so the same question about SQL's `UNION ALL` (`tableUnionDisjoint`) and `UNION`
-(`tableUnionMax`) has a different answer.
+Tables count rows, so the same question about SQL's `UNION ALL` (`tableUnionDisjoint`) and `UNION` (`tableUnionMax`) has a different answer.
 
 ```lean (name := intro_ex_tab)
 #eval Env.runIO do

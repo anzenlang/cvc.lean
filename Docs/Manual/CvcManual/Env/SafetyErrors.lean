@@ -29,9 +29,7 @@ variable [Ω]
 ```
 
 
-Using a cvc.lean type after its manager has been freed is rejected due to the quantification of the
-{lean}`Ω` instance. While this guarantees no use-after-free, the error message is a regular lean
-type-error and its meaning is pretty obscure.
+Using a cvc.lean type after its manager has been freed is rejected due to the quantification of the {lean}`Ω` instance. While this guarantees no use-after-free, the error message is a regular lean type-error and its meaning is pretty obscure.
 
 ```lean +error (name := env_ex_dangling)
 def mkSort : Env Srt := Srt.int

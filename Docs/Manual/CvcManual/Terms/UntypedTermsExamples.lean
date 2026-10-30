@@ -21,8 +21,7 @@ set_option verso.docstring.allowMissing true
 
 #doc (Manual) "Examples" =>
 
-Below is the untyped version of the first typed-term example. No type-inference can take place, so
-we must always specify what the sort of each symbol is.
+Below is the untyped version of the first typed-term example. No type-inference can take place, so we must always specify what the sort of each symbol is.
 
 ```lean (name := term_ex_untyped_1)
 open Untyped in #eval Env.runIO do

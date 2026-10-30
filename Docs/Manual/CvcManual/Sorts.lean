@@ -68,9 +68,7 @@ Cvc.lean associates some Lean types to cvc5-sorts `Srt` through the `ToTyp` clas
 
 {docstring ToTyp}
 
-`ToTyp α` specifies a `Typ`-value for `α` that corresponds to a `Srt`.{margin}[But is _not_ a
-`Srt` as constructing one requires to be in `Env`: a `Srt` value is tied to a specific manager.]
-This lets us go from compatible Lean types to `Srt` easily.
+`ToTyp α` specifies a `Typ`-value for `α` that corresponds to a `Srt`.{margin}[But is _not_ a `Srt` as constructing one requires to be in `Env`: a `Srt` value is tied to a specific manager.] This lets us go from compatible Lean types to `Srt` easily.
 
 ```lean (name := sort_ex_Srt_of)
 #eval Env.runIO do
@@ -93,9 +91,7 @@ bv := (_ BitVec 8)
 f1 := (-> Int Bool Real)
 ```
 
-Some cvc5-sorts do not map nicely to builtin Lean types however, so cvc.lean has a few custom types
-with `ToTyp` instance.{margin}[In the following, `Float` refers to `Cvc.Float`, not the Lean
-builtin type for floating point numbers.] Here are a few examples:
+Some cvc5-sorts do not map nicely to builtin Lean types however, so cvc.lean has a few custom types with `ToTyp` instance.{margin}[In the following, `Float` refers to `Cvc.Float`, not the Lean builtin type for floating point numbers.] Here are a few examples:
 
 ```lean (name := sort_ex_Srt_of_2)
 #eval Env.runIO do

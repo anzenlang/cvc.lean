@@ -48,6 +48,20 @@ def codeStyle : CSS := r#"
 }
 "#
 
+/-- The side table of contents lists only the current page's direct sub-sections.
+
+Verso lists every docstring of the page there too, and every nested section when sub-sections share
+the page, which makes a long page unreadable. It has no setting for this, so the extra entries are
+hidden: a section entry is a `header head-N` span, `N` its nesting level, and a docstring entry is a
+bare link.
+-/
+def tocStyle : CSS := r#"
+#toc .split-toc > ol > li:not(:has(.header)),
+#toc .split-toc > ol > li:has(.header:not(.head-1)) {
+  display: none;
+}
+"#
+
 /-- Where the API reference built by doc-gen4 is published. -/
 def apiRoot : String := "https://adrienchampion.github.io/cvc.lean/api"
 
@@ -77,7 +91,7 @@ def config : RenderConfig where
   emitTeX := false
   emitHtmlSingle := .no
   emitHtmlMulti := .immediately
-  extraCss := {codeStyle}
+  extraCss := {codeStyle, tocStyle}
   htmlDepth := 2
   linkTargets state remotes := state.localTargets ++ remotes.remoteTargets ++ apiTargets state
 

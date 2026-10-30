@@ -469,8 +469,11 @@ form is declared in the theory it belongs to. Import `Cvc.Untyped.Theory.Set` an
 pull in `Core.Defs` and `Core.Value` but not `Theory.Arith`. That is the point: a form whose theory
 is absent does not parse, rather than parsing and failing later on an unknown constant.
 
-- **In `Cvc/Ext.lean`**: `(…)`, `![lean term]`, a plain identifier, application `f a b`, and
-  `let x ← _; _`.
+- **In `Cvc/Ext.lean`**: `(…)`, `![lean term]`, a plain identifier, application `f a b`,
+  `let x ← _; _`, and `fun (x : s) => _` (or `λ`) with the `smtQuantBinder` binders the
+  quantifiers share. `fun`'s syntax is theory-free but each layer expands it in its `Core/BVar`,
+  beside `Term.lambdaH`, since the sort-erased expansion needs `srtOf%` and `Ext.lean` imports no
+  sort.
 - **In `Theory/Arith`**: integer and real literals. In **`Core/Bool`**: `if _ then _ else _`, and
   `true`/`false`. In **`Theory/String`**: string literals. In **`Theory/Datatype`**: `match … with`.
   In **`Theory/Record`**: `{a := t}`, `{r with a := t}`, `r.a` and `e |>.a`. In **`Theory/Quant`**:
@@ -1259,7 +1262,9 @@ Two spellings per layer:
 - **`forallH`/`existsH`**, the body a Lean function of the variables, through a `Binder φ` class
   with one instance for `Term α → Env (Term Bool)` and one for `Term α → ψ`. There is **no
   instance for a bare body**, so binding nothing does not typecheck, and none at a non-`Bool`
-  codomain. Typed, a variable's sort comes from its argument's type, so `fun (x : Term Int) => …`
+  codomain. Sort-erased, `Binder` and `Binder.bindAll` live in `Core/BVar`, shared with
+  `Term.lambdaH`; typed, the lambda has its own `LambdaBinder`, the quantifier's being fixed at
+  `Bool`. Typed, a variable's sort comes from its argument's type, so `fun (x : Term Int) => …`
   needs the annotation when the body does not pin it; names are optional (`x0`, `x1`, … by
   position). Sort-erased, the sorts are given beside the names as `List (String × Srt)`, and
   `Binder.arity` lets `bindAll` compare that list's length with the function's arity **before**
@@ -1666,6 +1671,16 @@ as arrows — applies directly, with no re-typing.
 `Cvc/{Untyped,Typed}/Core/BVar.lean` hold `BVar.lambda`, `BVars.lambda` — typed, answering
 `Term (bvs.signatureTo β)` — and `Term.lambda`/`lambda1`.
 
+**`Term.lambdaH` is the HOAS spelling**, the body a Lean function of the variables as for
+`forallH`. Sort-erased it takes the sorts beside the names, through the quantifiers' `Binder`.
+Typed it goes through `LambdaBinder φ σ`, whose `σ` is an **`outParam`** computed from the function
+type — `Term α → … → Env (Term β)` gives `α → … → β` — so `lambdaH fun (x y : Term Int) => …`
+answers a `Term (Int → Int → Int)` with nothing written but the binders. A body against the wrong
+expected index is reported as a missing `LambdaBinder (…) (wrong σ)` instance, pinned in the typed
+`Core/BVar` test. `smt! fun (x y : s) => body` expands to it in both layers. Applying a lambda
+builds an `APPLY_UF` that cvc5 prints as `@`, and it is reduced even under a first-order logic:
+`(fun (x : Int) => x + 1) 2 = 3` is sat in `QF_LIA`.
+
 **`BVar` is in `Core` because every view needs it.** A term view's aggregate has a `bvar` leaf
 whatever theories are imported, so `def.term_view` over `Core` alone has to find `BVar` and
 `Term.asBVar`. It depends on `Core.Value` and not on `Core.Bool`: `Bool` is a view-generation site
@@ -2009,7 +2024,11 @@ tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still o
   only way across, `Solver.declareFun` splitting a function index into domain and codomain, and
   `Solver.defineFun` over a `BVars` list at zero, one, two and three parameters — the two- and
   three-parameter cases with non-commutative bodies, so a reversed argument order would show.
-- `CvcTests/{Untyped,Typed}/{Solver,Proof,Subst}.lean` — the driving surface.
+- `CvcTests/{Untyped,Typed}/{Solver,Proof,Subst}.lean` — the driving surface. The sort-erased
+  `Solver` test covers recursive definitions: `defineFunRec`, `defineFunRecTerm`, mutual
+  `defineFunsRec`, `global` across `pop`. A sat answer over one needs `fmf-fun` (`unknown`
+  without), which enforces a definition only on the applications assertions mention, so values are
+  read off asserted equations — `getValue` of an unconstrained `fact 5` answered `1`.
 - `CvcTests/{Untyped,Typed}/View.lean` — the aggregate's signatures, taking terms apart, kind
   ownership; typed, the record/tuple/nullable helpers, wrong-sort matches as errors, containers
   denoting their own types. `CvcTests/View.lean` — the two `View` modules alone, with no theory.
@@ -2040,11 +2059,11 @@ with lean-cvc5. What follows is everything that is *not* term construction or so
 
 1. **`smt!` DSL parity** — the fixed forms the expander still lacks: the `name` literal for
    `mkSymbol`, a sort ascription `?[term : type]` over `typeCheck`, escaped string literals (both
-   layers' `Theory/String` expansions hard-code `useEscapes := false`), and the lambda family
-   `smt! fun`/`smtFun!`/`smtPred!`/`smtRel!`, none of which exist. Both remaining literal-shaped
-   items are **asymmetric across the layers** and need a decision before they can be written: the
-   typed layer gets the sort from the index, while sort-erased `mkSymbol` takes a `Srt` and a sort
-   ascription has no index to check against.
+   layers' `Theory/String` expansions hard-code `useEscapes := false`), and the
+   `smtFun!`/`smtPred!`/`smtRel!` shorthands on top of `smt! fun`, none of which exist. Both
+   remaining literal-shaped items are **asymmetric across the layers** and need a decision before
+   they can be written: the typed layer gets the sort from the index, while sort-erased `mkSymbol`
+   takes a `Srt` and a sort ascription has no index to check against.
 
    Beyond the fixed forms, **28 of the 256 `op%` entries carry a notation** and the rest are
    reachable only through `![…]`. Adding more runs into the collisions listed under "The `smt!`
@@ -2053,8 +2072,7 @@ with lean-cvc5. What follows is everything that is *not* term construction or so
    (`→[]`, `=[]`, `≠[]`, `<[]`, `≤[]`, `≥[]`, `>[]`, `+[]`, `-[]`, `*[]`, `⊻[]`, `∪[]`, `∩[]`,
    `∖[]`, `⊎[]`, `++[]`, `∧[]`, `∨[]`), and unary minus works through `neg`'s prefix notation.
 2. **Instantiation patterns** — the `INST_*` annotations a quantifier carries as a third child.
-   See "Quantifiers" for where they would go. `LAMBDA` lacks the HOAS spelling quantifiers have;
-   `Binder` is the model for one.
+   See "Quantifiers" for where they would go.
 3. **Leftovers** — the cvc5 corners never wrapped (pools, oracles, the parser, operator
    reflection, statistics). See [MISSING.md](MISSING.md).
 

@@ -18,8 +18,7 @@ set_option pp.rawOnError true
 
 #doc (Manual) "Examples" =>
 
-Examples of using term constructors follow, feel free to hover around to make sure the terms are
-correctly typed.
+Examples of using term constructors follow, feel free to hover around to make sure the terms are correctly typed.
 
 ```lean (name := terms_ex_typed_basic)
 open Typed in #eval Env.runIO do
