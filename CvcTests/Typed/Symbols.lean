@@ -164,7 +164,7 @@ arrays' elements in order. -/
 #guard_msgs in #eval Env.runIO do
   let idents : Vars.Idents := ⟨#["b0", "b1"], #["i0"], #[]⟩
   let terms : Vars.Terms ← idents.declare
-  println! ← terms.foldM #[] fun acc t => return acc.push t.erase
+  println! ← terms.foldM #[] fun acc t => return acc.push t.relax
 
 end ByHand
 

@@ -79,13 +79,13 @@ group     : (Set (Set (Tuple Int Bool Real)))
   let rr ← s.declareConstAs (Rel [Int] Int) "R"
   let u ← s.declareConstAs (Rel [] Int) "U"
 
-  println! "join      : {← sortOf (← relJoin abc cde).erase}"
-  println! "product   : {← sortOf (← relProduct abc cde).erase}"
-  println! "transpose : {← sortOf (← relTranspose abc).erase}"
-  println! "tclosure  : {← sortOf (← relTclosure rr).erase}"
-  println! "iden      : {← sortOf (← relIden u).erase}"
-  println! "joinImage : {← sortOf (← relJoinImage rr (← mkInt 2)).erase}"
-  println! "group     : {← sortOf (← relGroup #[0] abc).erase}"
+  println! "join      : {← sortOf (← relJoin abc cde).relax}"
+  println! "product   : {← sortOf (← relProduct abc cde).relax}"
+  println! "transpose : {← sortOf (← relTranspose abc).relax}"
+  println! "tclosure  : {← sortOf (← relTclosure rr).relax}"
+  println! "iden      : {← sortOf (← relIden u).relax}"
+  println! "joinImage : {← sortOf (← relJoinImage rr (← mkInt 2)).relax}"
+  println! "group     : {← sortOf (← relGroup #[0] abc).relax}"
 
 section indices
 variable [Ω]
@@ -137,14 +137,14 @@ singleton : (Set (Tuple Int Bool))
   let b ← s.declareConstAs (Rel [Int] Bool) "B"
   let pair ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
 
-  println! "member    : {← sortOf (← relMember pair a).erase}"
-  println! "union     : {← sortOf (← relUnion a b).erase}"
-  println! "insert    : {← sortOf (← relInsert pair a).erase}"
-  println! "card      : {← sortOf (← relCard a).erase}"
-  println! "choose    : {← sortOf (← relChoose a).erase}"
+  println! "member    : {← sortOf (← relMember pair a).relax}"
+  println! "union     : {← sortOf (← relUnion a b).relax}"
+  println! "insert    : {← sortOf (← relInsert pair a).relax}"
+  println! "card      : {← sortOf (← relCard a).relax}"
+  println! "choose    : {← sortOf (← relChoose a).relax}"
   let empty : Term (Rel [Int] Bool) ← relEmpty
-  println! "empty     : {← sortOf empty.erase}"
-  println! "singleton : {← sortOf (← relSingleton pair).erase}"
+  println! "empty     : {← sortOf empty.relax}"
+  println! "singleton : {← sortOf (← relSingleton pair).relax}"
 
 
 
@@ -188,14 +188,14 @@ rest.last: Real
 #guard_msgs in #eval Env.runIO do
   let t : Term (Tup [Int, Bool] Rat) ←
     mkTup (.cons (← mkInt 1) (.cons (← mkTrue) (.last (← mkReal (1/2 : Rat)))))
-  println! "tuple    : {← t.erase.getSort}"
-  println! "tupFst   : {(← tupFst t).erase} : {← (← tupFst t).erase.getSort}"
-  println! "tupLast  : {(← tupLast t).erase} : {← (← tupLast t).erase.getSort}"
+  println! "tuple    : {← t.relax.getSort}"
+  println! "tupFst   : {(← tupFst t).relax} : {← (← tupFst t).relax.getSort}"
+  println! "tupLast  : {(← tupLast t).relax} : {← (← tupLast t).relax.getSort}"
   let rest ← tupRest t
-  println! "tupRest  : {rest.erase} : {← rest.erase.getSort}"
+  println! "tupRest  : {rest.relax} : {← rest.relax.getSort}"
   -- composing reaches a middle component
-  println! "rest.fst : {← (← tupFst rest).erase.getSort}"
-  println! "rest.last: {← (← tupLast rest).erase.getSort}"
+  println! "rest.fst : {← (← tupFst rest).relax.getSort}"
+  println! "rest.last: {← (← tupLast rest).relax.getSort}"
 
 /-! A one-component tuple has no first-and-rest, only a last — which `tupLast` gives, at position
 zero.
@@ -204,7 +204,7 @@ zero.
 /-- info: single : ((_ tuple.select 0) (tuple 7)) : Int -/
 #guard_msgs in #eval Env.runIO do
   let t : Term (Tup [] Int) ← mkTup (.last (← mkInt 7))
-  println! "single : {(← tupLast t).erase} : {← (← tupLast t).erase.getSort}"
+  println! "single : {(← tupLast t).relax} : {← (← tupLast t).relax.getSort}"
 
 section indices
 variable [Ω] (t : Term (Tup [Int, Bool] Rat)) (single : Term (Tup [] Int))
@@ -273,10 +273,10 @@ aggrAll : (Set Int)
   let a ← s.declareConstAs (Rel [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
-  println! "f       : {← f.erase.getSort}"
-  println! "aggr    : {← (← relAggregate #[1] f zero a).erase.getSort}"
+  println! "f       : {← f.relax.getSort}"
+  println! "aggr    : {← (← relAggregate #[1] f zero a).relax.getSort}"
   -- with no index every tuple is in one group, which is a fold over the whole relation
-  println! "aggrAll : {← (← relAggregate #[] f zero a).erase.getSort}"
+  println! "aggrAll : {← (← relAggregate #[] f zero a).relax.getSort}"
 
 section indices
 variable [Ω]
@@ -342,9 +342,9 @@ minusN : (Set (Tuple Int Bool))
   let a ← s.declareConstAs (Rel [Int] Bool) "A"
   let b ← s.declareConstAs (Rel [Int] Bool) "B"
   let c ← s.declareConstAs (Rel [Int] Bool) "C"
-  println! "unionN : {← (← relUnionN #[a, b, c]).erase.getSort}"
-  println! "interN : {← (← relInterN #[a, b, c]).erase.getSort}"
-  println! "minusN : {← (← relMinusN #[a, b, c]).erase.getSort}"
+  println! "unionN : {← (← relUnionN #[a, b, c]).relax.getSort}"
+  println! "interN : {← (← relInterN #[a, b, c]).relax.getSort}"
+  println! "minusN : {← (← relMinusN #[a, b, c]).relax.getSort}"
 
 section indices
 variable [Ω] (a b : Term (Rel [Int] Bool)) (r : Term (Rel [Bool] Int))
@@ -408,12 +408,12 @@ at 3  : ((_ tuple.select 3) (tuple 1 true "s" (/ 1 2))) : Real
   let t ← mk4
   let show! (label : String) (x : Untyped.Term) : Env Unit := do
     println! "{label} : {x} : {← x.getSort}"
-  show! "tuple" t.erase
+  show! "tuple" t.relax
   -- position 3 is the split-off `β`, and needs no different spelling from the others
-  show! "at 0 " (← t.tupAt col%0).erase
-  show! "at 1 " (← t.tupAt col%1).erase
-  show! "at 2 " (← t.tupAt col%2).erase
-  show! "at 3 " (← t.tupAt col%3).erase
+  show! "at 0 " (← t.tupAt col%0).relax
+  show! "at 1 " (← t.tupAt col%1).relax
+  show! "at 2 " (← t.tupAt col%2).relax
+  show! "at 3 " (← t.tupAt col%3).relax
 
 /-! `tupAt` is the general form of the two accessors that predate it, and the only way to a middle
 component that does not go through `tupRest`. It agrees with them semantically rather than
@@ -487,11 +487,11 @@ project [1]    : ((_ tuple.project 1) (tuple 1 true "s" (/ 1 2))) : (Tuple Bool)
   let show! (label : String) (x : Untyped.Term) : Env Unit := do
     println! "{label} : {x} : {← x.getSort}"
   -- reordering
-  show! "project [2, 0]" (← tupProject cols% [2, 0] t).erase
+  show! "project [2, 0]" (← tupProject cols% [2, 0] t).relax
   -- and duplication: a position may appear twice
-  show! "project [3, 3]" (← tupProject cols% [3, 3] t).erase
+  show! "project [3, 3]" (← tupProject cols% [3, 3] t).relax
   -- one position still gives a *tuple*, which is what separates this from `tupAt`
-  show! "project [1]   " (← tupProject cols% [1] t).erase
+  show! "project [1]   " (← tupProject cols% [1] t).relax
 
 /-! The spine really carries the positions as written — in order, duplicates and all. -/
 

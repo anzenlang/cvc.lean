@@ -143,3 +143,22 @@ pinning `h.pto`'s signature are what would catch that.
   let s ← solver
   let h ← s.declareSepHeap Int Bool
   println! "sorts: {h.sorts}"
+
+/-! `relax` hands over the sort-erased handle, whose `pto` checks its operands at run time against
+the sorts the indices fixed. -/
+
+/-- info:
+relaxed sorts: (Int, Bool)
+pto          : (pto x v)
+wrong data   : this heap's data has sort `Bool`, but `x` has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solver
+  let h ← s.declareSepHeap Int Bool
+  let uh := h.relax
+  println! "relaxed sorts: {uh.sorts}"
+  let x ← s.declareConstAs Int "x"
+  let v ← s.declareConstAs Bool "v"
+  println! "pto          : {← uh.pto x.relax v.relax}"
+  try discard <| uh.pto x.relax x.relax
+  catch e => println! "wrong data   : {e}"

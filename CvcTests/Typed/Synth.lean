@@ -62,7 +62,7 @@ solution : (lambda ((x Int) (y Int)) (ite (<= y x) x y))
   s.addSygusConstraint (← Term.or (← Term.equal mab a) (← Term.equal mab b))
 
   s.checkSynth (ifSolved := do
-    println! "solution : {(← s.getSynthSolution mx).erase}")
+    println! "solution : {(← s.getSynthSolution mx).relax}")
 
 
 
@@ -86,7 +86,7 @@ solution : (lambda ((x Int)) (+ x 1))
   s.addSygusConstraint (← Term.equal (← Term.apply f a) (← Term.add a (← Term.mkInt 1)))
 
   s.checkSynth (ifSolved := do
-    println! "solution : {(← s.getSynthSolution f).erase}")
+    println! "solution : {(← s.getSynthSolution f).relax}")
 
 
 

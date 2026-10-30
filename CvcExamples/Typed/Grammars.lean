@@ -116,7 +116,7 @@ function is ordinary typed application, with no re-typing anywhere.
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {(← s.getSynthSolution mx).relax}")
 
 /-! Without a grammar, `synthAnyFun` folds the parameters and the codomain into the index itself,
 so the result is indexed just the same. -/
@@ -134,7 +134,7 @@ so the result is indexed just the same. -/
   s.addSygusConstraint (← smt! f a = a + 1)
 
   s.checkSynth (ifSolved := do
-    println! "f := {(← s.getSynthSolution f).erase}")
+    println! "f := {(← s.getSynthSolution f).relax}")
 
 
 
@@ -165,7 +165,7 @@ index is the same `Int → Int → Int`.
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {(← s.getSynthSolution mx).relax}")
 
 
 
@@ -211,7 +211,7 @@ def withConstants (g : Grammar σ) (nt : NT Int) (ks : List Int) : Env (Grammar 
   s.addSygusConstraint (← smt! f a = a + 10)
 
   s.checkSynth (ifSolved := do
-    println! "f := {(← s.getSynthSolution f).erase}")
+    println! "f := {(← s.getSynthSolution f).relax}")
 
 /-- The same with `smt.mkGrammar!`, whose parameter is not needed here. -/
 example (s : Solver) : Env (Grammar (Int → Int)) := do

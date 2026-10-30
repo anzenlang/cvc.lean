@@ -47,14 +47,14 @@ def mkForall (bvs : BVars) (body : Term Bool)
   (_nonEmpty : bvs ≠ [] := by
     (try simp) <;> fail "failed to prove this quantifier binds at least one variable")
 : Env (Term Bool) :=
-  T.mkForall bvs.erase body (by cases bvs <;> simp_all [BVars.erase])
+  T.mkForall bvs.relax body (by cases bvs <;> simp_all [BVars.relax])
 
 /-- Existential quantification of `body` over `bvs`. -/
 def mkExists (bvs : BVars) (body : Term Bool)
   (_nonEmpty : bvs ≠ [] := by
     (try simp) <;> fail "failed to prove this quantifier binds at least one variable")
 : Env (Term Bool) :=
-  T.mkExists bvs.erase body (by cases bvs <;> simp_all [BVars.erase])
+  T.mkExists bvs.relax body (by cases bvs <;> simp_all [BVars.relax])
 
 
 
@@ -84,14 +84,14 @@ abbrev Binder.nameAt := LambdaBinder.nameAt
 instance [ToTyp α] : Binder (Term α → Env (Term Bool)) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (Binder.nameAt names i)
-    return (#[bv.erase], ← f bv.toTerm)
+    return (#[bv.relax], ← f bv.toTerm)
 
 /-- The binder for a body taking a bound variable and more. -/
 instance [ToTyp α] [Binder ψ] : Binder (Term α → ψ) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (Binder.nameAt names i)
     let (bvs, body) ← Binder.bind names (i + 1) (f bv.toTerm)
-    return (#[bv.erase] ++ bvs, body)
+    return (#[bv.relax] ++ bvs, body)
 
 /-- Universal quantification of a body written as a Lean function of its variables.
 
@@ -180,7 +180,7 @@ protected inductive View.Quant : Typ → Type where
 /-- Takes a term of sort `τ` apart one level, if it is a quantified formula whose variables' sorts a
 `Typ` describes. -/
 def View.Quant.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Quant τ)) :=
-  match τ, Untyped.View.Quant.of? t.erase with
+  match τ, Untyped.View.Quant.of? t.relax with
   | .bool, some (.forall' vars body pats) => do
     let some ⟨doms, vars⟩ ← go vars.toList | return none
     return some (.forall' doms vars (View.reindex body) pats)

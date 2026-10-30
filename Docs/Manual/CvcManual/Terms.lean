@@ -24,6 +24,7 @@ public import VersoManual
 
 import CvcManual.Terms.TypedTermsExamples
 import CvcManual.Terms.UntypedTermsExamples
+import CvcManual.Terms.Views
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
@@ -155,28 +156,34 @@ cannot type the following term as `Int`, term has sort `Bool`:
 
 ## Typed to untyped
 
-This direction is simpler in that it cannot fail since we're simply erasing compile-time type information.
+This direction is simpler in that it cannot fail: a typed term already *is* a sort-erased one, and
+`relax` merely forgets its index.
 
-{docstring Typed.Term.erase}
+{docstring Typed.Term.relax}
 
 For example:
 
-```lean (name := ex_Terms_erase)
+```lean (name := ex_Terms_relax)
 open Typed in
 #eval Env.runIO do
   let x ← Term.mkSymbol "x"
   let typedTerm ← smt! x ∨ false
   --  ^^^^^^^^^~~~~~ `Typed.Term Bool`
-  println! "typedTerm:  {typedTerm}"
-  let erasedTerm := typedTerm.erase
-  --  ^^^^^^^^^^~~~~ `Untyped.Term`
-  println! "erasedTerm: {erasedTerm}"
+  println! "typedTerm:   {typedTerm}"
+  let relaxedTerm := typedTerm.relax
+  --  ^^^^^^^^^^^~~~~ `Untyped.Term`
+  println! "relaxedTerm: {relaxedTerm}"
 ```
 
-```leanOutput ex_Terms_erase
-typedTerm:  (or x false)
-erasedTerm: (or x false)
+```leanOutput ex_Terms_relax
+typedTerm:   (or x false)
+relaxedTerm: (or x false)
 ```
+
+Every typed value that wraps a sort-erased one relaxes the same way, under the same name: a bound
+variable (`Typed.BVar.relax`), a grammar and its non-terminals (`Typed.Grammar.relax`,
+`Typed.NT.relax`), a separation-logic heap (`Typed.Solver.Heap.relax`), and a solver
+(`Typed.Solver.relax`), which costs nothing at all since both layers share one solver type.
 
 ```lean -show
 end Conversions
@@ -324,3 +331,5 @@ exists_i := (exists ((i Int)) (forall ((j Int)) (=> (< n j) (< i j))))
 sat
 - n := -1
 ```
+
+{include 1 CvcManual.Terms.Views}

@@ -64,7 +64,7 @@ BVar.mk : z
 #guard_msgs in #eval Env.runIO do
   let x ← Term.mkBVarAs Rat "x"
   let y ← Term.mkBVarAs Rat "y"
-  println! "sum : {(← Term.add x.toTerm y.toTerm).erase}"
+  println! "sum : {(← Term.add x.toTerm y.toTerm).relax}"
 
 
 
@@ -86,14 +86,14 @@ constant : x
   let two ← Term.mkInt 2
 
   let f ← s.declareFun (α := Int → Int) "f"
-  println! "unary    : {(← Term.apply f two).erase}"
+  println! "unary    : {(← Term.apply f two).relax}"
 
   let g ← s.declareFun (α := Int → Bool → Int) "g"
-  println! "2-ary    : {(← Term.apply2 g two (← Term.mkTrue)).erase}"
+  println! "2-ary    : {(← Term.apply2 g two (← Term.mkTrue)).relax}"
 
   -- a non-function index has an empty domain, so this is `declareConst`
   let x ← s.declareFun (α := Int) "x"
-  println! "constant : {x.erase}"
+  println! "constant : {x.relax}"
 
 -- and it solves: an uninterpreted function constrained at a point reads back at that point
 /-- info: f 2 = 7 -/
@@ -130,7 +130,7 @@ dbl 21     : 42
 
   let x ← Term.mkBVarAs Int "x"
   let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
-  println! "define-fun : {dbl.erase}"
+  println! "define-fun : {dbl.relax}"
 
   let applied ← Term.apply dbl (← Term.mkInt 21)
   println! "dbl 21     : {← s.checkSat (ifSat := do s.getValue (α := Int) applied)}"
@@ -149,7 +149,7 @@ sub 4 10   : -6
   let x ← Term.mkBVarAs Int "x"
   let y ← Term.mkBVarAs Int "y"
   let sub ← s.defineFun "sub" (BVars.push y (BVars.push x [])) (← Term.sub x.toTerm y.toTerm)
-  println! "define-fun : {sub.erase}"
+  println! "define-fun : {sub.relax}"
 
   let ten ← Term.mkInt 10
   let four ← Term.mkInt 4
@@ -176,7 +176,7 @@ pick false 7 2 : 5
   let bvs := BVars.push y (BVars.push x (BVars.push b []))
   let body ← Term.ite b.toTerm (← Term.add x.toTerm y.toTerm) (← Term.sub x.toTerm y.toTerm)
   let pick ← s.defineFun "pick" bvs body
-  println! "define-fun : {pick.erase}"
+  println! "define-fun : {pick.relax}"
 
   let seven ← Term.mkInt 7
   let two ← Term.mkInt 2
@@ -212,7 +212,7 @@ c          : 7
   s.setOption "produce-models" "true"
 
   let c ← s.defineFun "c" [] (← Term.mkInt 7)
-  println! "define-fun : {c.erase}"
+  println! "define-fun : {c.relax}"
   println! "c          : {← s.checkSat (ifSat := do s.getValue (α := Int) c)}"
 
 

@@ -50,8 +50,8 @@ def mkAs (α : Type) : [ToTyp α] → (name : String) → Env (BVar α) := mk
 /-- Turns itself into a term. -/
 def toTerm : (bv : BVar α) → Term α := id
 
-/-- Erases its type. -/
-def erase : (bv : BVar α) → Untyped.BVar := id
+/-- Relaxes it to the sort-erased bound variable it is, for free. -/
+def relax : (bv : BVar α) → Untyped.BVar := id
 
 @[inherit_doc Untyped.BVar.lambda]
 def lambda : (bv : BVar α) → (body : Term β) → Env (Term (α → β)) := Untyped.BVar.lambda
@@ -111,12 +111,12 @@ public meta def delabSignatureTo : Delab := do
   guard <| !e'.hasExprMVar
   withTheReader SubExpr (fun c => { c with expr := e' }) delab
 
-/-- Erases the types of the bound variables. -/
-def erase (bvs : BVars) : Untyped.BVars :=
-  bvs.foldr (init := Array.mkEmpty bvs.length) fun ⟨_, _, bv⟩ acc => acc.push bv.erase
+/-- Relaxes them to sort-erased bound variables, keeping the order. -/
+def relax (bvs : BVars) : Untyped.BVars :=
+  bvs.foldr (init := Array.mkEmpty bvs.length) fun ⟨_, _, bv⟩ acc => acc.push bv.relax
 
 @[inherit_doc Untyped.BVars.lambda]
-def lambda (bv : BVars) : (body : Term β) → Env (Term (bv.signatureTo β)) := bv.erase.lambda
+def lambda (bv : BVars) : (body : Term β) → Env (Term (bv.signatureTo β)) := bv.relax.lambda
 
 end BVars
 
@@ -163,14 +163,14 @@ def LambdaBinder.nameAt (names : List String) (i : Nat) : String := names[i]?.ge
 instance [ToTyp α] : LambdaBinder (Term α → Env (Term β)) (α → β) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (LambdaBinder.nameAt names i)
-    return (#[bv.erase], (← f bv.toTerm).erase)
+    return (#[bv.relax], (← f bv.toTerm).relax)
 
 /-- The binder for a body taking a bound variable and more. -/
 instance [ToTyp α] [LambdaBinder ψ σ] : LambdaBinder (Term α → ψ) (α → σ) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (LambdaBinder.nameAt names i)
     let (bvs, body) ← LambdaBinder.bind names (i + 1) (f bv.toTerm)
-    return (#[bv.erase] ++ bvs, body)
+    return (#[bv.relax] ++ bvs, body)
 
 /-- A lambda whose body is written as a Lean function of its variables.
 

@@ -190,7 +190,7 @@ This example uses the `smt.grammar!` syntax extension for grammars, but they can
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {(← s.getSynthSolution mx).relax}")
 ```
 ```leanOutput intro_ex_synth
 max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
@@ -483,7 +483,7 @@ Take a company whose staff, `(employee, project)`, is sharded between a `paris` 
   s.setOption "produce-models" "true"
   -- relations have no Lean value type: print the model term
   let valueOf {α : Type} (t : Term α) := do
-    let v ← Untyped.Solver.getValue s t.erase
+    let v ← Untyped.Solver.getValue s t.relax
     return toString v
 
   let paris ←
@@ -533,7 +533,7 @@ Tables count rows, so the same question about SQL's `UNION ALL` (`tableUnionDisj
   s.setOption "produce-models" "true"
   -- relations have no Lean value type: print the model term
   let valueOf {α : Type} (t : Term α) := do
-    let v ← Untyped.Solver.getValue s t.erase
+    let v ← Untyped.Solver.getValue s t.relax
     return toString v
 
   let paris ←

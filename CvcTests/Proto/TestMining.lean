@@ -131,7 +131,6 @@ def infer [Ω] : Env (Option (Term (Int → Int → Bool))) := do
   s.setOption "sygus" "true"
   let sv0 ← s2.idents.declareAt 0
   let init_0 ← s2.init sv0
-  -- s.assert init_0
   let sv1 ← s2.idents.declareAt 1
   let sv2 ← s2.idents.declareAt 2
   let next_1_2 ← s2.next sv1 sv2
@@ -225,13 +224,13 @@ strengthening invariant: (lambda ((x Int) (y Int)) (and (<= 0 x) (<= 0 y)))
 --     | throwInternal "failed to extract grammar"
 --   let s := s.relax
 --   let str ← s.synthFun "STR" miner.bVars bool g
---   let str_0 ← str.apply4 sv0.count.erase sv0.counting.erase sv0.startStop.erase sv0.reset.erase
---   let str_1 ← str.apply4 sv1.count.erase sv1.counting.erase sv1.startStop.erase sv1.reset.erase
---   -- let str_2 ← str.apply4 sv2.count.erase sv2.counting.erase sv2.startStop.erase sv2.reset.erase
+--   let str_0 ← str.apply4 sv0.count.relax sv0.counting.relax sv0.startStop.relax sv0.reset.relax
+--   let str_1 ← str.apply4 sv1.count.relax sv1.counting.relax sv1.startStop.relax sv1.reset.relax
+--   -- let str_2 ← str.apply4 sv2.count.relax sv2.counting.relax sv2.startStop.relax sv2.reset.relax
 
---   init_0.erase.implies str_0 >>= s.addSygusConstraint
---   (← str_1.and next_0_1.erase).implies str_1 >>= s.addSygusConstraint
---   str_1.implies p_1.erase >>= s.addSygusConstraint
+--   init_0.relax.implies str_0 >>= s.addSygusConstraint
+--   (← str_1.and next_0_1.relax).implies str_1 >>= s.addSygusConstraint
+--   str_1.implies p_1.relax >>= s.addSygusConstraint
 
 --   let str? ← s.checkSynth? (ifSolved := do return (← some <$> s.getSynthSolution str))
 --   str?.mapM fun str => str.typeCheckAs (Int → Bool → Bool → Bool → Bool)

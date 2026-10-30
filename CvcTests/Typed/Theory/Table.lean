@@ -43,9 +43,9 @@ group          : (Bag (Bag (Tuple Int Bool Real)))
   let abc ← s.declareConstAs (Tab [Int, Bool] Rat) "A"
   let cde ← s.declareConstAs (Tab [Rat, String] Bool) "B"
   println! "Tab [Int] Bool : {← (Srt.of (Tab [Int] Bool) : Env Srt)}"
-  println! "product        : {← sortOf (← tableProduct abc cde).erase}"
-  println! "join           : {← sortOf (← tableJoin #[(2, 0)] abc cde).erase}"
-  println! "group          : {← sortOf (← tableGroup #[0] abc).erase}"
+  println! "product        : {← sortOf (← tableProduct abc cde).relax}"
+  println! "join           : {← sortOf (← tableJoin #[(2, 0)] abc cde).relax}"
+  println! "group          : {← sortOf (← tableGroup #[0] abc).relax}"
 
 -- the bag operators, at a table's index: a table never has to be read as a bag
 /-- info:
@@ -62,13 +62,13 @@ empty      : (Bag (Tuple Int Bool))
   let a ← s.declareConstAs (Tab [Int] Bool) "A"
   let b ← s.declareConstAs (Tab [Int] Bool) "B"
   let row ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
-  println! "count      : {← sortOf (← tableCount row a).erase}"
-  println! "unionMax   : {← sortOf (← tableUnionMax a b).erase}"
-  println! "unionDisj  : {← sortOf (← tableUnionDisjoint a b).erase}"
-  println! "setof      : {← sortOf (← tableSetof a).erase}"
-  println! "make       : {← sortOf (← tableMake row (← mkInt 3)).erase}"
+  println! "count      : {← sortOf (← tableCount row a).relax}"
+  println! "unionMax   : {← sortOf (← tableUnionMax a b).relax}"
+  println! "unionDisj  : {← sortOf (← tableUnionDisjoint a b).relax}"
+  println! "setof      : {← sortOf (← tableSetof a).relax}"
+  println! "make       : {← sortOf (← tableMake row (← mkInt 3)).relax}"
   let empty : Term (Tab [Int] Bool) ← tableEmpty
-  println! "empty      : {← sortOf empty.erase}"
+  println! "empty      : {← sortOf empty.relax}"
 
 section indices
 variable [Ω] (t : Term (Tab [Int, Bool] Rat)) (r : Term (Rel [Int, Bool] Rat))
@@ -124,10 +124,10 @@ aggrAll : (Bag Int)
   let a ← s.declareConstAs (Tab [Int] Bool) "A"
   let f ← sumFst
   let zero ← mkInt 0
-  println! "f       : {← f.erase.getSort}"
-  println! "aggr    : {← (← tableAggregate #[1] f zero a).erase.getSort}"
+  println! "f       : {← f.relax.getSort}"
+  println! "aggr    : {← (← tableAggregate #[1] f zero a).relax.getSort}"
   -- with no column every row is in one group, which is a fold over the whole table
-  println! "aggrAll : {← (← tableAggregate #[] f zero a).erase.getSort}"
+  println! "aggrAll : {← (← tableAggregate #[] f zero a).relax.getSort}"
 
 section indices
 variable [Ω]
@@ -189,9 +189,9 @@ interMinN      : (Bag (Tuple Int Bool))
   let a ← s.declareConstAs (Tab [Int] Bool) "A"
   let b ← s.declareConstAs (Tab [Int] Bool) "B"
   let c ← s.declareConstAs (Tab [Int] Bool) "C"
-  println! "unionMaxN      : {← (← tableUnionMaxN #[a, b, c]).erase.getSort}"
-  println! "unionDisjointN : {← (← tableUnionDisjointN #[a, b, c]).erase.getSort}"
-  println! "interMinN      : {← (← tableInterMinN #[a, b, c]).erase.getSort}"
+  println! "unionMaxN      : {← (← tableUnionMaxN #[a, b, c]).relax.getSort}"
+  println! "unionDisjointN : {← (← tableUnionDisjointN #[a, b, c]).relax.getSort}"
+  println! "interMinN      : {← (← tableInterMinN #[a, b, c]).relax.getSort}"
 
 section indices
 variable [Ω] (a b : Term (Tab [Int] Bool)) (r : Term (Rel [Int] Bool))
@@ -249,11 +249,11 @@ project [1]    : (Bag (Tuple Bool))
   let s ← Solver.new
   let b ← s.declareConstAs B4 "B"
   let sortOf (t : Untyped.Term) : Env String := do return s!"{← t.getSort}"
-  println! "table          : {← sortOf b.erase}"
+  println! "table          : {← sortOf b.relax}"
   -- reordering, duplication, and a one-column result that is still a tuple
-  println! "project [2, 0] : {← sortOf (← tableProject cols% [2, 0] b).erase}"
-  println! "project [3, 3] : {← sortOf (← tableProject cols% [3, 3] b).erase}"
-  println! "project [1]    : {← sortOf (← tableProject cols% [1] b).erase}"
+  println! "project [2, 0] : {← sortOf (← tableProject cols% [2, 0] b).relax}"
+  println! "project [3, 3] : {← sortOf (← tableProject cols% [3, 3] b).relax}"
+  println! "project [1]    : {← sortOf (← tableProject cols% [1] b).relax}"
 
 section indices
 variable [Ω] (b : Term B4) (r : Term (Rel [Int, Bool, String] Rat))

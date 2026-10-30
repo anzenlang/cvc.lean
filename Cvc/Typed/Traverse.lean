@@ -60,7 +60,7 @@ def Term.fold [Monad m] [MonadLiftT Env m] [ViewFamily V] (t : Term ρ) (init : 
   (prePlain : Untyped.Term → σ → m (FoldPre σ) := fun _ s => return .descend s)
   (postPlain : Untyped.Term → σ → m (FoldPost σ) := fun _ s => return .continue s)
 : m σ :=
-  Untyped.foldWith (fun u => monadLift (FoldNode.of u : Env (FoldNode V))) t.erase init
+  Untyped.foldWith (fun u => monadLift (FoldNode.of u : Env (FoldNode V))) t.relax init
     (fun n s => match n with
       | .typed _ t v => pre t v s
       | .plain u => prePlain u s)
@@ -100,7 +100,7 @@ private def ofRaw (z : Untyped.ZipperOf (Option Typ)) : Zipper.Any ρ := ⟨z.pa
 
 /-- A zipper focused on a term's root. -/
 def ofTerm (t : Term ρ) : Env (Zipper.Any ρ) := do
-  return ofRaw (.ofTerm t.erase (← View.typOf? t.erase))
+  return ofRaw (.ofTerm t.relax (← View.typOf? t.relax))
 
 /-- The focus. -/
 def focus : Zipper ρ s → Focus s :=
@@ -109,7 +109,7 @@ def focus : Zipper ρ s → Focus s :=
   | none => fun z => z.raw.focus
 
 /-- The focus, sort-erased. -/
-def focusErased (z : Zipper ρ s) : Untyped.Term := z.raw.focus
+def relaxedFocus (z : Zipper ρ s) : Untyped.Term := z.raw.focus
 
 /-- The focus's view. -/
 def view [ViewFamily V] (z : Zipper ρ (some τ)) : Env (V τ) := ViewFamily.viewOf τ z.focus
@@ -139,7 +139,7 @@ def root (z : Zipper ρ s) : Env (Term ρ) := do
 
 /-- Replaces the focus by a term of its sort. -/
 def replace (z : Zipper ρ (some τ)) (t : Term τ.Denote) : Zipper ρ (some τ) :=
-  ⟨z.raw.replaceUnchecked t.erase⟩
+  ⟨z.raw.replaceUnchecked t.relax⟩
 
 /-- Replaces a sort-erased focus, checking that the replacement has the focus's sort. -/
 def replacePlain (z : Zipper ρ none) (t : Untyped.Term) : Env (Zipper ρ none) := do
@@ -170,13 +170,13 @@ def Term.walk [Monad m] [MonadLiftT Env m] [ViewFamily V] (t : Term ρ) (init : 
   (prePlain : Zipper ρ none → σ → m (WalkPre σ Untyped.Term) := fun _ s => return .descend s)
   (postPlain : Zipper ρ none → σ → m (WalkPost σ Untyped.Term) := fun _ s => return .continue s)
 : m (Term ρ × σ) := do
-  let z₀ := Untyped.ZipperOf.ofTerm t.erase (← (View.typOf? t.erase : Env _))
+  let z₀ := Untyped.ZipperOf.ofTerm t.relax (← (View.typOf? t.relax : Env _))
   let (u, s) ← Untyped.ZipperOf.walkWith (fun k => monadLift (View.typOf? k)) z₀ init
     (fun z s => do
       match z.payloadOf with
       | some τ =>
         let zt : Zipper ρ (some τ) := ⟨z⟩
-        return (← pre zt (← (zt.view : Env _)) s).map Term.erase
+        return (← pre zt (← (zt.view : Env _)) s).map Term.relax
       | none =>
         let step ← prePlain ⟨z⟩ s
         match step with
@@ -187,7 +187,7 @@ def Term.walk [Monad m] [MonadLiftT Env m] [ViewFamily V] (t : Term ρ) (init : 
       match z.payloadOf with
       | some τ =>
         let zt : Zipper ρ (some τ) := ⟨z⟩
-        return (← post zt (← (zt.view : Env _)) s).map Term.erase
+        return (← post zt (← (zt.view : Env _)) s).map Term.relax
       | none =>
         let step ← postPlain ⟨z⟩ s
         match step with

@@ -57,7 +57,7 @@ def tableOfBag [Ord (Tup α β)] (bag : Term (Bag (Tup α β))) : Term (Tab α �
 /-- Cartesian product: every pairing of rows, with the columns appended. -/
 def tableProduct (lft : Term (Tab α β)) (rgt : Term (Tab α' β'))
 : Env (Term (Tab (α ++ β :: α') β')) :=
-  T.tableProduct lft.erase rgt.erase
+  T.tableProduct lft.relax rgt.relax
 
 /-- Equi-join: the product, keeping the pairings whose given column pairs agree.
 
@@ -65,7 +65,7 @@ The result's sort is the product's, since the pairs only filter.
 -/
 def tableJoin (columns : Array (Nat × Nat)) (lft : Term (Tab α β)) (rgt : Term (Tab α' β'))
 : Env (Term (Tab (α ++ β :: α') β')) :=
-  T.tableJoin columns lft.erase rgt.erase
+  T.tableJoin columns lft.relax rgt.relax
 
 /-- Partitions the table, putting rows that agree on the given columns in the same part.
 
@@ -74,7 +74,7 @@ sort.
 -/
 def tableGroup [Ord (Tab α β)] (columns : Array Nat) (table : Term (Tab α β))
 : Env (Term (Bag (Tab α β))) :=
-  T.tableGroup columns table.erase
+  T.tableGroup columns table.relax
 
 /-- Folds each group of rows that agree on the given columns.
 
@@ -92,7 +92,7 @@ every row is in one group, which is an ordinary fold over the whole table.
 def tableAggregate [Ord γ] (columns : Array Nat) (f : Term (Tup α β → γ → γ)) (init : Term γ)
   (table : Term (Tab α β))
 : Env (Term (Bag γ)) :=
-  T.tableAggregate columns f.erase init.erase table.erase
+  T.tableAggregate columns f.relax init.relax table.relax
 
 /-- Projects every row onto the given columns, in the order given.
 
@@ -100,7 +100,7 @@ Typed by its `Cols` spine, as `relProject` is; `T.tableProject` on an `Array Nat
 sort-erased form, for columns that are only known at run time.
 -/
 def tableProject (cols : Cols α β α' β') (table : Term (Tab α β)) : Env (Term (Tab α' β')) :=
-  T.tableProject cols.toArray table.erase
+  T.tableProject cols.toArray table.relax
 
 
 
@@ -108,32 +108,32 @@ def tableProject (cols : Cols α β α' β') (table : Term (Tab α β)) : Env (T
 
 /-- Whether a row occurs at least once. -/
 def tableMember (row : Term (Tup α β)) (table : Term (Tab α β)) : Env (Term Bool) :=
-  T.bagMember row.erase table.erase
+  T.bagMember row.relax table.relax
 
 /-- Whether every row of the first table occurs at least as often in the second. -/
 def tableSubtable (lft rgt : Term (Tab α β)) : Env (Term Bool) :=
-  T.bagSubbag lft.erase rgt.erase
+  T.bagSubbag lft.relax rgt.relax
 
 /-- The table holding one row, with the given multiplicity. -/
 def tableMake (row : Term (Tup α β)) (count : Term Int) : Env (Term (Tab α β)) :=
-  T.bagMake row.erase count.erase
+  T.bagMake row.relax count.relax
 
 /-- How often a row occurs. -/
 def tableCount (row : Term (Tup α β)) (table : Term (Tab α β)) : Env (Term Int) :=
-  T.bagCount row.erase table.erase
+  T.bagCount row.relax table.relax
 
 /-- How many rows the table holds, counting duplicates. -/
-def tableCard (table : Term (Tab α β)) : Env (Term Int) := T.bagCard table.erase
+def tableCard (table : Term (Tab α β)) : Env (Term Int) := T.bagCard table.relax
 
 /-- The table with every multiplicity reduced to one. -/
-def tableSetof (table : Term (Tab α β)) : Env (Term (Tab α β)) := T.bagSetof table.erase
+def tableSetof (table : Term (Tab α β)) : Env (Term (Tab α β)) := T.bagSetof table.relax
 
 /-- Some row of the table, unspecified which; undefined on the empty table. -/
-def tableChoose (table : Term (Tab α β)) : Env (Term (Tup α β)) := T.bagChoose table.erase
+def tableChoose (table : Term (Tab α β)) : Env (Term (Tup α β)) := T.bagChoose table.relax
 
 /-- Union taking the greater multiplicity of each row. -/
 def tableUnionMax (lft rgt : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagUnionMax lft.erase rgt.erase
+  T.bagUnionMax lft.relax rgt.relax
 
 /-- N-ary version of `tableUnionMax`, requires at least two elements. -/
 def tableUnionMaxN (tables : Terms (Tab α β))
@@ -144,7 +144,7 @@ def tableUnionMaxN (tables : Terms (Tab α β))
 
 /-- Union adding the multiplicities of each row. -/
 def tableUnionDisjoint (lft rgt : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagUnionDisjoint lft.erase rgt.erase
+  T.bagUnionDisjoint lft.relax rgt.relax
 
 /-- N-ary version of `tableUnionDisjoint`, requires at least two elements. -/
 def tableUnionDisjointN (tables : Terms (Tab α β))
@@ -155,7 +155,7 @@ def tableUnionDisjointN (tables : Terms (Tab α β))
 
 /-- Intersection taking the lesser multiplicity of each row. -/
 def tableInterMin (lft rgt : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagInterMin lft.erase rgt.erase
+  T.bagInterMin lft.relax rgt.relax
 
 /-- N-ary version of `tableInterMin`, requires at least two elements. -/
 def tableInterMinN (tables : Terms (Tab α β))
@@ -166,28 +166,28 @@ def tableInterMinN (tables : Terms (Tab α β))
 
 /-- Difference subtracting multiplicities. -/
 def tableDifferenceSubtract (lft rgt : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagDifferenceSubtract lft.erase rgt.erase
+  T.bagDifferenceSubtract lft.relax rgt.relax
 
 /-- Difference removing a row entirely wherever it occurs on the right. -/
 def tableDifferenceRemove (lft rgt : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagDifferenceRemove lft.erase rgt.erase
+  T.bagDifferenceRemove lft.relax rgt.relax
 
 /-- The rows satisfying a predicate. -/
 def tableFilter (p : Term (Tup α β → Bool)) (table : Term (Tab α β)) : Env (Term (Tab α β)) :=
-  T.bagFilter p.erase table.erase
+  T.bagFilter p.relax table.relax
 
 /-- Whether every row satisfies a predicate. -/
 def tableAll (p : Term (Tup α β → Bool)) (table : Term (Tab α β)) : Env (Term Bool) :=
-  T.bagAll p.erase table.erase
+  T.bagAll p.relax table.relax
 
 /-- Whether some row satisfies a predicate. -/
 def tableSome (p : Term (Tup α β → Bool)) (table : Term (Tab α β)) : Env (Term Bool) :=
-  T.bagSome p.erase table.erase
+  T.bagSome p.relax table.relax
 
 /-- Partitions the rows by an equivalence, answering a bag of tables. -/
 def tablePartition [Ord (Tab α β)] (p : Term (Tup α β → Tup α β → Bool)) (table : Term (Tab α β))
 : Env (Term (Bag (Tab α β))) :=
-  T.bagPartition p.erase table.erase
+  T.bagPartition p.relax table.relax
 
 /-- The empty table of the given shape. -/
 def tableEmpty' (α : List Type) (β : Type) [ToTypList α] [ToTyp β] : Env (Term (Tab α β)) := do

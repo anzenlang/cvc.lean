@@ -71,4 +71,4 @@ def setComprehension [ToTyp β] [Ord β] (bvs : BVars) (pred : Term Bool) (elem 
   (_nonEmpty : bvs ≠ [] := by
     (try simp) <;> fail "failed to prove a comprehension binds at least one variable")
 : Env (Term (Cvc.Set β)) :=
-  T.setComprehension bvs.erase pred elem (by cases bvs <;> simp_all [BVars.erase])
+  T.setComprehension bvs.relax pred elem (by cases bvs <;> simp_all [BVars.relax])

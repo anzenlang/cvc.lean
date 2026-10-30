@@ -49,7 +49,7 @@ instance [inst : TermToValue α] [ToTyp α] : Untyped.TermToValue α where
   termToValue t := t.typeCheckAs α >>= inst.termToValue
 
 instance [inst : Untyped.TermToValue α] : TermToValue α where
-  termToValue t := inst.termToValue t.erase
+  termToValue t := inst.termToValue t.relax
 
 end TermToValue
 

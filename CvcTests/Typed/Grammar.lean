@@ -306,7 +306,7 @@ max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
   s.addSygusConstraint (← smt! mab ≥ a)
   s.addSygusConstraint (← smt! mab ≥ b)
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
-  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).erase}")
+  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).relax}")
 
 /-! A parameter is not a non-terminal: extending a grammar "at" one does not compile. -/
 
@@ -386,7 +386,7 @@ f := (lambda ((x Int)) (+ (+ x 3) 7))
   let f ← s.synthFun "f" g
   let a ← s.declareSygusVar Int "a"
   s.addSygusConstraint (← smt! f a = a + 10)
-  s.checkSynth (ifSolved := do println! "f := {(← s.getSynthSolution f).erase}")
+  s.checkSynth (ifSolved := do println! "f := {(← s.getSynthSolution f).relax}")
 
 /-! `smt.grammar!` refuses a non-terminal without alternatives, the grammar it answers being closed. -/
 
@@ -464,7 +464,7 @@ max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
   s.addSygusConstraint (← smt! mab ≥ a)
   s.addSygusConstraint (← smt! mab ≥ b)
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
-  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).erase}")
+  s.checkSynth (ifSolved := do println! "max := {(← s.getSynthSolution mx).relax}")
 
 /-! A grammar with no parameters types at its start symbol's sort. A wrong signature — a wrong
 parameter count, a wrong codomain, or parameters for a grammar that has none — is refused, as is a
@@ -505,3 +505,45 @@ cannot type non-terminal `start` as `Bool`, it has sort `Int`
   catch e => println! "no parameters:\n{e}"
   try discard <| start.typeCheckAs Bool
   catch e => println! "non-terminal:\n{e}"
+
+
+
+/-! ## To a sort-erased grammar
+
+`Grammar.relax` is the other direction, and it cannot fail: the typed grammar wraps a sort-erased
+one, which carries its own parameters and start sort, so it serves the sort-erased `synthFun` as
+is. A round trip through `typeCheckAs` gives the grammar back, and the two views share one cvc5
+grammar, so a rule added through the sort-erased one shows in the typed one. -/
+
+/-- info:
+relaxed    : ((start Int) )((start Int (x y)))
+parameters : #[x, y]
+start sort : Int
+round trip : ((start Int) )((start Int (x y)))
+shared     : ((start Int) )((start Int (x y 0)))
+f := (lambda ((x Int) (y Int)) y)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let x ← BVar.mk (α := Int) "x"
+  let y ← BVar.mk (α := Int) "y"
+  let start ← NT.mk' Int "start"
+  let g ← s.mkGrammar (.push y (.push x [])) start
+  let g ← g.addRules start #[x.toTerm, y.toTerm]
+  let ug := g.relax
+  println! "relaxed    : {ug}"
+  println! "parameters : {ug.boundVars}"
+  println! "start sort : {ug.startSrt}"
+  let g' ← ug.typeCheckAs (Int → Int → Int)
+  println! "round trip : {g'}"
+  discard <| ug.addRule start.relax (← Untyped.Term.mkInt 0)
+  println! "shared     : {g}"
+  -- the sort-erased `synthFun` takes the relaxed grammar's own parameters and start sort
+  let f ← Untyped.Solver.synthFun s "f" ug.boundVars ug.startSrt ug
+  let a ← Untyped.Solver.declareSygusVar s "a" (← Srt.int)
+  let b ← Untyped.Solver.declareSygusVar s "b" (← Srt.int)
+  Untyped.Solver.addSygusConstraint s
+    (← Untyped.Term.equal (← Untyped.Term.apply2 f a b) b)
+  Untyped.Solver.checkSynth s (ifSolved := do
+    println! "f := {← Untyped.Solver.getSynthSolution s f}")

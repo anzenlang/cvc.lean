@@ -90,8 +90,8 @@ def toTerm (nt : NT α) : Term α := nt.untyped.toTerm
 
 instance : Coe (NT α) (Term α) := ⟨toTerm⟩
 
-/-- Erases the sort. -/
-def erase (nt : NT α) : Untyped.NT := nt.untyped
+/-- Relaxes it to the sort-erased non-terminal it wraps. -/
+def relax (nt : NT α) : Untyped.NT := nt.untyped
 
 end NT
 
@@ -116,9 +116,9 @@ namespace NTs
 /-- Adds a non-terminal. -/
 abbrev push (nt : NT α) (nts : NTs) : NTs := ⟨α, nt⟩ :: nts
 
-/-- Erases the sorts, keeping the order. -/
-def erase (nts : NTs) : Untyped.NTs :=
-  nts.foldr (init := Array.mkEmpty nts.length) fun ⟨_, nt⟩ acc => acc.push nt.erase
+/-- Relaxes them to sort-erased non-terminals, keeping the order. -/
+def relax (nts : NTs) : Untyped.NTs :=
+  nts.foldr (init := Array.mkEmpty nts.length) fun ⟨_, nt⟩ acc => acc.push nt.relax
 
 end NTs
 
@@ -140,9 +140,7 @@ the rules may mention.
 -/
 def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
 : Env (Grammar (boundVars.signatureTo α)) := do
-  let startSrt ← Srt.of α
-  let untyped ← Untyped.Solver.mkGrammar s boundVars.erase start.erase others.erase
-  return ⟨untyped, boundVars.erase, startSrt⟩
+  return ⟨← Untyped.Solver.mkGrammar s boundVars.relax start.relax others.relax⟩
 
 end Solver
 
@@ -160,7 +158,7 @@ def _root_.Cvc.Untyped.Grammar.typeCheckAs (σ : Type) [ToTyp σ] (g : Untyped.G
   let srt' ← Srt.of σ
   if srt != srt' then
     throwUser s!"cannot type the following grammar as `{srt'}`, it generates `{srt}`:\n{g}"
-  return ⟨g, g.boundVars, g.startSrt⟩
+  return ⟨g⟩
 
 @[inherit_doc Untyped.Grammar.typeCheckAs]
 abbrev _root_.Cvc.Untyped.Grammar.typeCheck [ToTyp σ] (g : Untyped.Grammar) : Env (Grammar σ) :=
@@ -175,19 +173,19 @@ non-terminal belongs to *this* grammar is a property of a value rather than a ty
 checked when the rule is added.
 -/
 def addRule (nt : NT α) (rule : Term α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addRule nt.erase rule.erase}
+  return {g with toUntyped := ← g.toUntyped.addRule nt.relax rule.relax}
 
 @[inherit_doc addRule]
 def addRules (nt : NT α) (rules : Terms α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addRules nt.erase (rules.map Term.erase)}
+  return {g with toUntyped := ← g.toUntyped.addRules nt.relax (rules.map Term.relax)}
 
 /-- Allows any constant of the non-terminal's sort. -/
 def addAnyConstant (nt : NT α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addAnyConstant nt.erase}
+  return {g with toUntyped := ← g.toUntyped.addAnyConstant nt.relax}
 
 /-- Allows any of the grammar's parameters that has the non-terminal's sort. -/
 def addAnyVariable (nt : NT α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addAnyVariable nt.erase}
+  return {g with toUntyped := ← g.toUntyped.addAnyVariable nt.relax}
 
 end Grammar
 

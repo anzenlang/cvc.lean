@@ -70,12 +70,12 @@ records do.
 private def nil : Fields [] := ⟨#v[]⟩
 
 /-- A record's last field. -/
-def last (name : String) (value : Term gamma) : Fields [(name, gamma)] := ⟨#v[value.erase]⟩
+def last (name : String) (value : Term gamma) : Fields [(name, gamma)] := ⟨#v[value.relax]⟩
 
 /-- Adds a field in front of the ones collected so far. -/
 def cons (name : String) (value : Term gamma) (rest : Fields fields)
 : Fields ((name, gamma) :: fields) :=
-  ⟨⟨#[value.erase] ++ rest.values.toArray, by simp; omega⟩⟩
+  ⟨⟨#[value.relax] ++ rest.values.toArray, by simp; omega⟩⟩
 
 /-- A field's term, at the type the index gives it.
 
@@ -85,13 +85,13 @@ def get (name : String) [F : FieldOf fields name gamma] : Term gamma := fs.value
 
 /-- The same fields, with one field's term replaced. -/
 def set (name : String) [F : FieldOf fields name gamma] (value : Term gamma) : Fields fields :=
-  ⟨fs.values.set F.idx value.erase⟩
+  ⟨fs.values.set F.idx value.relax⟩
 
-/-- The terms, sort-erased, in the order the fields are. -/
-def erase : Untyped.Terms := fs.values.toArray
+/-- Relaxes them to sort-erased terms, in the order the fields are. -/
+def relax : Untyped.Terms := fs.values.toArray
 
 /-- The fields as name/term pairs, sort-erased, in the order the fields are. -/
-def pairs : Array (String × Untyped.Term) := (fields.map Prod.fst).toArray.zip fs.erase
+def pairs : Array (String × Untyped.Term) := (fields.map Prod.fst).toArray.zip fs.relax
 
 instance : ToString (Fields fields) where
   toString fs :=
@@ -131,12 +131,12 @@ def checkFieldSrt [ToTyp gamma] (field : String) (expected : Srt) (term : Term g
 /-- Reads a field out of a record value. -/
 def recordGet (record : Term (Record fields)) (name : String) [FieldOf fields name gamma]
 : Env (Term gamma) :=
-  T.recordGet record.erase name
+  T.recordGet record.relax name
 
 /-- The record value with one field replaced. -/
 def recordSet (record : Term (Record fields)) (name : String) [FieldOf fields name gamma]
 (value : Term gamma) : Env (Term (Record fields)) :=
-  T.recordSet record.erase name value.erase
+  T.recordSet record.relax name value.relax
 
 /-- Reads a record value apart, into all of its fields.
 
@@ -149,7 +149,7 @@ where
   go : (remaining : List (String × Type)) → Env (Fields remaining)
     | [] => return .nil
     | (name, _) :: rest => do
-      return Fields.cons name (← T.recordGet record.erase name) (← go rest)
+      return Fields.cons name (← T.recordGet record.relax name) (← go rest)
 
 /-- A record's fields, if the term is a record literal: `fs.get "a"` then reads one, by a name
 checked at compile time.
@@ -158,7 +158,7 @@ checked at compile time.
 `ite` of a record sort is not one. Generic code meets records through the datatype view instead.
 -/
 def recordFields? (t : Term (Record fields)) : Env (Option (Fields fields)) := do
-  let raw := t.erase
+  let raw := t.relax
   unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
   -- the first kid is the constructor
   let args := raw.getKids.extract 1
@@ -212,11 +212,11 @@ instance : ValuesToTerm [] := ⟨fun _ => return []⟩
 instance [A : ValueToTerm gamma] [R : ValuesToTerm fields]
 : ValuesToTerm ((_name, gamma) :: fields) where
   toTerms | (value, values) => do
-    return (← A.valueToTerm value).erase :: (← R.toTerms values)
+    return (← A.valueToTerm value).relax :: (← R.toTerms values)
 
 instance [R : TermToValues fields] : TermToValue (Record fields) where
   termToValue record := do
-    let term := record.erase
+    let term := record.relax
     unless term.getKind? = some .APPLY_CONSTRUCTOR do
       throwUser s!"`{term}` is not a record value"
     -- an `APPLY_CONSTRUCTOR`'s first child is the constructor, the fields follow it

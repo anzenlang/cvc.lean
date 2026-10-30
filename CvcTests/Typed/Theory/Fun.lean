@@ -150,12 +150,12 @@ lambda   : (@ (@ (lambda ((x Int) (y Int)) (+ x y)) i) i) : Int
     println! "{label} : {t} : {← t.getSort}"
 
   -- the fixed-arity spelling and the spine agree
-  show! "apply2  " (← apply2 f i b).erase
-  show! "applyN 2" (← applyN f (.cons i (.last b))).erase
+  show! "apply2  " (← apply2 f i b).relax
+  show! "applyN 2" (← applyN f (.cons i (.last b))).relax
   -- past three arguments only the spine will do
-  show! "applyN 4" (← applyN g (.cons i (.cons i (.cons i (.last i))))).erase
+  show! "applyN 4" (← applyN g (.cons i (.cons i (.cons i (.last i))))).relax
   -- stopping early leaves the rest of the arrow
-  show! "partial " (← applyN f (.last i)).erase
+  show! "partial " (← applyN f (.last i)).relax
 
   -- and it applies a lambda, whose index the binders determine
   let x ← Cvc.Typed.BVar.mk (α := Int) "x"
@@ -163,7 +163,7 @@ lambda   : (@ (@ (lambda ((x Int) (y Int)) (+ x y)) i) i) : Int
   let lam ← Cvc.Typed.BVars.lambda
     (Cvc.Typed.BVars.push y (Cvc.Typed.BVars.push x []))
     (← add x.toTerm y.toTerm)
-  show! "lambda  " (← applyN lam (.cons i (.last i))).erase
+  show! "lambda  " (← applyN lam (.cons i (.last i))).relax
 
 section indices
 variable [Ω]
@@ -208,12 +208,12 @@ apply then : (f i b r)
   let b ← s.declareConstAs Bool "b"
   let r ← s.declareConstAs Rat "r"
 
-  println! "applyN     : {(← applyN f (.cons i (.cons b (.last r)))).erase}"
-  println! "apply3     : {(← apply3 f i b r).erase}"
+  println! "applyN     : {(← applyN f (.cons i (.cons b (.last r)))).relax}"
+  println! "apply3     : {(← apply3 f i b r).relax}"
   -- `f i b r` goes through the two `CoeFun` instances
-  println! "coe chain  : {(← (f i b r : Env (Cvc.Typed.Term Int))).erase}"
+  println! "coe chain  : {(← (f i b r : Env (Cvc.Typed.Term Int))).relax}"
   -- and reaching it in two steps is the same term again
-  println! "apply then : {(← apply2 (← apply f i) b r).erase}"
+  println! "apply then : {(← apply2 (← apply f i) b r).relax}"
 
 /-- info: coe chain, no logic set : sat -/
 #guard_msgs in #eval Env.runIO do

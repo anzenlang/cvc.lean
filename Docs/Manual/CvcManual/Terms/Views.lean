@@ -23,7 +23,7 @@ set_option pp.rawOnError true
 
 
 
-#doc (Manual) "Taking Terms Apart" =>
+#doc (Manual) "Term inspection" =>
 %%%
 tag := "views"
 htmlSplit := .never
@@ -31,7 +31,7 @@ htmlSplit := .never
 
 Building terms is half of the story: a solver hands terms back — models, unsat cores, proofs, synthesized functions — and a rewrite has to look inside a term before it replaces it. cvc.lean takes a term apart through a *view*: the term one level down, its operator as a constructor and its kids, indices and names as fields.
 
-`import Cvc.Typed.View` (or `Cvc.Untyped.View`) brings in everything this chapter uses; `import Cvc` includes it.
+`import Cvc.Typed.View` (or `Cvc.Untyped.View`) brings in everything this section uses; `import Cvc` includes it.
 
 # The View of the Imported Theories
 

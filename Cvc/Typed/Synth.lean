@@ -66,7 +66,7 @@ The grammar carries the parameters and the start sort, so its index *is* the sig
 function this declares.
 -/
 def synthFun (symbol : String) (g : Grammar σ) : Env (Term σ) :=
-  U.synthFun s symbol g.boundVars g.startSrt g.toUntyped
+  U.synthFun s symbol g.relax.boundVars g.relax.startSrt g.relax
 
 /-- Declares a function to synthesize, unrestricted.
 
@@ -76,7 +76,7 @@ its own.
 -/
 def synthAnyFun' (symbol : String) (boundVars : BVars) (α : Type) [ToTyp α]
 : Env (Term (boundVars.signatureTo α)) := do
-  U.synthFun s symbol boundVars.erase (← Srt.of α)
+  U.synthFun s symbol boundVars.relax (← Srt.of α)
 
 @[inherit_doc synthAnyFun']
 abbrev synthAnyFun [ToTyp α] (symbol : String) (boundVars : BVars)

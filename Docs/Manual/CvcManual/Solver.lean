@@ -167,13 +167,13 @@ The only argument left to explain is `assuming` which is an optional array of {l
   println! "model as cvc terms:\n\
     - b  := {bVal}\n- i1 := {i1Val}\n- i2 := {i2Val}"
 
-  -- we can always erase type information if needed
+  -- a typed term can always be relaxed if needed
   let vals ← solver.checkSat
     (ifSat := do
       let bVal ← solver.getValueTerm b
       let i1Val ← solver.getValueTerm i1
       let i2Val ← solver.getValueTerm i2
-      return #[ bVal.erase, i1Val.erase, i2Val.erase ])
+      return #[ bVal.relax, i1Val.relax, i2Val.relax ])
   println! "untyped model: {vals}"
 ```
 ```leanOutput ex_Solver_modal1

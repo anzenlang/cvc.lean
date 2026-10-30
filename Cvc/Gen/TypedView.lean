@@ -66,8 +66,8 @@ def id_Cvc_Typed_View_typOfQ : Ident := mkIdent `Cvc.Typed.View.typOf?
 def id_Cvc_Typed_View_proofQ : Ident := mkIdent `Cvc.Typed.View.proof?
 /-- `Cvc.Untyped.Kids.first`. -/
 def id_Cvc_Untyped_Kids_first : Ident := mkIdent `Cvc.Untyped.Kids.first
-/-- `Cvc.Typed.Term.erase`. -/
-def id_Cvc_Typed_Term_erase : Ident := mkIdent `Cvc.Typed.Term.erase
+/-- `Cvc.Typed.Term.relax`. -/
+def id_Cvc_Typed_Term_relax : Ident := mkIdent `Cvc.Typed.Term.relax
 /-- `Cvc.Bag`. -/
 def id_Cvc_Bag : Ident := mkIdent `Cvc.Bag
 /-- `Cvc.Env`. -/
@@ -715,7 +715,7 @@ def elabGenTypedView : CommandElab
       def $(mkIdent (`_root_ ++ theory ++ `of)) ($tau:ident : $id_Cvc_Typ)
         ($t : $id_Cvc_Typed_Term ($id_Cvc_Typ_Denote $tau))
       : $id_Cvc_Env (Option ($(mkIdent theory) $tau)) :=
-        match $tau:term, ($(mkIdent (untyped ++ `of?)) ($id_Cvc_Typed_Term_erase $t)) with
+        match $tau:term, ($(mkIdent (untyped ++ `of?)) ($id_Cvc_Typed_Term_relax $t)) with
         $[$alts:matchAlt]*
         | _, _ => return none))
     modifyEnv (typedViewExt.addEntry · { theory := theoryName, view := theory, ctors, kinds })

@@ -39,7 +39,7 @@ abbrev Solver [Ω] := Cvc.Untyped.Solver
 @[inherit_doc Untyped.Solver.Proof]
 abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
 
-/-- Turns a `Solver` into an `Untyped.Solver`. -/
+/-- Relaxes it to the sort-erased solver it is, for free: the two layers share one solver type. -/
 abbrev Solver.relax [Ω] : Solver → Untyped.Solver := id
 
 /-- An array of `Solver.Proof`.
@@ -52,16 +52,22 @@ abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (S
 
 /-- A grammar generating terms of signature `σ`.
 
-Carries the parameters it was declared over, so that `synthFun` cannot be given different ones.
-Like the sort-erased one it belongs to the scope, not to the solver that built it. Declared here
-rather than beside the builders in `Cvc.Typed.Grammar` because the interpolant and abduct
-queries below take one.
+A sort-erased grammar under an index. That one carries the parameters it was declared over and its
+start symbol's sort, so `synthFun` cannot be given different parameters, and `σ` is what they
+describe. Like the sort-erased one it belongs to the scope, not to the solver that built it.
+Declared here rather than beside the builders in `Cvc.Typed.Grammar` because the interpolant and
+abduct queries below take one.
 -/
 structure Grammar [Ω] (σ : Type) where
   private mk ::
   private toUntyped : Untyped.Grammar
-  private boundVars : Untyped.BVars
-  private startSrt : Srt
+
+/-- Relaxes it to the sort-erased grammar it wraps, parameters and start sort included.
+
+Free, and the two share one cvc5 grammar: a rule added through either shows in both, and once either
+has been used by a solver, neither accepts more rules. `Untyped.Grammar.typeCheckAs` goes back up.
+-/
+def Grammar.relax [Ω] (g : Grammar σ) : Untyped.Grammar := g.toUntyped
 
 /-- String representation, as the SyGuS pre-declaration and rule set. -/
 protected def Grammar.toString [Ω] (g : Grammar σ) : String := toString g.toUntyped
@@ -114,7 +120,7 @@ abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := false) : Env (Te
 def defineFun [ToTyp β]
   (symbol : String) (bvs : BVars) (body : Term β)
 : Env (Term (bvs.signatureTo β)) := do
-  Untyped.Solver.defineFun s symbol bvs.erase (← Srt.of β) body
+  Untyped.Solver.defineFun s symbol bvs.relax (← Srt.of β) body
 
 /-- Re-types a solver function, narrowing the terms it mentions.
 

@@ -302,11 +302,17 @@ Both term types are rooted at lean-cvc5 and at nothing else — `def3% Term ← 
 `import` keeps each opaque, which is what makes the layers distinct to a user. `Terms` is `Array
 Term` in both, with private `ofUnsafe`/`toUnsafe` at `id`.
 
-Going down is `Typed.Term.erase`, free. Going up is a **runtime check** comparing the term's sort
-against `Srt.of α`, under two pairs of names: `Typed.Term.ofUntypedAs α t` / `ofUntyped t`, and the
-dot-notation spelling `Untyped.Term.typeCheckAs α t` / `typeCheck t`, which is what the rest of the
-library uses. The `…As` forms take the index **first**, so `t.typeCheckAs Int` reads naturally. A
-mismatch is a `throwUser`; there is no `Option`-answering variant.
+Going down is `Typed.Term.relax`, free. **Every typed-to-sort-erased conversion is named
+`relax`**: `Term`, `BVar`/`BVars`, `NT`/`NTs`, `Grammar`, `Solver.Heap`, `Solver` (the identity,
+the two layers sharing one solver type), and the datatype and record `Args`/`Fields` spines, which
+relax to `Untyped.Terms`. `FiniteField.erase` and `Float.erase` are not conversions between layers
+— they drop a value-level size index — and keep their name.
+
+Going up is a **runtime check** comparing the term's sort against `Srt.of α`, under two pairs of
+names: `Typed.Term.ofUntypedAs α t` / `ofUntyped t`, and the dot-notation spelling
+`Untyped.Term.typeCheckAs α t` / `typeCheck t`, which is what the rest of the library uses. The
+`…As` forms take the index **first**, so `t.typeCheckAs Int` reads naturally. A mismatch is a
+`throwUser`; there is no `Option`-answering variant.
 
 Each `Defs.lean` also declares the layer's `scoped syntax "smt!"`, expanding to `smtU!`/`smtT!`, so
 opening a layer gives the short spelling of the DSL.
@@ -959,7 +965,7 @@ appears inside its own rules) but *not* to a `BVar`, which is the mistake worth 
 `NT` is a **structure**, not a `def` alias. An alias needs `BVar`, and so `Term`, `@[expose]`d for
 its identity conversions to compile across a module boundary — and exposing `Term` would make the
 two layers the same type to every downstream module. A one-field structure costs nothing and stops
-the cascade. The typed `NT α` wraps `Untyped.NT` rather than `BVar α`, so erasure is a projection
+the cascade. The typed `NT α` wraps `Untyped.NT` rather than `BVar α`, so relaxing is a projection
 instead of a private-constructor call.
 
 **A grammar belongs to the scope, not to a solver.** cvc5 builds one through a solver
@@ -983,9 +989,11 @@ built with, and `smt.grammar!` makes them out of sight: `s.synthFun "f" g.boundV
 typed `Grammar σ` is indexed by the **signature it generates**: `mkGrammar` folds its parameters
 with `BVars.signatureTo`, exactly as `Solver.defineFun` folds its own. With no parameters that is
 the start symbol's sort, which is the shape `getInterpolant`/`getAbduct` want — both take `Option
-(Grammar Bool)`. It is a `structure` carrying the raw grammar plus the parameters and the start
-sort, deliberately unlike the zero-cost `Term`/`BVar` wrappers: holding the parameters is what lets
-`synthFun` take nothing but the grammar, so the two cannot disagree.
+(Grammar Bool)`. It is a `structure` wrapping the sort-erased grammar and nothing else — that one
+already carries the parameters and the start sort, and holding them is what lets `synthFun` take
+nothing but the grammar, so the two cannot disagree. `Grammar.relax` hands it over, free; the two
+views share one cvc5 grammar, so a rule added through either shows in both and the freeze applies
+to both.
 
 **Going up is a runtime check, as for terms.** The sort-erased `Grammar` also records `startSrt`,
 the start symbol's sort, because cvc5 offers no way to read a grammar's non-terminals back; with it,
@@ -1146,8 +1154,8 @@ Three things to know:
   one of the same name is picked up ahead of it wherever both are open.
 - **`Args` carries a `ToTyp` field** it does not otherwise need — `List ((β : Type) × ToTyp β ×
   Term β)`, shaped exactly like `BVars`. Without it the sigma's layout is unknown across a module
-  boundary and `Args.erase` fails to compile.
-- **`Args.erase` folds left**, where `BVars.erase` folds right: `Args.cons` reads in field order,
+  boundary and `Args.relax` fails to compile.
+- **`Args.relax` folds left**, where `BVars.relax` folds right: `Args.cons` reads in field order,
   `BVars.push` prepends. Getting this wrong silently reverses a constructor's arguments — the sort
   check caught it.
 
@@ -1705,7 +1713,7 @@ be pinned by a build.
 
 **`BVars` collects in reverse**:
 `BVars.push acc (BVars.push t [])` is the lambda `t → acc → _`, which is the order `signatureTo`
-folds and the order `erase` restores. Getting it backwards silently reverses the parameters.
+folds and the order `relax` restores. Getting it backwards silently reverses the parameters.
 
 `Cvc/{Untyped,Typed}/Theory/Fun.lean` hold application. `applyHo` (`HO_APPLY`, one argument at a
 time) is kept and is genuinely different — it does require a higher-order logic. Everything else is

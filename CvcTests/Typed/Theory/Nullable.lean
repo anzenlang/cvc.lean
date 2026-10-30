@@ -43,12 +43,12 @@ nested  : (nullable.some (nullable.some 3))
 -/
 #guard_msgs in #eval Env.runIO do
   let some3 ← nullableSome (← mkInt 3)
-  println! "null    : {(← mkNull' Int).erase}"
-  println! "some 3  : {some3.erase}"
-  println! "val     : {(← nullableVal some3).erase}"
-  println! "isNull  : {(← nullableIsNull some3).erase}"
-  println! "isSome  : {(← nullableIsSome some3).erase}"
-  println! "nested  : {(← nullableSome some3).erase}"
+  println! "null    : {(← mkNull' Int).relax}"
+  println! "some 3  : {some3.relax}"
+  println! "val     : {(← nullableVal some3).relax}"
+  println! "isNull  : {(← nullableIsNull some3).relax}"
+  println! "isSome  : {(← nullableIsSome some3).relax}"
+  println! "nested  : {(← nullableSome some3).relax}"
 
 /-! The index tracks the element, so nothing needs re-typing to be used. -/
 
@@ -105,7 +105,7 @@ of Bool : (nullable.some true) → (some true)
   : Env String := do
     let term : Term (Option α) ← mkValue value
     let back : Option α ← extractValue term
-    return s!"{term.erase} → {back}"
+    return s!"{term.relax} → {back}"
   println! "some 3  : {← roundTrip Int (some 3)}"
   println! "none    : {← roundTrip Int none}"
   println! "nested  : {← roundTrip (Option Int) (some (some 3))}"

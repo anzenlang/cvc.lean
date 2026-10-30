@@ -72,6 +72,9 @@ as the sort-erased handle is, and by the two types the sort-erased one carries a
 structure Heap (solver : Solver) (α β : Type) where private mk ::
   private toUntyped : U.Heap solver
 
+/-- Relaxes it to the sort-erased heap it wraps, which carries `α` and `β` as `Srt`s. -/
+def Heap.relax {solver : Solver} (h : Heap solver α β) : U.Heap solver := h.toUntyped
+
 variable (s : Solver)
 
 @[inherit_doc U.declareSepHeap]
@@ -94,7 +97,7 @@ The operands are the heap's own indices, so the mismatch the sort-erased version
 not expressible here.
 -/
 def pto (loc : Term α) (data : Term β) : Env (Term Bool) :=
-  h.toUntyped.pto loc.erase data.erase
+  h.toUntyped.pto loc.relax data.relax
 
 end Heap
 

@@ -80,7 +80,7 @@ node's is checked. `post` sees a node rebuilt with its replaced kids, so a botto
 section variable [Ω]
 
 /-- Whether a term is the integer literal `n`. -/
-def isInt (n : Int) (t : Term Int) : Bool := t.erase.getIntValue? == some n
+def isInt (n : Int) (t : Term Int) : Bool := t.relax.getIntValue? == some n
 
 /-- Simplifies `t + 0`, `0 + t`, `t * 1` and `¬¬t` over integers, bottom-up, counting the steps.
 
@@ -141,7 +141,7 @@ refused  : cannot replace `((n Int))`, of sort `the type of bound variable lists
   println! "first x  : {s}"
   let q ← smt! ∀ (n : Int), n < x
   try
-    discard <| q.walk (V := V) () (prePlain := fun _ _ => return .replace zero.erase ())
+    discard <| q.walk (V := V) () (prePlain := fun _ _ => return .replace zero.relax ())
   catch e => println! "refused  : {e}"
 
 /-! A typed replacement of the wrong sort is a type error. -/
@@ -188,5 +188,5 @@ root: (< (+ x 7) 3)
   println! "focus: {y'}, depth {z.depth}"
   let z := z.replace (← Term.mkInt 7)
   let some ⟨_, z⟩ ← z.left | println! "no sibling"
-  println! "left of it: {z.focusErased}"
+  println! "left of it: {z.relaxedFocus}"
   println! "root: {← z.root}"

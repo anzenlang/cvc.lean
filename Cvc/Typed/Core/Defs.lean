@@ -37,7 +37,7 @@ namespace Cvc.Typed public section variable [Ω]
 constructor states its sorts through the index, so a sort mistake is a Lean type error rather than
 a cvc5 error at runtime, and a value read out of a model comes back as an `α`.
 
-The index is phantom: at runtime a `Term α` is exactly a `Cvc.Untyped.Term`. `erase` goes down for
+The index is phantom: at runtime a `Term α` is exactly a `Cvc.Untyped.Term`. `relax` goes down for
 free, and `Cvc.Untyped.Term.typeCheck` goes up by checking the term's sort.
 -/
 def3% Term α ← Cvc.Untyped.Term (ofUntypedUnsafe / toUntypedUnsafe)
@@ -47,10 +47,10 @@ abbrev Terms (α : Type) := Array (Term α)
 
 namespace Term
 
-/-- Erases its type. -/
-def erase (t : Term α) : Untyped.Term := t
+/-- Relaxes it to the sort-erased term it is, for free. -/
+def relax (t : Term α) : Untyped.Term := t
 
-instance : CoeDep (Term α) t Untyped.Term := ⟨t.erase⟩
+instance : CoeDep (Term α) t Untyped.Term := ⟨t.relax⟩
 
 /-- Types an untyped term. -/
 def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
@@ -95,19 +95,19 @@ def substitute'
   (valid : src.size = tgt.size := by
     (try grind) <;> fail "failed to prove there are as many replacements as sub-terms")
 : Env (Term α) :=
-  t.erase.substitute' src tgt valid
+  t.relax.substitute' src tgt valid
 
 /-- Simultaneously replaces the first of each pair by the second throughout `t`.
 
 Every pair is at one index `β`. Use `heteroSubstitute` to replace terms of several sorts at once.
 -/
 def substitute (t : Term α) (terms : Array (Term β × Term β)) : Env (Term α) :=
-  t.erase.substitute terms
+  t.relax.substitute terms
 
 /-- `substitute` where the pairs need not share an index, only agree within each pair. -/
 def heteroSubstitute (t : Term α) (terms : Array ((β : Type) × Term β × Term β)) : Env (Term α) :=
-  let terms := terms.map fun ⟨_, src, tgt⟩ => (src.erase, tgt.erase)
-  t.erase.substitute terms
+  let terms := terms.map fun ⟨_, src, tgt⟩ => (src.relax, tgt.relax)
+  t.relax.substitute terms
 
 end Term
 

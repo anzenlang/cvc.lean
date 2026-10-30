@@ -68,12 +68,12 @@ namespace Args
 /-- The final argument. Its `β` is whatever the function has left, so stopping here is a partial
 application. -/
 def last (arg : Term α) : Args (α → β) β where
-  terms := #[arg.erase]
+  terms := #[arg.relax]
   nonEmpty := by simp
 
 /-- One more argument, in front of the ones collected so far. -/
 def cons (arg : Term α) (rest : Args φ β) : Args (α → φ) β where
-  terms := #[arg.erase] ++ rest.terms
+  terms := #[arg.relax] ++ rest.terms
   nonEmpty := by grind only [
     usr Array.eq_empty_of_size_eq_zero, = Array.size_append,
     = List.size_toArray, = List.length_cons
@@ -90,7 +90,7 @@ There is always at least one argument, since `Args.last` carries one. That is wh
 requires, and it costs no side condition here.
 -/
 def applyN (f : Term φ) (args : Args φ β) : Env (Term β) :=
-  T.applyN f.erase args.terms args.nonEmpty
+  T.applyN f.relax args.terms args.nonEmpty
 
 instance : CoeFun (Term (α → β)) (fun _ => Term α → Env (Term β)) where
   coe f arg := f.applyN (.last arg)
@@ -148,7 +148,7 @@ protected inductive View.Apply : Typ → Type where
 /-- Takes a term of sort `τ` apart one level, if it is an uninterpreted function's application whose
 arguments' sorts a `Typ` describes. -/
 def View.Apply.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Apply τ)) := do
-  let some (.apply f args) := Untyped.View.Apply.of? t.erase | return none
+  let some (.apply f args) := Untyped.View.Apply.of? t.relax | return none
   let some ⟨doms, args⟩ ← go args.val.toList | return none
   return some (.apply doms (View.reindex f) args)
 where

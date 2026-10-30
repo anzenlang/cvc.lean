@@ -78,7 +78,7 @@ declareConst  : p : Pair
   println! "Int × Pair    : {← (Srt.of (Int × Pair) : Env Srt)}"
 
   let p ← s.declareConstAs Pair "p"
-  println! "declareConst  : {p.erase} : {← p.erase.getSort}"
+  println! "declareConst  : {p.relax} : {← p.relax.getSort}"
 
 -- naming a datatype before declaring it is an error, not a fresh incompatible sort
 /-- info: undeclared : caught -/
@@ -116,10 +116,10 @@ model    : 7
   let fst ← mkC.field Int "fst"
 
   let p ← mkC.apply2 (← Term.mkInt 7) (← Term.mkTrue)
-  println! "value    : {p.erase}"
-  println! "fst      : {(← fst.get p).erase}"
-  println! "is mk    : {(← mkC.is p).erase}"
-  println! "updated  : {(← fst.update p (← Term.mkInt 9)).erase}"
+  println! "value    : {p.relax}"
+  println! "fst      : {(← fst.get p).relax}"
+  println! "is mk    : {(← mkC.is p).relax}"
+  println! "updated  : {(← fst.update p (← Term.mkInt 9)).relax}"
 
   -- the indices are exact, so the model read needs no `typeCheck`
   let x ← s.declareConstAs Pair "x"
@@ -215,7 +215,7 @@ head of l : 7
     ← consC.case2 h t h.toTerm,
     ← nilC.case0 (← Term.mkInt 0),
   ]
-  println! "match     : {m.erase}"
+  println! "match     : {m.relax}"
 
   -- `l` is a one-element list, so the match takes the `cons` branch
   let seven ← consC.apply2 (← Term.mkInt 7) (← nilC.apply)
@@ -304,7 +304,7 @@ head of l : 15
     match l with
     | cons h t => h * 2 + 1
     | nil => 0
-  println! "match     : {m.erase}"
+  println! "match     : {m.relax}"
 
   let consC ← Datatype.ctor Lst "cons"
   let seven ← consC.apply2 (← Term.mkInt 7) (← (← Datatype.ctor Lst "nil").apply)
@@ -327,7 +327,7 @@ ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
     match l with
     | cons h t => h
     | _ => 0
-  println! "catch-all : {anyCase.erase}"
+  println! "catch-all : {anyCase.relax}"
 
   -- `t` states its index because the only thing mentioning it is the match that wants it; the
   -- inner `h` states its own because its index reaches it only through the outer match's expected
@@ -340,13 +340,13 @@ ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
       | cons (h : Int) t => h
       | _ => 0
     | _ => 0
-  println! "nested    : {nested.erase}"
+  println! "nested    : {nested.relax}"
 
   -- an ascription is a check against the declaration
   println! "ascribed  : {(← smt!
     match l with
     | cons (h : Int) t => h + 1
-    | _ => 0).erase}"
+    | _ => 0).relax}"
 
 /-! The index a match carries, and what it rejects. -/
 
@@ -388,8 +388,8 @@ wrong width: caught: constructor `cons` takes 2 field(s), bound 1
   println! "wrong sort : {← caught do pure s!"{(← smt!
     match l with
     | cons (h : Lst) t => 0
-    | _ => 0).erase}"}"
+    | _ => 0).relax}"}"
   println! "wrong width: {← caught do pure s!"{(← smt!
     match l with
     | cons h => h
-    | _ => 0).erase}"}"
+    | _ => 0).relax}"}"

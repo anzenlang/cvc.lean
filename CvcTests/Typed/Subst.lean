@@ -51,17 +51,17 @@ hetero : (and c (< j j))
 -/
 #guard_msgs in #eval Env.runIO do
   let (i, j, b, c, t) ← setup
-  println! "base   : {t.erase}"
+  println! "base   : {t.relax}"
   -- an `Int` sub-term replaced by an `Int` one, in a `Term Bool`, still a `Term Bool`
-  println! "i ↦ j  : {(← t.substitute #[(i, j)]).erase}"
-  println! "b ↦ c  : {(← t.substitute #[(b, c)]).erase}"
+  println! "i ↦ j  : {(← t.substitute #[(i, j)]).relax}"
+  println! "b ↦ c  : {(← t.substitute #[(b, c)]).relax}"
   -- both at once, at two different indices
-  println! "hetero : {(← t.heteroSubstitute #[⟨Int, i, j⟩, ⟨Bool, b, c⟩]).erase}"
+  println! "hetero : {(← t.heteroSubstitute #[⟨Int, i, j⟩, ⟨Bool, b, c⟩]).relax}"
 
 /-- info: parallel : (and b (< j j)) -/
 #guard_msgs in #eval Env.runIO do
   let (i, j, _b, _c, t) ← setup
-  println! "parallel : {(← t.substitute' #[i] #[j]).erase}"
+  println! "parallel : {(← t.substitute' #[i] #[j]).relax}"
 
 section discipline
 variable [Ω] (t : Term Bool) (i j : Term Int) (b : Term Bool)

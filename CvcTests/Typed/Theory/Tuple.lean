@@ -45,17 +45,17 @@ nested : (Tuple (Tuple Int Bool) Real) / (Tuple (Tuple Int Bool) Real)
   let half ← Term.mkReal (1/2 : Rat)
 
   let pair ← Term.mkTuple one (.last tru)
-  println! "pair   : {← pair.erase.getSort} / {← (Srt.of (Int × Bool) : Env Srt)}"
+  println! "pair   : {← pair.relax.getSort} / {← (Srt.of (Int × Bool) : Env Srt)}"
 
   let triple ← Term.mkTuple one (.cons tru (.last half))
-  println! "triple : {← triple.erase.getSort} / {← (Srt.of (Int × Bool × Rat) : Env Srt)}"
+  println! "triple : {← triple.relax.getSort} / {← (Srt.of (Int × Bool × Rat) : Env Srt)}"
 
   let quad ← Term.mkTuple one (.cons tru (.cons half (.last one)))
-  println! "quad   : {← quad.erase.getSort} / {← (Srt.of (Int × Bool × Rat × Int) : Env Srt)}"
+  println! "quad   : {← quad.relax.getSort} / {← (Srt.of (Int × Bool × Rat × Int) : Env Srt)}"
 
   -- a tuple *does* nest, to the left, and that index is exact too
   let nested ← Term.mkTuple pair (.last half)
-  println! "nested : {← nested.erase.getSort} / {← (Srt.of ((Int × Bool) × Rat) : Env Srt)}"
+  println! "nested : {← nested.relax.getSort} / {← (Srt.of ((Int × Bool) × Rat) : Env Srt)}"
 
 
 
@@ -176,13 +176,13 @@ nested.snd : String / String
   let show! (label : String) (got : Untyped.Term) (claimed : Env Srt) : Env Unit := do
     println! "{label} : {← got.getSort} / {← claimed}"
 
-  show! "pair.fst  " (← pair.fst).erase (Srt.of Int)
-  show! "pair.snd  " (← pair.snd).erase (Srt.of Bool)
-  show! "triple.fst" (← triple.fst).erase (Srt.of Int)
-  show! "triple.snd" (← triple.snd).erase (Srt.of (Bool × String))
-  show! "quad.snd  " (← quad.snd).erase (Srt.of (Bool × String × Int))
-  show! "nested.fst" (← nested.fst).erase (Srt.of (Int × Bool))
-  show! "nested.snd" (← nested.snd).erase (Srt.of String)
+  show! "pair.fst  " (← pair.fst).relax (Srt.of Int)
+  show! "pair.snd  " (← pair.snd).relax (Srt.of Bool)
+  show! "triple.fst" (← triple.fst).relax (Srt.of Int)
+  show! "triple.snd" (← triple.snd).relax (Srt.of (Bool × String))
+  show! "quad.snd  " (← quad.snd).relax (Srt.of (Bool × String × Int))
+  show! "nested.fst" (← nested.fst).relax (Srt.of (Int × Bool))
+  show! "nested.snd" (← nested.snd).relax (Srt.of String)
 
 /-! On a longer tuple `snd` rebuilds the tail from its components rather than projecting it. The
 two are the same term to the solver, which is what this checks.
@@ -193,8 +193,8 @@ two are the same term to the solver, which is what this checks.
   let s ← Solver.new
   let x ← s.declareConstAs (Int × Bool × String) "x"
   let viaSnd ← x.snd
-  let viaProject ← Untyped.Term.tupleProject #[1, 2] x.erase
-  let same ← Untyped.Term.equal viaSnd.erase viaProject
+  let viaProject ← Untyped.Term.tupleProject #[1, 2] x.relax
+  let same ← Untyped.Term.equal viaSnd.relax viaProject
   Untyped.Term.not same >>= Untyped.Solver.assert s
   println! "snd = tupleProject #[1, 2] : {if ← Untyped.Solver.checkIsSat s then "SAT" else "unsat"}"
 

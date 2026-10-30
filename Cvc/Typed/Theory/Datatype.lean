@@ -58,10 +58,10 @@ abbrev nil : Args := []
 /-- Adds an argument in front of the ones collected so far, so a spine reads in field order. -/
 abbrev cons [ToTyp β] (arg : Term β) (rest : Args) : Args := ⟨β, inferInstance, arg⟩ :: rest
 
-/-- Erases the indices, keeping field order. -/
-def erase (args : Args) : Untyped.Terms :=
+/-- Relaxes them to sort-erased terms, keeping field order. -/
+def relax (args : Args) : Untyped.Terms :=
   -- `foldl`, not `foldr`: `cons` reads in field order here, unlike `BVars.push` which prepends
-  args.foldl (init := Array.mkEmpty args.length) fun acc ⟨_, _, arg⟩ => acc.push arg.erase
+  args.foldl (init := Array.mkEmpty args.length) fun acc ⟨_, _, arg⟩ => acc.push arg.relax
 
 end Args
 
@@ -128,7 +128,7 @@ field sorts are a property of its declaration and not of any index.
 -/
 def apply (args : Args := .nil) : Env (Term α) := do
   let expected ← c.fieldSorts
-  let terms := args.erase
+  let terms := args.relax
   if terms.size != expected.size then
     throwUser s!"constructor `{← c.getName}` takes {expected.size} argument(s), got {terms.size}"
   for h : idx in [0 : terms.size] do
@@ -151,7 +151,7 @@ def apply3 [ToTyp β₁] [ToTyp β₂] [ToTyp β₃] (fst : Term β₁) (snd : T
   c.apply (.cons fst (.cons snd (.cons thd .nil)))
 
 /-- Whether a value was built by this constructor. -/
-def is (t : Term α) : Env (Term Bool) := T.applyTester c.tester t.erase
+def is (t : Term α) : Env (Term Bool) := T.applyTester c.tester t.relax
 
 /-- The selector of the given name, at the field index `β`.
 
@@ -233,8 +233,8 @@ def caseErased (vars : Untyped.BVars) (body : Term β) : Env (Case α β) := do
   -- a constructor with no field binds nothing, and cvc5 wants the unbound form there
   let term ←
     if vars.isEmpty
-    then T.matchCase pattern body.erase
-    else T.matchBindCase vars pattern body.erase
+    then T.matchCase pattern body.relax
+    else T.matchBindCase vars pattern body.relax
   return ⟨term⟩
 
 /-- The case taken when the scrutinee was built by this constructor.
@@ -242,7 +242,7 @@ def caseErased (vars : Untyped.BVars) (body : Term β) : Env (Case α β) := do
 `args` binds the constructor's fields, and `body` is free to mention them. Their sorts are checked
 against the constructor's, so a `Case` that exists is one whose pattern is well formed.
 -/
-def case (args : BVars := []) (body : Term β) : Env (Case α β) := c.caseErased args.erase body
+def case (args : BVars := []) (body : Term β) : Env (Case α β) := c.caseErased args.relax body
 
 /-- The case taken when the scrutinee was built by this constructor, which takes no field. -/
 def case0 (body : Term β) : Env (Case α β) := c.case [] body
@@ -275,8 +275,8 @@ namespace Datatype
 cases already cover every constructor.
 -/
 def caseAny [ToTyp α] (v : BVar α) (body : Term β) : Env (Case α β) := do
-  let vars := (BVars.push v []).erase
-  return ⟨← T.matchBindCase vars v.toTerm.erase body.erase⟩
+  let vars := (BVars.push v []).relax
+  return ⟨← T.matchBindCase vars v.toTerm.relax body.relax⟩
 
 end Datatype
 
@@ -302,7 +302,7 @@ def mkMatch
   (scrutinee : Term α) (cases : Array (Case α β))
   (_h : 0 < cases.size := by (try grind) <;> fail "failed to prove there is at least one case")
 : Env (Term β) :=
-  T.mkMatch scrutinee.erase (cases.map Datatype.Case.term) (by simpa using _h)
+  T.mkMatch scrutinee.relax (cases.map Datatype.Case.term) (by simpa using _h)
 
 end Term
 
@@ -315,11 +315,11 @@ namespace Datatype.Field variable (sel : Field α β)
 Undefined where the value was not built by the selector's own constructor, which is what
 `Ctor.is` is for.
 -/
-def get (t : Term α) : Env (Term β) := T.applySelector sel.term t.erase
+def get (t : Term α) : Env (Term β) := T.applySelector sel.term t.relax
 
 /-- The value with this field replaced. -/
 def update (t : Term α) (v : Term β) : Env (Term α) :=
-  T.applyUpdater sel.updater t.erase v.erase
+  T.applyUpdater sel.updater t.relax v.relax
 
 end Datatype.Field
 
@@ -364,7 +364,7 @@ protected inductive View.Datatype : Typ → Type where
 /-- Takes a term of sort `τ` apart one level, if it is a datatype operation whose kids' sorts a
 `Typ` describes. -/
 def View.Datatype.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Datatype τ)) :=
-  match τ, Untyped.View.Datatype.of? t.erase with
+  match τ, Untyped.View.Datatype.of? t.relax with
   | _, some (.construct ctor args) => do
     let some ⟨doms, args⟩ ← go args.toList | return none
     return some (.construct ctor doms args)
