@@ -30,7 +30,7 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
 - **TEMPORARY, to remove: a glibc shim on Linux.** lean-cvc5's Linux cvc5 was compiled against
   glibc ≥ 2.38 and references `__isoc23_strtol`/`__isoc23_fscanf`, which the older glibc Lean links
   executables against lacks, so no executable using the library linked on Linux, the manual's
-  included. [c/glibc_compat.c](c/glibc_compat.c) defines the two, forwarding to the classic
+  included. [Cvc/glibc_compat.c](Cvc/glibc_compat.c) defines the two, forwarding to the classic
   functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere). It
   covers executables only: a host whose own glibc predates 2.38 presumably still fails to load
   lean-cvc5's precompiled modules, which the shim cannot reach. Entry 8 of
@@ -141,6 +141,7 @@ Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as da
                               each one's value type (`argType`) and `toStrings` for `setOption`,
                               plus a flat `abbrev` per option (`.smt_produceModels`).
                               Publicly imported by `Untyped/Core/Solver.lean`, so `Cvc` exposes it
+Cvc/glibc_compat.c          → TEMPORARY: a Linux glibc shim linked into `Cvc`, see "Build / test"
 CvcExamples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
 CvcManual/                 → the Verso manual: a Lake project of its own (it requires Verso, which
                               the library must not impose), sources under `CvcManual/CvcManual/`

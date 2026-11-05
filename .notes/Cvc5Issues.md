@@ -487,7 +487,7 @@ The C23 variants differ from the classic functions only in reading `0b` binary l
 with base 0 or 2, `fscanf`'s `%i`), which the callers have no use for: MiniSat's integer options,
 GMP's `scanf`, and CaDiCaL reading its resident set size from `/proc`.
 
-**What it costs a wrapper.** cvc.lean carries the shim in `c/glibc_compat.c`, with a target in the
+**What it costs a wrapper.** cvc.lean carries the shim in `Cvc/glibc_compat.c`, with a target in the
 root lakefile, both marked temporary, to be removed once this is fixed. It covers executables only.
 Lake keeps a library's `moreLinkObjs` out of the per-module shared libraries its own build loads,
 and lean-cvc5's shared library, the one referencing the symbols, is loaded before cvc.lean's

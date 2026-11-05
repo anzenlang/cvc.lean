@@ -20,18 +20,18 @@ require "abdoo8080" / cvc5
 lean-cvc5's Linux cvc5 libraries were built against glibc 2.38 or later and reference the C23
 variants `__isoc23_strtol` and `__isoc23_fscanf`, which the older glibc Lean links executables
 against does not have: without this shim, no executable using the library links on Linux, the
-manual's included. `c/glibc_compat.c` defines the two, forwarding to the classic functions, and is
+manual's included. `Cvc/glibc_compat.c` defines the two, forwarding to the classic functions, and is
 linked into everything that links `Cvc`; elsewhere it is empty. Remove it once lean-cvc5 ships a
 cvc5 built against an older glibc.
 -/
 
 input_file glibcCompat.c where
-  path := "c" / "glibc_compat.c"
+  path := "Cvc" / "glibc_compat.c"
   text := true
 
 target glibcCompat.o pkg : System.FilePath := do
   let srcJob ← glibcCompat.c.fetch
-  let oFile := pkg.buildDir / "c" / "glibc_compat.o"
+  let oFile := pkg.buildDir / "Cvc" / "glibc_compat.o"
   let compiler := if System.Platform.isWindows then "cc" else "clang"
   -- C11 without `_GNU_SOURCE`: glibc's headers must not redirect the shim's own calls
   buildO oFile srcJob (traceArgs := #["-std=c11", "-fPIC"]) (compiler := compiler)
