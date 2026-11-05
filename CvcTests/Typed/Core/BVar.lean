@@ -1,0 +1,376 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+import Cvc.Typed.Core.BVar
+import Cvc.Typed.Core
+import Cvc.Typed.Theory
+import Cvc.Typed.Core.Solver
+
+public meta import Cvc.Typed.Core.BVar
+public meta import Cvc.Typed.Core
+public meta import Cvc.Typed.Theory
+public meta import Cvc.Typed.Core.Solver
+
+
+
+/-! # Bound variables, typed
+
+A bound variable is only meaningful under a binder — the parameters of a definition, or of a
+quantifier, lambda or witness. It is therefore a type of its own rather than a `Term`, so that a
+signature can require one where a free constant would be wrong.
+
+The index carries the sort, so `mkBVar` takes no `Srt`: it computes one from `α`.
+-/
+namespace Cvc.Tests.Typed.BVar
+
+open Cvc
+open Cvc
+open Cvc.Typed
+
+
+
+/-! ## Construction
+
+`Term.mkBVarAs` takes the type explicitly, `Term.mkBVar` infers it from the expected index, and
+`BVar.mk` is the same function reached from the type.
+-/
+
+/-- info:
+mkBVarAs : v
+mkBVar  : w
+BVar.mk : z
+-/
+#guard_msgs in #eval Env.runIO do
+  println! "mkBVarAs : {(← Term.mkBVarAs Int "v").toTerm}"
+  println! "mkBVar  : {(← (Term.mkBVar "w" : Env (Typed.BVar Int))).toTerm}"
+  println! "BVar.mk : {(← (Typed.BVar.mk "z" : Env (Typed.BVar Rat))).toTerm}"
+
+-- each call is a fresh variable, even at the same name and index
+/-- info: distinct : true -/
+#guard_msgs in #eval Env.runIO do
+  let x ← Term.mkBVarAs Int "x"
+  let x' ← Term.mkBVarAs Int "x"
+  println! "distinct : {!(x.toTerm.beq x'.toTerm)}"
+
+-- the index decides the sort, and nothing else does: a variable at a `Rat` index is usable where a
+-- `Rat` term is expected, and only there
+/-- info: sum : (+ x y) -/
+#guard_msgs in #eval Env.runIO do
+  let x ← Term.mkBVarAs Rat "x"
+  let y ← Term.mkBVarAs Rat "y"
+  println! "sum : {(← Term.add x.toTerm y.toTerm).erase}"
+
+
+
+/-! ## `declareFun`
+
+The index decides the split between domain and codomain: an arrow index declares a function
+symbol, anything else declares a constant.
+-/
+
+-- applying the symbol is the evidence the split was right: a wrong domain is a runtime error from
+-- cvc5, and a wrong codomain would not typecheck against the index
+/-- info:
+unary    : (f 2)
+2-ary    : (g 2 true)
+constant : x
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let two ← Term.mkInt 2
+
+  let f ← s.declareFun (α := Int → Int) "f"
+  println! "unary    : {(← Term.apply f two).erase}"
+
+  let g ← s.declareFun (α := Int → Bool → Int) "g"
+  println! "2-ary    : {(← Term.apply2 g two (← Term.mkTrue)).erase}"
+
+  -- a non-function index has an empty domain, so this is `declareConst`
+  let x ← s.declareFun (α := Int) "x"
+  println! "constant : {x.erase}"
+
+-- and it solves: an uninterpreted function constrained at a point reads back at that point
+/-- info: f 2 = 7 -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+
+  let f ← s.declareFun (α := Int → Int) "f"
+  let two ← Term.mkInt 2
+  let fTwo ← Term.apply f two
+  Term.equal fTwo (← Term.mkInt 7) >>= s.assert
+
+  let value ← s.checkSat (ifSat := do s.getValue (α := Int) fTwo)
+  println! "f 2 = {value}"
+
+
+
+/-! ## `defineFun`
+
+The parameters are bound variables, collected right to left by `BVars.push`, so the array handed
+to the solver comes out in declaration order.
+
+`BVars.signatureTo` folds them into the definition's index, which is the same arrow a function
+symbol carries, so a definition applies exactly like a declared symbol does.
+-/
+
+/-- info:
+define-fun : dbl
+dbl 21     : 42
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+
+  let x ← Term.mkBVarAs Int "x"
+  let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
+  println! "define-fun : {dbl.erase}"
+
+  let applied ← Term.apply dbl (← Term.mkInt 21)
+  println! "dbl 21     : {← s.checkSat (ifSat := do s.getValue (α := Int) applied)}"
+
+-- two parameters. The erased array is in declaration order even though `push` prepends, so a
+-- non-commutative body is the test: `sub 10 4` distinguishes the right order from the reversed one
+/-- info:
+define-fun : sub
+sub 10 4   : 6
+sub 4 10   : -6
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+
+  let x ← Term.mkBVarAs Int "x"
+  let y ← Term.mkBVarAs Int "y"
+  let sub ← s.defineFun "sub" (BVars.push y (BVars.push x [])) (← Term.sub x.toTerm y.toTerm)
+  println! "define-fun : {sub.erase}"
+
+  let ten ← Term.mkInt 10
+  let four ← Term.mkInt 4
+  let fst ← Term.apply2 sub ten four
+  let snd ← Term.apply2 sub four ten
+  s.checkSat (ifSat := do
+    println! "sub 10 4   : {← s.getValue (α := Int) fst}"
+    println! "sub 4 10   : {← s.getValue (α := Int) snd}")
+
+-- three parameters, at mixed sorts: the index threads them in order, and the body only typechecks
+-- because each bound variable carries its own
+/-- info:
+define-fun : pick
+pick true 7 2  : 9
+pick false 7 2 : 5
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+
+  let b ← Term.mkBVarAs Bool "b"
+  let x ← Term.mkBVarAs Int "x"
+  let y ← Term.mkBVarAs Int "y"
+  let bvs := BVars.push y (BVars.push x (BVars.push b []))
+  let body ← Term.ite b.toTerm (← Term.add x.toTerm y.toTerm) (← Term.sub x.toTerm y.toTerm)
+  let pick ← s.defineFun "pick" bvs body
+  println! "define-fun : {pick.erase}"
+
+  let seven ← Term.mkInt 7
+  let two ← Term.mkInt 2
+  let onTrue ← Term.apply3 pick (← Term.mkTrue) seven two
+  let onFalse ← Term.apply3 pick (← Term.mkFalse) seven two
+  s.checkSat (ifSat := do
+    println! "pick true 7 2  : {← s.getValue (α := Int) onTrue}"
+    println! "pick false 7 2 : {← s.getValue (α := Int) onFalse}")
+
+-- a definition is a definition, not an assumption: the solver knows `dbl n = 2 * n` for every `n`,
+-- so contradicting it at an unconstrained argument is unsat
+/-- info: dbl n ≠ 2 * n → unsat -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+
+  let x ← Term.mkBVarAs Int "x"
+  let dbl ← s.defineFun "dbl" (BVars.push x []) (← Term.mul x.toTerm (← Term.mkInt 2))
+
+  let n ← s.declareConstAs Int "n"
+  let lft ← Term.apply dbl n
+  let rgt ← Term.mul n (← Term.mkInt 2)
+  Term.distinct lft rgt >>= s.assert
+
+  println! "dbl n ≠ 2 * n → {← s.checkSat (ifUnsat := do return "unsat")}"
+
+-- no parameters at all: the index is the body's own, so this is a plain definition
+/-- info:
+define-fun : c
+c          : 7
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+
+  let c ← s.defineFun "c" [] (← Term.mkInt 7)
+  println! "define-fun : {c.erase}"
+  println! "c          : {← s.checkSat (ifSat := do s.getValue (α := Int) c)}"
+
+
+
+/-! ## Signatures -/
+
+section signatures
+variable [Ω]
+
+/-- info: @Term.mkBVarAs : [inst : Ω] → (α : Type) → [ToTyp α] → String → Env (BVar α) -/
+#guard_msgs in #check @Cvc.Typed.Term.mkBVarAs
+
+/-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → optParam Bool false → Env (Term α) -/
+#guard_msgs in #check @Cvc.Typed.Solver.declareFun
+
+/-- info: @Solver.defineFun : [inst : Ω] →
+  Solver → {β : Type} → [ToTyp β] → String → (bvs : BVars) → Term β → Env (Term (BVars.signatureTo β bvs)) -/
+#guard_msgs in #check @Cvc.Typed.Solver.defineFun
+
+-- `signatureTo` folds the bound variables into the definition's index, and reduces definitionally
+example (s : Solver) (x : BVar Int) (body : Term Bool)
+: Env (Term (Int → Bool)) := s.defineFun "p" (BVars.push x []) body
+
+example (s : Solver) (x : BVar Int) (y : BVar Bool) (body : Term Rat)
+: Env (Term (Int → Bool → Rat)) := s.defineFun "f" (BVars.push y (BVars.push x [])) body
+
+end signatures
+
+
+
+/-! ## The type is distinct from `Term`
+
+`BVar` is a `def`, so a plain `import` keeps it opaque: a bound variable does not silently pass
+where a term is expected. `toTerm` is the way across, and it is `id`, so crossing costs nothing.
+-/
+
+section discipline
+variable [Ω] (bv : Typed.BVar Int)
+
+/-- A bound variable converts to a term explicitly… -/
+example : Term Int := bv.toTerm
+
+/-- …or through the coercion, which is the same function. -/
+example : Term Int := bv
+
+example : bv.toTerm = bv := rfl
+
+end discipline
+
+
+
+/-! ## A signature is shown in the form it computes to
+
+`BVars.signatureTo` is what indexes `lambda`, `Solver.defineFun`, `synthAnyFun` and a `Grammar`, and
+it is *computed* — so without help a term indexed by one is shown as the application rather than as
+the arrow it denotes. A delaborator beside the definition reduces it before printing.
+
+Being an `abbrev` does not do this on its own: reducibility governs unification, not printing.
+-/
+
+/-- info: fun [Ω] x y => sorry : [inst : Ω] → (x y : BVar Int) → Term (Int → Int → Int) -/
+#guard_msgs in
+#check fun [Ω] (x y : BVar Int) =>
+  (sorry : Term (BVars.signatureTo Int (BVars.push y (BVars.push x []))))
+
+/-! A spine that cannot reduce is left alone — and, more to the point, does not send the
+delaborator round in circles. -/
+
+/-- info: fun [Ω] bvs => sorry : [inst : Ω] → (bvs : BVars) → Term (BVars.signatureTo Int bvs) -/
+#guard_msgs in
+#check fun [Ω] (bvs : BVars) => (sorry : Term (BVars.signatureTo Int bvs))
+
+/-! A partly concrete one shows how far it got: `x` has been accounted for, the rest has not. -/
+
+/-- info: fun [Ω] x bvs => sorry : [inst : Ω] → (x : BVar Int) → (bvs : BVars) → Term (BVars.signatureTo (Int → Int) bvs)
+-/
+#guard_msgs in
+#check fun [Ω] (x : BVar Int) (bvs : BVars) =>
+  (sorry : Term (BVars.signatureTo Int (BVars.push x bvs)))
+
+
+
+/-! ## Lambdas through Lean functions
+
+`Term.lambdaH` takes the body as a Lean function of the variables, and the lambda's index is the
+arguments' indices arrowed onto the body's. Names are optional, `x{i}` by position. `smt! fun`
+expands to it, binding each variable under the name the writer gave it.
+-/
+
+/-- info:
+lambdaH : (lambda ((x0 Int) (x1 Int)) (- x0 x1)) : (-> Int Int Int)
+names   : (lambda ((a Int) (x1 Bool)) (ite x1 a a))
+smt     : (lambda ((x Int) (y Int) (b Bool)) (ite b (- x y) y))
+nested  : (lambda ((x Int)) (lambda ((y Int)) (- x y)))
+applied : (@ (lambda ((x Int)) (+ x 1)) 2)
+-/
+#guard_msgs in #eval Env.runIO do
+  let l ← Term.lambdaH fun (x y : Term Int) => Term.sub x y
+  println! "lambdaH : {l} : {← l.getSort}"
+  let l' ← Term.lambdaH (names := ["a"]) fun (x : Term Int) (b : Term Bool) => Term.ite b x x
+  println! "names   : {l'}"
+  println! "smt     : {← smt! fun (x y : Int) (b : Bool) => if b then x - y else y}"
+  println! "nested  : {← smt! fun (x : Int) => fun (y : Int) => x - y}"
+  println! "applied : {← smt! (fun (x : Int) => x + 1) 2}"
+
+/-- info: sat : true -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setLogic Logic.qf_lia
+  s.assert (← smt! (fun (x y : Int) => x - y) 5 2 = 3)
+  println! "sat : {← s.checkIsSat}"
+
+section lambdaIndex
+variable [Ω]
+
+/-- The index is the binders' types arrowed onto the body's. -/
+example : Env (Term (Int → Bool → Int)) := smt! fun (x : Int) (b : Bool) => if b then x else 0
+
+/-- A lambda returning a lambda has the curried index, the sort being the same. -/
+example : Env (Term (Int → Int → Int)) := smt! fun (x : Int) => fun (y : Int) => x + y
+
+/-- Applying one answers the body's index. -/
+example : Env (Term Int) := smt! (fun (x : Int) => x + 1) 2
+
+/-- info: @Term.lambdaH : [inst : Ω] → {φ σ : Type} → [Term.LambdaBinder φ σ] → φ → optParam (List String) [] → Env (Term σ) -/
+#guard_msgs in #check @Term.lambdaH
+
+end lambdaIndex
+
+/--
+error: failed to synthesize instance of type class
+  Term.LambdaBinder (Term Int → Env (Term Int)) (Int → Bool)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example [Ω] : Env (Term (Int → Bool)) := smt! fun (x : Int) => x + 1
+
+
+
+/-! ## Between the layers
+
+`toUntyped` (or `erase`) forgets a bound variable's index; `Untyped.BVar.toTypedAs` (or
+`typeCheckAs`) puts one back, checking the variable's sort, so that a variable made sort-erased can
+bind in a typed lambda. -/
+
+/-- info:
+typed      : x
+lambda     : (lambda ((x Int)) (+ x 1))
+round trip : true
+wrong sort : cannot type bound variable `x` as `Bool`, it has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let ux ← Untyped.BVar.mk (← Srt.int) "x"
+  let x ← ux.toTypedAs Int
+  println! "typed      : {x.toTerm}"
+  println! "lambda     : {← x.lambda (← Term.add x.toTerm (← Term.mkInt 1))}"
+  let y : BVar Int ← x.erase.toTyped
+  println! "round trip : {y.erase == ux}"
+  try discard <| ux.typeCheckAs Bool
+  catch e => println! "wrong sort : {e}"

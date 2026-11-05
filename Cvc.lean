@@ -1,93 +1,131 @@
 /-
-Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
 institutional affiliations. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Basic
-import Cvc.Logic
-import Cvc.Option
-import Cvc.Srt
-import Cvc.Defs
-import Cvc.Term
-import Cvc.Actlit
-import Cvc.Symbols
-import Cvc.State
-import Cvc.Sys
+module
+
+public import Cvc.Basic
+public import Cvc.Logic
+public import Cvc.Defs
+public import Cvc.Srt
+public import Cvc.Types
+public import Cvc.Spec
+public import Cvc.Gen
+public import Cvc.Ext
+public import Cvc.Untyped
+public import Cvc.Typed
 
 
 
-/-! # cvc.lean
+namespace Cvc
 
-Lean 4 API for the [cvc5 SMT solver][cvc5] with a strong concern for ergonomics and type-safety.
-Cvc5 is heavily based on the [SMT-LIB standard][smtlib] which the documentation of this library will
-frequently reference.
+/-! # A high-level, safety-oriented API for cvc5
 
-The general workflow is to build strongly-typed `Cvc.Term`-s of some SMT-LIB sort `Srt`, in
-particular `Cvc.Formula`s, in the term builder monad `Cvc.Term.Build` (does not allow interacting
-with the solvers, only building terms). Terms in this monadic environment can then be used in the
-`Cvc.Smt` monad which does allow interactions with cvc5, in particular
-- `Cvc.Smt.assert` which asserts a formula in the underlying (cvc5) solver;
-- `Cvc.Smt.checkSat`, `Cvc.Smt.checkSatAnd`, and other variants that check whether the assertions
-  are *satisfiable*;
+This library drives the [cvc5](https://cvc5.github.io) SMT solver from Lean. It sits on top of
+[lean-cvc5](https://github.com/abdoo8080/lean-cvc5), a thin binding over cvc5's C++ API, and its
+purpose is to turn the mistakes that binding reports at runtime — or does not report at all — into
+errors Lean reports at compile time.
 
-Check-sat-result-specific SMT-LIB commands are strongly typed: (un)sat-specific commands are only
-accessible through the sat-specific `Cvc.Smt.Sat` (`Cvc.Smt.Unsat`) monad; see for instance
-`Cvc.Smt.Sat.getValue` and `Cvc.Smt.Unsat.getProof`.
+## Environments, `Ω`, and running them
 
-Mode-specific monadic code can only run by passing it to `Cvc.Smt.checkSatAnd` *via* its `ifSat`,
-`ifUnsat`, and `ifUnknown` arguments.
+Everything cvc5 creates — sorts, terms, solvers — belongs to a *term manager*, and objects of two
+different managers must never meet. This library never shows you a term manager. In its place is the
+class `Ω`, whose instances stand for "the term manager of the current scope". Nearly every type and
+function takes one implicitly: `Term α`, `Srt` and `Solver` all mean "of the scope's
+manager", and two of them can only meet when they share one.
+
+Work happens in the **environment monad** `Env`, itself (implicitly) parameterized by `Ω`. An `Env
+α` (or `@Env Ω α`) builds and manipulates terms, drives solvers, and can throw a `Cvc.Error`; it
+also lifts `IO`, so `println!` works inside it. `EnvT m` is the transformer, for a base monad other
+than `BaseIO`.
+
+**You cannot make an `Ω` yourself.** Its constructor is private, and the only place one comes from
+is running an environment:
 
 ```lean
-def run [Monad m]
-  (mySatCode : Cvc.Smt.Sat m α)
-  (myUnsatCode : Cvc.Smt.Unsat m α)
-  (myUnknownCode : Cvc.Smt.Unknown m α)
-: Cvc.Smt α :=
-  Cvc.Smt.checkSatAnd (ifSat := mySatCode) (ifUnsat := myUnsatCode) (ifUnknown := myUnknownCode)
-
--- All three parameters default to producing an unexpected-check-sat-result error.
---
--- For instance, the following will produce an error saying that the *unknown* check-sat result was
--- not expected if cvc5's check-sat produces *unknown*.
-def run [Monad m]
-  (mySatCode : Cvc.Smt.Sat m α)
-  (myUnsatCode : Cvc.Smt.Unsat m α)
-: Cvc.Smt α :=
-  Cvc.Smt.checkSatAnd (ifSat := mySatCode) (ifUnsat := myUnsatCode)
+Env.run   : ([Ω] → Env α) → BaseIO (Res α)   -- errors as a value
+Env.runIO : ([Ω] → Env α) → IO α             -- errors as an `IO` exception
+EnvT.run  : ([Ω] → EnvT m α) → m (Res α)
 ```
 
-This guarantees that sat/unsat/unknown-specific commands only run when the solver is in the
-appropriate mode.
+Each run creates a fresh term manager, hands your code an `Ω` standing for it, and is the whole
+lifetime of that manager. The `[Ω] →` in the argument is the point: `α` is chosen *outside*, where
+no `Ω` exists, so it cannot mention one. A `Term`, an `Srt` or a `Solver` therefore cannot escape a
+run — `Env.runIO (Term.mkInt 3) : IO (Term Int)` does not typecheck — while a Lean value read out of
+a model can. This is the `runST` discipline, applied to term managers.
 
-## Top-level modules
+### Always write `Env` code with an `Ω` in scope
 
-- `Cvc.Basic`: basic helpers.
-- `Cvc.Logic`: SMT-LIB logic definition and helpers.
-- `Cvc.Option`: cvc5's options definition and helpers.
-- `Cvc.Srt`: SMT-LIB sort definition and helpers.
-- `Cvc.Defs`: strongly-typed `Cvc.Term`s, `Cvc.Term.Build`er, and `Cvc.Smt`-like monadic
-  environments and associated SMT-LIB commands including `Cvc.Smt.Sat`, `Cvc.Smt.Unsat`, and
-  `Cvc.Smt.Unknown`.
-- `Cvc.Term`: extra term-related features such as erased terms and the term DSL.
-- `Cvc.Actlit`: activation literal API.
-- `Cvc.Symbols`: specification for a collection of SMT symbols, typically used to define a notion of
-  state. The main class (`Cvc.Symbols`) supports user-defined strongly-typed symbols structures, as
-  well as generic symbols structures such the provided `Cvc.Symbols.ByName` which wraps an `RBMap`
-  from symbols names (`String`) to untyped terms.
+The consequence for writing code is simple and worth following without exception: **every definition
+that mentions `Env`, `Term`, `Srt` or `Solver` takes an `Ω` instance**, most easily by opening a
+section with `variable [Ω]`. Such a definition does not pick a scope; it works in *whichever* scope
+calls it, and `Env.run` is called once, at the edge, to supply one.
 
-  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed symbols structures.
-- `Cvc.State`: builds on `Cvc.Symbols` but adds a notion of state, *i.e.* symbol/term/value
-  parameterized with an unrolling index `k : Nat`.
+```lean
+open Cvc Typed
 
-  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed state structures.
-- `Cvc.Sys`: transition system `k`-induction API, builds on `Cvc.State`.
+section variable [Ω]
 
-  See `Cvc.Symbols.Dsl` for easy user-defined strongly-typed system structures.
+/-- `x + x`, in whatever scope calls it. -/
+def double (x : Term Int) : Env (Term Int) := smt! x + x
 
-[cvc5]: https://cvc5.github.io (cvc5 official github page)
+/-- Finds an `x` such that `double x = 6`. -/
+def solve : Env Int := do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let x ← s.declareConst Int "x"
+  s.assert (← smt! ![double x] = 6)
+  s.checkSat (ifSat := s.getValue x)
 
-[smtlib]: https://smt-lib.org (SMT-LIB official website)
+end
 
+#eval Env.runIO solve   -- 3
+```
+
+Without `variable [Ω]`, `def double … : Env (Term Int)` does not compile at all — `failed to
+synthesize Ω` — since there is no instance to find. The fix is never to look for one: it is to take
+it as a parameter. The alternative of writing everything inline, inside one `Env.runIO do …`, does
+work, but nothing in that block can be reused or tested on its own.
+
+Carrying an `Ω` everywhere costs nothing at runtime: its only field is a type, which the compiler
+erases, so an instance is passed as a constant scalar, with no allocation and no reference counting.
+It is not a `Prop`, and that matters. Proof irrelevance would make any two instances equal, so a
+term of one scope would also be a term of every other, and the only protection left would be that
+no instance exists outside a run, which nested runs defeat. As a `Type`, each run's `Ω` is its own:
+a term of an outer run is rejected by an inner one, and an inner term cannot be returned to the
+outer run.
+
+## Two layers
+
+Terms come in two flavours, which share the environment, the solver and the sorts.
+
+- **`Cvc.Untyped`**: a `Term` carries no Lean-side sort. It is close to cvc5 itself, and a sort
+  mistake is cvc5's to report, at runtime.
+- **`Cvc.Typed`**: a `Term α` is indexed by the Lean type its sort denotes — `Term Int`,
+  `Term (Set Bool)`, `Term (Int → Bool)`. A sort mistake is a Lean type error, and a model value
+  comes back as an `Int`, a `Set Bool`, with nothing to convert.
+
+The two are the same type at runtime: `Typed.Term.erase` goes down for free, and
+`Untyped.Term.typeCheck` goes up by checking the term's sort. `open Cvc.Untyped` or
+`open Cvc.Typed` selects a layer, along with its spelling of the `smt!` DSL, which writes terms in
+something close to Lean's own notation: `smt! i + 2 * j ≤ k ∧ ¬ b`.
+
+## Solving
+
+A `Solver` is created inside an environment with `Solver.new`, and is fed assertions with
+`Solver.assert`. `Solver.checkSat` takes one branch per possible answer, and each branch runs in a
+monad that only allows what that answer makes meaningful: reading a model is only possible in the
+`ifSat` branch, an unsat core only in `ifUnsat`. Those monads are indexed by the solver that
+answered, so one solver's model cannot be read through another.
+
+## What to import
+
+This root module imports everything. That is convenient, but each theory's constructors are
+generated in a module of their own, per layer, so that a user compiles only the theories and the
+layer they import — and `smt!` accepts only the notations of the theories imported. Prefer
+importing `Cvc.Typed.Theory.Arith` and friends, or `Cvc.Untyped`, over `Cvc`, once you know
+which you need.
 -/

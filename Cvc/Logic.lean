@@ -5,12 +5,43 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-namespace Cvc
+module
+
+
+
+
+public import Cvc.Basic.Error
+import Std.Internal.Parsec.String
+
+
+
+namespace Std.Internal.Parsec
+
+def opt? (p : Parsec ι α) : Parsec ι (Option α) := fun input =>
+  match p input with
+  | .success input res => .success input (some res)
+  | .error _ _ => .success input none
+
+def opt {α : Type} (p : Parsec ι α) : Parsec ι Bool := Option.isSome <$> p.opt?
+
+def String.tryChar (c : Char) : Parser Bool := pchar c |>.opt
+def String.tryString (s : String) : Parser Bool := pstring s |>.opt
+
+def context (txt : String) (code : Parsec ι α) : Parsec ι α := fun input =>
+  match code input with
+  | res@(.success _ _) | res@(.error _ .eof) => res
+  | .error pos (.other desc) => .other s!"{desc}\n{txt}" |> .error pos
+
+end Std.Internal.Parsec
+
+
+
+namespace Cvc public section
 
 
 
 /-! # Logic -/
-namespace Logic
+namespace Logic open Std.Internal (Parsec) open Std.Internal.Parsec.String (Parser)
 
 
 
@@ -70,6 +101,20 @@ def simplest : IntReal := .int
 def toSmtLib : IntReal → String
 | int => "I" | real => "R" | both => "IR"
 
+open Std.Internal.Parsec.String in
+private def parseSmtLib : Parser IntReal :=
+  .context "failed to parse int/real logic bit" do
+  if ← tryChar 'I' then
+    if ← tryChar 'R' then return both
+    else return int
+  if ← tryChar 'R' then return real
+  Parsec.fail "expected `I`, `R`, or `IR`"
+
+
+def ofSmtLib : String → Res IntReal
+  | "I" => return int | "R" => return real | "IR" => return both
+  | s => throwUser s!"illegal int/real bit `{s}`, expected `I`, `R`, or `IR`"
+
 def setInt : IntReal → IntReal
 | real => both
 | l@int | l@both => l
@@ -118,6 +163,26 @@ def toSmtLib (self : Arith) : String :=
     | .diff => ("", "DL")
     | .nonDiff l t => (if l then "L" else "N", if t then "AT" else "A")
   pref ++ self.intReal.toSmtLib ++ suff
+
+open Std.Internal.Parsec.String in
+private def parseSmtLib? : Parser (Option Arith) :=
+  .context "failed to parse arithmetic logic bit" do
+  let mut nonDiff_l? := none
+  if ← tryChar 'L' then
+    nonDiff_l? := some true
+  else if ← tryChar 'N' then
+    nonDiff_l? := some false
+  let intReal? ←
+    if nonDiff_l?.isNone then IntReal.parseSmtLib |>.opt? else some <$> IntReal.parseSmtLib
+  let some intReal := intReal?
+    | return none
+  if let some l := nonDiff_l? then
+    if ← tryString "AT" then return some { kind := Kind.nonDiff l true, intReal }
+    else if ← tryChar 'A' then return some { kind := Kind.nonDiff l false, intReal }
+    else Parsec.fail "expected `AT` or `A` because `L`/`N` prefix"
+  else
+    if ← tryString "DL" then return some { kind := Kind.diff, intReal}
+    else Parsec.fail "expected `DL` because of the absence of `L`/`N` prefix"
 
 /-- `LIA`. -/
 def lia : Arith := ⟨.nonDiff true false, .int⟩
@@ -210,7 +275,7 @@ structure Logic : Type where private mkRaw ::
   -/
   private card? : Bool := false
   /-- Bit-vectors. -/
-  private bitvec? : Bool := false
+  private bitVec? : Bool := false
   /-- [Finite fields theory][ff].
 
   [ff]: https://en.wikipedia.org/wiki/Finite_field
@@ -239,9 +304,9 @@ If `oneTrailing? false` yields false, then either `Logic.all?` or *the logic is 
 @[local simp]
 private
 def oneTrailing? (ignoreArray : Bool) : Logic → Bool
-| { array?, uf?, card?, bitvec?, ff?, float?, datatype?, string?, arith?, .. } =>
+| { array?, uf?, card?, bitVec?, ff?, float?, datatype?, string?, arith?, .. } =>
   (¬ ignoreArray ∧ array?)
-  ∨ uf? ∨ card? ∨ bitvec? ∨ ff? ∨ float? ∨ datatype? ∨ string?
+  ∨ uf? ∨ card? ∨ bitVec? ∨ ff? ∨ float? ∨ datatype? ∨ string?
   ∨ arith?.isSome
 
 
@@ -251,31 +316,6 @@ section variable (self : Logic)
 /-- True if the SMT-LIB logic's string has letters after the `A`rray letter(s). -/
 private def oneAfterArray? : Bool :=
   self.oneTrailing? true
-
-/-- SMT-LIB string representation. -/
-def toSmtLib : String :=
-  if let {
-    all? := false,
-    ho?, qf?, sep?, array?, uf?, card?, bitvec?, ff?, float?, datatype?, string?, arith?
-  } := self
-  then Id.run do
-    let mut s := ""
-    if ho? then s := s ++ "HO_"
-    if qf? then s := s ++ "QF_"
-    if sep? then s := s ++ "SEP_"
-    if array? then
-      s := s ++ if self.oneAfterArray? then "A" else "AX"
-    if uf? then s := s ++ "UF"
-    if card? then s := s ++ "C"
-    if bitvec? then s := s ++ "BV"
-    if ff? then s := s ++ "FF"
-    if float? then s := s ++ "FP"
-    if datatype? then s := s ++ "DT"
-    if string? then s := s ++ "S"
-    if let some arith := arith? then
-      s := s ++ arith.toSmtLib
-    s
-  else "ALL"
 
 /-- Either `Logic.all?` or at least one actual fragment is active. -/
 @[simp]
@@ -313,9 +353,9 @@ def card : Builder := {self with card? := true}
 theorem card_valid {b : Builder} : b.card.valid := by
   simp [Builder.card]
 
-def bitvec : Builder := {self with bitvec? := true}
-theorem bitvec_valid {b : Builder} : b.bitvec.valid := by
-  simp [Builder.bitvec]
+def bitVec : Builder := {self with bitVec? := true}
+theorem bitVec_valid {b : Builder} : b.bitVec.valid := by
+  simp [Builder.bitVec]
 
 def ff : Builder := {self with ff? := true}
 theorem ff_valid {b : Builder} : b.ff.valid := by
@@ -347,8 +387,6 @@ def int : Builder := {self with arith? := self.getArith.setInt}
 def real : Builder := {self with arith? := self.getArith.setReal}
 
 end Builder
-
-
 
 
 def all : Logic where
@@ -384,9 +422,9 @@ def card : Logic := {self with card? := true}
 theorem card_valid {l : Logic} : l.card.valid := by
   simp [card]
 
-def bitvec : Logic := {self with bitvec? := true}
-theorem bitvec_valid {l : Logic} : l.bitvec.valid := by
-  simp [bitvec]
+def bitVec : Logic := {self with bitVec? := true}
+theorem bitVec_valid {l : Logic} : l.bitVec.valid := by
+  simp [bitVec]
 
 def ff : Logic := {self with ff? := true}
 theorem ff_valid {l : Logic} : l.ff.valid := by
@@ -412,25 +450,25 @@ theorem arith_valid {l : Logic} {a : Arith} : (l.arith a).valid := by
 
 /-! ### Convenient `Logic` constructors for `Arith` -/
 
-def lia := mk |>.arith .lia
-def lra := mk |>.arith .lra
-def lira := mk |>.arith .lira
+def lia := mk |>.arith .lia |>.toLogic
+def lra := mk |>.arith .lra |>.toLogic
+def lira := mk |>.arith .lira |>.toLogic
 
-def nia := mk |>.arith .nia
-def nra := mk |>.arith .nra
-def nira := mk |>.arith .nira
+def nia := mk |>.arith .nia |>.toLogic
+def nra := mk |>.arith .nra |>.toLogic
+def nira := mk |>.arith .nira |>.toLogic
 
-def liat := mk |>.arith .liat
-def lrat := mk |>.arith .lrat
-def lirat := mk |>.arith .lirat
+def liat := mk |>.arith .liat |>.toLogic
+def lrat := mk |>.arith .lrat |>.toLogic
+def lirat := mk |>.arith .lirat |>.toLogic
 
-def niat := mk |>.arith .niat
-def nrat := mk |>.arith .nrat
-def nirat := mk |>.arith .nirat
+def niat := mk |>.arith .niat |>.toLogic
+def nrat := mk |>.arith .nrat |>.toLogic
+def nirat := mk |>.arith .nirat |>.toLogic
 
-def idl := mk |>.arith .idl
-def rdl := mk |>.arith .rdl
-def irdl := mk |>.arith .irdl
+def idl := mk |>.arith .idl |>.toLogic
+def rdl := mk |>.arith .rdl |>.toLogic
+def irdl := mk |>.arith .irdl |>.toLogic
 
 /-! ### Ubiquitous logics -/
 
@@ -441,5 +479,71 @@ def qf_lira := lira.qf
 def qf_nia := nia.qf
 def qf_nra := nra.qf
 def qf_nira := nira.qf
+
+/-! ### Conversion from/to strings -/
+
+/-- SMT-LIB string representation. -/
+def toSmtLib : Logic → String
+| self@{
+  all?, ho?, qf?, sep?, array?, uf?, card?, bitVec?, ff?, float?, datatype?, string?, arith?
+} => Id.run do
+  let mut s := ""
+  if ho? then s := s ++ "HO_"
+  if qf? then s := s ++ "QF_"
+  if all? then s!"{s}ALL" else
+    if sep? then s := s ++ "SEP_"
+    if array? then s := s ++ if self.oneAfterArray? then "A" else "AX"
+    if uf? then s := s ++ "UF"
+    if card? then s := s ++ "C"
+    if bitVec? then s := s ++ "BV"
+    if ff? then s := s ++ "FF"
+    if float? then s := s ++ "FP"
+    if datatype? then s := s ++ "DT"
+    if string? then s := s ++ "S"
+    if let some arith := arith? then
+      s := s ++ arith.toSmtLib
+    s
+
+@[inherit_doc toSmtLib]
+protected abbrev toString := toSmtLib
+
+instance : ToString Logic := ⟨Logic.toString⟩
+
+open Std.Internal.Parsec.String in
+private def parseSmtLib (thenEoi : Bool := false) : Parser Logic := do
+  let logic ← aux
+  if thenEoi then if ← not <$> .isEof then
+    .fail s!"expected end-of-input after logic `{logic.toSmtLib}`"
+  return logic
+where
+  aux :=
+    .context "failed to parse SMT-LIB logic" do
+    if ← tryString "ALL" then return all
+    if ← tryString "HO_ALL" then return all.ho
+    if ← tryString "QF_ALL" then return all.qf
+    if ← tryString "HO_QF_ALL" then return all.ho.qf
+    let mut builder1 ←
+      parseBit "HO_" .ho Builder.mk
+      >>= parseBit "QF_" .qf
+      >>= parseBit "SEP_" .sep
+    if ← tryChar 'A' then
+      builder1 := builder1.array
+      if ← tryChar 'X' then return builder1.toLogic
+    let mut builder2 ←
+      parseBit "UF" .uf builder1
+      >>= parseBit "C" .card
+      >>= parseBit "BV" .bitVec
+      >>= parseBit "FF" .ff
+      >>= parseBit "FP" .float
+      >>= parseBit "DT" .datatype
+      >>= parseBit "S" .string
+    if let some arith ← Arith.parseSmtLib? then
+      builder2 := builder2.arith arith
+    return builder2.toLogic
+  parseBit (tag : String) (f : Builder → Builder) (builder : Builder) : Parser Builder := do
+    if ← pstring tag |>.opt then return f builder else return builder
+
+def ofSmtLib (s : String) : Res Logic :=
+  parseSmtLib (thenEoi := true) |>.run s |>.mapError Error.user
 
 end Logic
