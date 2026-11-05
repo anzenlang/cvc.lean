@@ -3,7 +3,8 @@
 Bugs and sharp edges found in cvc5 itself while building this wrapper. Everything here is at the
 **C++ API level** — reproduced against cvc5's own headers and static library, with no Lean and no
 [lean-cvc5](https://github.com/abdoo8080/lean-cvc5) involved, so that each entry is something the
-cvc5 maintainers can act on directly.
+cvc5 maintainers can act on directly. The exception is entry 8, which concerns the cvc5 build
+lean-cvc5 distributes rather than cvc5's API. It is written as an issue to file against lean-cvc5.
 
 This is not the list of things cvc.lean does not wrap — that is [MISSING.md](MISSING.md) — nor of
 things it has decided not to do, which is [TODO.md](TODO.md).
@@ -350,3 +351,144 @@ showed it forbade something that works. Its grammars are now scope-level, as ter
 `Solver.declareConst` still exists, but it carries exactly the illusion described above, and
 cvc.lean is considering removing it outright: a symbol is an `Env`-level thing, and a solver-level
 spelling of it is worse user experience than having none.
+
+## 8. lean-cvc5's Linux cvc5 needs glibc 2.38, so no executable links
+
+**Severity: high, on Linux.** No executable importing `cvc5` links, whatever it does. Addressed to
+[lean-cvc5](https://github.com/abdoo8080/lean-cvc5) rather than cvc5, and written to be filed there
+as is.
+
+**Title:** Linux: executables fail to link against the cvc5 release (`undefined symbol:
+__isoc23_strtol`)
+
+### Summary
+
+On Linux, any `lean_exe` that imports `cvc5` fails to link, because the downloaded cvc5 static
+libraries reference two glibc 2.38 symbols that the glibc Lean links executables against does not
+have. Libraries, and so tests run as a `lean_lib`, are unaffected on a recent distribution, which is
+presumably why lean-cvc5's own test suite, a library, has never shown it.
+
+### Reproduction
+
+`lean-toolchain`:
+
+```
+leanprover/lean4:v4.34.0
+```
+
+`lakefile.toml`:
+
+```toml
+name = "repro"
+defaultTargets = ["repro"]
+
+[[require]]
+name = "cvc5"
+git = "https://github.com/abdoo8080/lean-cvc5"
+rev = "41e47796d4d15712e6064b064ca5d251a1283955"
+
+[[lean_exe]]
+name = "repro"
+root = "Main"
+```
+
+`Main.lean`:
+
+```lean
+import cvc5
+
+def main : IO Unit := do
+  match ← cvc5.TermManager.new.run with
+  | .ok _ => IO.println "ok"
+  | .error _ => IO.println "error"
+```
+
+`lake build` on Linux x86_64 then fails at the link:
+
+```
+ld.lld: error: undefined symbol: __isoc23_strtol
+>>> referenced by SimpSolver.cc
+>>>               SimpSolver.cc.o:(cvc5::internal::Minisat::IntOption::parse(char const*)) in archive …/.lake/packages/cvc5/cvc5-Linux-x86_64-static/lib/libcvc5.a
+
+ld.lld: error: undefined symbol: __isoc23_fscanf
+>>> referenced by resources.cpp
+>>>               resources.o:(CaDiCaL::current_resident_set_size()) in archive …/.lake/packages/cvc5/cvc5-Linux-x86_64-static/lib/libcadical.a
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+```
+
+That output is from GitHub Actions' `ubuntu-latest`, linking an executable of a project that
+depends on lean-cvc5 at that revision through cvc.lean, on Lean v4.35.0. The minimal project above
+was not run as such; its `Main.lean` typechecks against that revision, and the link it ends with is
+the same.
+
+### Cause
+
+The `cvc5-1.3.2` release lean-cvc5 downloads from `abdoo8080/cvc5` was compiled on Ubuntu 24.04,
+whose glibc is 2.39: its objects carry `GCC: (Ubuntu 14.2.0-4ubuntu2~24.04) 14.2.0`. From glibc
+2.38, compiling with `_GNU_SOURCE`, which g++ always defines, or with `-std=c2x` redirects `strtol`,
+`scanf` and their relatives to the C23 variants `__isoc23_*`. Lean's toolchain links executables
+against the glibc it bundles, which predates 2.38, so the variants are not there.
+
+Shared libraries link anyway, leaving the symbols to the system's glibc when they are loaded, which
+is why building a library works on a recent distribution. On one whose glibc is older than 2.38
+(Ubuntu 22.04, Debian 12, RHEL 9), the symbols are missing at load time too, so loading the
+precompiled modules presumably fails there as well. That part has not been verified.
+
+`nm -u` over every archive of both Linux releases finds exactly these references, the same on x86_64
+and arm64:
+
+| archive | object | symbol |
+|---|---|---|
+| `libcvc5.a` | `Solver.cc.o`, `SimpSolver.cc.o` (MiniSat) | `__isoc23_strtol` |
+| `libgmp.a` | `doscan.o` | `__isoc23_strtol` |
+| `libcadical.a` | `resources.o` | `__isoc23_fscanf` |
+
+No other `__isoc23_*` symbol is referenced, nor `arc4random`, `strlcpy` or `strlcat`, the other
+functions recent glibc releases added.
+
+### Suggested fix
+
+- **Build the Linux release against a glibc older than 2.38**: on the `ubuntu-22.04` runner (glibc
+  2.35), or in a `manylinux_2_28` container (glibc 2.28) for the widest reach. A library built
+  against an old glibc runs against any newer one.
+- **Until then, ship the two symbols.** Adding the forwarding definitions below to lean-cvc5's
+  `libs` would fix every downstream project at once. lean-cvc5's `moreLinkObjs` also go into its
+  shared library, so this would cover loading on an old glibc as well, which a downstream project
+  cannot reach.
+- **Link an executable in CI.** A `lean_exe` among lean-cvc5's tests would catch a regression. The
+  test driver being a `lean_lib`, nothing there links an executable today.
+
+### Workaround
+
+cvc.lean links this into its library with `moreLinkObjs`, compiled as C11 without `_GNU_SOURCE` so
+that glibc's headers do not redirect the forwarding calls to the functions being defined:
+
+```c
+#if defined(__linux__)
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+long __isoc23_strtol(const char *nptr, char **endptr, int base) {
+  return strtol(nptr, endptr, base);
+}
+
+int __isoc23_fscanf(FILE *stream, const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  int result = vfscanf(stream, format, args);
+  va_end(args);
+  return result;
+}
+#endif
+```
+
+The C23 variants differ from the classic functions only in reading `0b` binary literals (`strtol`
+with base 0 or 2, `fscanf`'s `%i`), which the callers have no use for: MiniSat's integer options,
+GMP's `scanf`, and CaDiCaL reading its resident set size from `/proc`.
+
+**What it costs a wrapper.** cvc.lean carries the shim in `c/glibc_compat.c`, with a target in the
+root lakefile, both marked temporary, to be removed once this is fixed. It covers executables only.
+Lake keeps a library's `moreLinkObjs` out of the per-module shared libraries its own build loads,
+and lean-cvc5's shared library, the one referencing the symbols, is loaded before cvc.lean's
+anyway. So an old-glibc host is left as it was.

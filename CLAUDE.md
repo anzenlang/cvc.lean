@@ -27,6 +27,15 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   clones lean-cvc5 at the manifest's revision, and lean-cvc5's `cvc5Enums` build target downloads
   the precompiled cvc5 for the platform — verified on a clean clone. The README still says
   otherwise. lean-cvc5 has no post-update hook.
+- **TEMPORARY, to remove: a glibc shim on Linux.** lean-cvc5's Linux cvc5 was compiled against
+  glibc ≥ 2.38 and references `__isoc23_strtol`/`__isoc23_fscanf`, which the older glibc Lean links
+  executables against lacks, so no executable using the library linked on Linux, the manual's
+  included. [c/glibc_compat.c](c/glibc_compat.c) defines the two, forwarding to the classic
+  functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere). It
+  covers executables only: a host whose own glibc predates 2.38 presumably still fails to load
+  lean-cvc5's precompiled modules, which the shim cannot reach. Entry 8 of
+  [Cvc5Issues.md](.notes/Cvc5Issues.md) is the issue to file against lean-cvc5. Remove the file
+  and its lakefile target once lean-cvc5 ships a cvc5 built against an older glibc.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
   PRs to `main` only, so a topic branch is **not** covered. **One job does everything in sequence**,
   on one machine, so the manual and the API reference build on the library `lake build` just built,
