@@ -122,8 +122,11 @@ registers the sort, so a typed heap's locations can be an uninterpreted sort lik
 
 **Nothing missing.** `Solver.Proof` wraps cvc5's, indexed by the solver that produced it, with
 `getRule`, `getResult`, `getArguments`, `getChildren`, `getRewriteRule?`/`getRewriteRule` and
-`toString` in both layers, and `Solver.proofToString` beside them. See `CLAUDE.md`'s "Proofs"
-section for the design, including the two hazards it documents.
+`toString` in both layers, and `Solver.proofToString` beside them. On top of that, beyond what
+lean-cvc5 offers: `view` (each step decoded into `Cvc.Proof.View`), `fold`/`foldUp`/`ForIn`, and
+`freeAssumptions`/`ruleCounts`/`trusted`. About 70 rules are decoded; the rest, theory-specific
+rules mostly, come out as `other` until decoded. See `CLAUDE.md`'s "Proofs" section for the design,
+including the two hazards it documents.
 
 ## Operator reflection
 

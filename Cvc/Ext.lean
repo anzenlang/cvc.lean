@@ -60,17 +60,17 @@ syntax:max (name := smtIdent) ident : smtTerm
 syntax (name := smtLet) "let " ident " ← " smtTerm "; " ppLine smtTerm : smtTerm
 /-- Function application, `f arg₁ arg₂ …`, spelled as Lean spells it.
 
-Declared exactly as Lean's own `app` is (`trailing_parser:leadPrec:maxPrec many1 argument`): the
-rule sits at `lead` while its function and arguments are parsed at `max`. The gap is what makes the
-application flat — at `max` the rule cannot apply to its own argument, so `f i b` is one node with
-two arguments rather than `f` applied to `(i b)`. `colGt` stops a new line at or left of the
-application's column from being read as one more argument, which is what keeps a `match`
-alternative's body from swallowing the next `|`.
-
-Everything below `max` — `if`, `let`, `match`, and every operator — needs parentheses to be an
+`f i b` applies `f` to two arguments, and a new line at or left of the application's column is not
+read as one more argument. `if`, `let`, `match` and every operator need parentheses to be an
 argument, exactly as in Lean.
 -/
 syntax:lead (name := smtApp) smtTerm:max (ppSpace colGt smtTerm:max)+ : smtTerm
+-- Declared exactly as Lean's own `app` is (`trailing_parser:leadPrec:maxPrec many1 argument`): the
+-- rule sits at `lead` while its function and arguments are parsed at `max`. The gap is what makes
+-- the application flat — at `max` the rule cannot apply to its own argument, so `f i b` is one node
+-- with two arguments rather than `f` applied to `(i b)`. `colGt` stops a new line at or left of the
+-- application's column from being read as one more argument, which is what keeps a `match`
+-- alternative's body from swallowing the next `|`.
 
 /-! ### Binders
 
@@ -97,16 +97,17 @@ syntax:lead (name := smtFun) ("fun" <|> "λ") (ppSpace smtQuantBinder)+ " => " s
 
 /-- Expands one `smtTerm` of the layer whose root is named, deferring its sub-terms to itself.
 
-This is the DSL's dispatch, and it is a `macro_rules` table on purpose: `macro_rules` composes
-across modules — a later alternative is tried first and falls through to earlier ones when it
-answers `Macro.throwUnsupported` — so a theory can add the expansion of its own forms without the
-base module knowing they exist. An environment extension would not do: `MacroM` can resolve names
-but cannot read one.
-
-Recursion goes through this node rather than through a function, which is what lets a core form
-contain a theory's form and the other way round.
+This is the DSL's dispatch: each theory adds the expansion of its own forms as a `macro_rules`
+alternative for it, tried before those of the modules it imports.
 -/
 syntax (name := smtExpand) "smtExpand% " ident ppSpace smtTerm : term
+-- A `macro_rules` table on purpose: `macro_rules` composes across modules — a later alternative is
+-- tried first and falls through to earlier ones when it answers `Macro.throwUnsupported` — so a
+-- theory can add the expansion of its own forms without the base module knowing they exist. An
+-- environment extension would not do: `MacroM` can resolve names but cannot read one.
+--
+-- Recursion goes through this node rather than through a function, which is what lets a core form
+-- contain a theory's form and the other way round.
 
 /-- An identifier leaf of the layer whose root is named, elaborated by `Cvc.Ext.elabSmtIdent`. -/
 syntax (name := smtIdentElab) "smtIdent% " ident ppSpace ident : term
@@ -178,12 +179,9 @@ def naryIdOf (id : Name) : Name := id.appendAfter "N"
 
 /-- Binds every argument in order, then applies `mk` to the identifiers they were bound to.
 
-Expansion goes through `>>=` rather than `do`-notation because an antiquotation in `doElem`
-head position does not elaborate: `` `(do $fn (← $a) (← $b)) `` is rejected, whereas the bind
-chain below is fine. Binder names are macro-scoped, so they cannot capture user identifiers.
-
-Two calls in one expansion produce the *same* binder names, macro scopes and all, so a nested one
-shadows what the outer bound. `binder` is what tells them apart where that matters.
+Binder names are macro-scoped, so they cannot capture user identifiers. Two calls in one expansion
+produce the *same* binder names, macro scopes and all, so a nested one shadows what the outer
+bound. `binder` is what tells them apart where that matters.
 -/
 def bindArgs (args : Array (TSyntax `term)) (mk : Array Ident → MacroM (TSyntax `term))
 (binder : String := "smtArg") : MacroM (TSyntax `term) := do
@@ -195,6 +193,9 @@ def bindArgs (args : Array (TSyntax `term)) (mk : Array Ident → MacroM (TSynta
     let j := args.size - 1 - i
     body ← `($(args[j]!) >>= fun $(ids[j]!) => $body)
   return body
+-- Expansion goes through `>>=` rather than `do`-notation because an antiquotation in `doElem`
+-- head position does not elaborate: `` `(do $fn (← $a) (← $b)) `` is rejected, whereas the bind
+-- chain above is fine.
 
 /-- A macro-scoped identifier, for a name the expansion binds but the writer never sees. -/
 def freshId (base : String) : MacroM Ident := do
@@ -294,12 +295,10 @@ def typedToTerm? (type : Expr) : Option Name :=
 
 /-- Elaborates an identifier leaf: the term it names, lifted with `pure`.
 
-Typed, a non-terminal, a bound variable or a state symbol (`Symbols.At`) is converted to its term
-here, by looking at its type, rather than left to the coercion. The coercion needs the index it
-targets to be known, and in `smt! n * m` with no expected type nothing fixes it, so two
-non-terminals — or `x + y` over two state symbols — could not be combined at all. Converting by hand needs no index: it is read off the identifier's own type.
-Anything else is elaborated exactly as written, so a sort mismatch between two terms is reported
-as before. Not only identifiers come through here: a field projection on a Lean value does too.
+Typed, a non-terminal, a bound variable or a state symbol (`Symbols.At`) is converted to its term,
+at the index its own type carries, so `smt! n * m` works over two non-terminals with nothing else
+fixing the index. Anything else is elaborated exactly as written. Not only identifiers come through
+here: a field projection on a Lean value does too.
 -/
 def elabSmtIdent (layer : Layer) (id : Term) (expected? : Option Expr)
 : Elab.Term.TermElabM Expr := do
@@ -313,6 +312,12 @@ def elabSmtIdent (layer : Layer) (id : Term) (expected? : Option Expr)
       return ← Elab.Term.elabTerm (← `(pure ($(mkIdent conv) $e))) expected?
   -- passing the identifier through unchanged keeps its use visible to the unused-variable linter
   Elab.Term.elabTerm (← `(pure $id)) expected?
+-- The conversion is done here, by looking at the identifier's type, rather than left to the
+-- coercion. The coercion needs the index it targets to be known, and in `smt! n * m` with no
+-- expected type nothing fixes it, so two non-terminals — or `x + y` over two state symbols — could
+-- not be combined at all. Converting by hand needs no index: it is read off the identifier's own
+-- type. A term of any other type goes through unchanged, so a sort mismatch between two terms is
+-- reported as it would be without the DSL.
 
 @[term_elab smtIdentElab, inherit_doc smtIdentElab]
 def elabSmtIdentTerm : Elab.Term.TermElab := fun stx expected? => do

@@ -9,6 +9,7 @@ module
 
 
 public import Cvc.Untyped.Core.View
+public import Cvc.Basic.Traverse
 
 
 
@@ -29,64 +30,7 @@ per node, which the typed layer uses for each node's sort, and `foldWith`/`walkW
 node is presented to the user's functions.
 -/
 
-namespace Cvc public section
-
-/-- What a fold does on reaching a node, before its kids. -/
-inductive FoldPre (σ : Type) where
-  /-- Visit the kids. -/
-  | descend (s : σ)
-  /-- Do not visit the kids; the node is still left, `post` and all. -/
-  | skip (s : σ)
-  /-- End the fold. -/
-  | stop (s : σ)
-
-/-- What a fold does on leaving a node, after its kids. -/
-inductive FoldPost (σ : Type) where
-  /-- Carry on. -/
-  | continue (s : σ)
-  /-- End the fold. -/
-  | stop (s : σ)
-
-/-- What a walk does on reaching a node, before its kids. `R` is what replaces the node. -/
-inductive WalkPre (σ R : Type) where
-  /-- Visit the kids. -/
-  | descend (s : σ)
-  /-- Do not visit the kids; the node is still left, `post` and all. -/
-  | skip (s : σ)
-  /-- Replace the node, without visiting the replacement; it is then left. -/
-  | replace (t : R) (s : σ)
-  /-- Replace the node and visit the replacement, from `pre`. -/
-  | replaceAndRevisit (t : R) (s : σ)
-  /-- End the walk, keeping every replacement made. -/
-  | stop (s : σ)
-
-/-- What a walk does on leaving a node, after its kids. `R` is what replaces the node. -/
-inductive WalkPost (σ R : Type) where
-  /-- Carry on. -/
-  | continue (s : σ)
-  /-- Replace the node, and carry on. -/
-  | replace (t : R) (s : σ)
-  /-- Replace the node and visit the replacement, from `pre`. -/
-  | replaceAndRevisit (t : R) (s : σ)
-  /-- End the walk, keeping every replacement made. -/
-  | stop (s : σ)
-
-/-- The same step, its replacement mapped. -/
-def WalkPre.map (f : R → R') : WalkPre σ R → WalkPre σ R'
-  | .descend s => .descend s
-  | .skip s => .skip s
-  | .replace t s => .replace (f t) s
-  | .replaceAndRevisit t s => .replaceAndRevisit (f t) s
-  | .stop s => .stop s
-
-/-- The same step, its replacement mapped. -/
-def WalkPost.map (f : R → R') : WalkPost σ R → WalkPost σ R'
-  | .continue s => .continue s
-  | .replace t s => .replace (f t) s
-  | .replaceAndRevisit t s => .replaceAndRevisit (f t) s
-  | .stop s => .stop s
-
-end
+namespace Cvc
 
 namespace Untyped public section variable [Ω]
 

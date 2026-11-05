@@ -55,18 +55,17 @@ end ToTypFields
 
 
 
-/-- A record's field values: `gamma` for each field, in order.
-
-A **computed** product rather than a spine, and that is what keeps it in `Type`. An inductive
-collecting one value per field would have to bind a type variable per constructor and would land in
-`Type 1`, which `Env` cannot answer — so `Solver.getValue` could never produce one.
-
-`expose`d because every instance below reduces it: a downstream module has to see that a record's
-values *are* a product to lift `Ord` or `ToString` over them.
+/-- A record's field values: `gamma` for each field, in order, as nested pairs ending in `PUnit`.
 -/
 @[expose] def Values : List (String × Type) → Type
   | [] => PUnit
   | (_name, gamma) :: rest => gamma × Values rest
+-- A **computed** product rather than a spine, and that is what keeps it in `Type`. An inductive
+-- collecting one value per field would have to bind a type variable per constructor and would land
+-- in `Type 1`, which `Env` cannot answer — so `Solver.getValue` could never produce one.
+--
+-- `expose`d because every instance below reduces it: a downstream module has to see that a
+-- record's values *are* a product to lift `Ord` or `ToString` over them.
 
 /-- A record of the named, ordered `fields`, and its values.
 
@@ -101,14 +100,8 @@ the list, and the one that matches the head wins, so resolution both finds the f
 its type. A name that is not there, or one asked for at the wrong type, has no instance and does
 not compile.
 
-The two representations a record has need different accessors, so the class carries both. A
-**position** reaches a field's term, where the terms are held erased in an array — carrying a
-position rather than a projection is what keeps a record of *terms* in `Type`, for the reason
-`Values` is a computed product. A **projection** reaches a field's value, `Values` being a nested
-product with nothing to index.
-
-The position is a `Fin`, which is safe here in a way a hand-written one would not be — resolution
-produces it, so there is no numeral for `Fin`'s modular `OfNat` to reduce.
+It carries both accessors a record needs: the field's **position**, which reaches its term in a
+record of terms, and a **projection**, which reaches its value in a record's `Values`.
 
 Where a field name occurs twice the head match wins, matching `Srt.record`'s "first duplicate"
 report — but such an index has no sort at all, `Srt.record` refusing duplicate names.
@@ -120,6 +113,13 @@ class FieldOf (fields : List (String × Type)) (name : String) (gamma : outParam
   get : Values fields → gamma
   /-- The values, with this field's replaced. -/
   set : Values fields → gamma → Values fields
+-- The two representations need different accessors. Terms are held erased in an array, and carrying
+-- a position rather than a projection is what keeps a record of *terms* in `Type`, for the reason
+-- `Values` is a computed product. `Values` is a nested product with nothing to index, so a value is
+-- reached by projection.
+--
+-- The position is a `Fin`, which is safe here in a way a hand-written one would not be —
+-- resolution produces it, so there is no numeral for `Fin`'s modular `OfNat` to reduce.
 
 instance (priority := high) : FieldOf ((name, gamma) :: fields) name gamma where
   idx := 0

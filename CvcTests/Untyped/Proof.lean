@@ -10,10 +10,14 @@ module
 import Cvc.Untyped.Core.Solver
 import Cvc.Untyped.Core
 import Cvc.Untyped.Theory.Arith
+import Cvc.Untyped.Theory.Fun
+import Cvc.Untyped.Proof
 
 public meta import Cvc.Untyped.Core.Solver
 public meta import Cvc.Untyped.Core
 public meta import Cvc.Untyped.Theory.Arith
+public meta import Cvc.Untyped.Theory.Fun
+public meta import Cvc.Untyped.Proof
 
 
 
@@ -30,6 +34,10 @@ what these tests do.
   is what stops two solvers' proofs from being mixed;
 - the **component** it was asked for, because printing in any format but `Proof.Format.no` is legal
   only when that component is `full`. See "Printing" below.
+
+Then the inspection API of `Cvc.Untyped.Proof`: each step's view, which rules are left undecoded,
+sharing, ending a traversal early, folding in a monad, `foldUp`, the ready-made questions, several
+proofs at once, and that every step of every component answers.
 -/
 namespace Cvc.Tests.Untyped.Proof
 
@@ -52,20 +60,55 @@ def solver (proofs := true) : Env Solver := do
   contradiction s
   return s
 
-/-- The rules of a proof tree, indented by depth. Fuel because a proof is not structurally
-recursive as far as Lean is concerned. -/
-def rules (fuel : Nat) (p : s.Proof pc) (depth := 0) (acc : Array String := #[]) : Array String :=
-  match fuel with
-  | 0 => acc.push "<out of fuel>"
-  | fuel + 1 =>
-    let acc := acc.push s!"{"".pushn ' ' (2 * depth)}{p.getRule}"
-    p.getChildren.foldl (fun acc kid => rules fuel kid (depth + 1) acc) acc
+/-- `x ≥ 1`, `x ≤ 1` and `f x ≠ f 1`: arithmetic decides `x = 1`, congruence does the rest, so the
+refutation goes through both theories and through rewriting. -/
+def congruence (s : Solver) : Env Unit := do
+  let f ← Term.mkSymbolAs (Int → Int) "f"
+  let x ← Term.mkSymbolAs Int "x"
+  let one ← Term.mkInt 1
+  Term.ge x one >>= s.assert
+  Term.le x one >>= s.assert
+  Term.distinct (← Term.apply f x) (← Term.apply f one) >>= s.assert
 
-/-- Every step of a proof tree. -/
-def steps (fuel : Nat) (p : s.Proof pc) (acc : s.Proofs pc := #[]) : s.Proofs pc :=
-  match fuel with
-  | 0 => acc
-  | fuel + 1 => p.getChildren.foldl (fun acc kid => steps fuel kid acc) (acc.push p)
+/-- A solver with proofs on, holding `problem`. -/
+def solverWith (problem : Solver → Env Unit) : Env Solver := do
+  let s ← Solver.new
+  s.setOption "produce-proofs" "true"
+  problem s
+  return s
+
+/-- One line per step, saying what its view holds. -/
+def describe : s.ProofView pc → String
+  | .assume f => s!"assume {f}"
+  | .scope _ discharged => s!"scope, discharging {discharged}"
+  | .resolution _ _ polarity pivot => s!"resolution on {pivot}, polarity {polarity}"
+  | .chainResolution ps steps => s!"chainResolution of {ps.size}, steps {steps}"
+  | .chainMResolution ps steps => s!"chainMResolution of {ps.size}, steps {steps}"
+  | .dslRewrite rule ps inst =>
+    s!"dslRewrite {rule} {inst}" ++ if ps.isEmpty then "" else s!", {ps.size} premises"
+  | .theoryRewrite rule => s!"theoryRewrite {rule}"
+  | .evaluate t => s!"evaluate {t}"
+  | .refl t => s!"refl {t}"
+  | .cong ps app => s!"cong of {ps.size} on {app}"
+  | .naryCong ps app => s!"naryCong of {ps.size} on {app}"
+  | .andElim _ index => s!"andElim at {index}"
+  | .cnfAndNeg f => s!"cnfAndNeg {f}"
+  | .other rule ps args => s!"other {rule}: {ps.size} premises, {args.size} arguments"
+  | v => s!"{v.rule}, {v.premises.size} premises"
+
+/-- The distinct steps of `p`, indented by depth, a shared one shown on the first path reaching it.
+-/
+def render (p : s.Proof pc) : Array String :=
+  Id.run <| Prod.snd <$> p.fold (0, #[])
+    (pre := fun _ v (depth, lines) =>
+      return .descend (depth + 1, lines.push s!"{"".pushn ' ' (2 * depth)}{describe v}"))
+    (post := fun _ _ (depth, lines) => return .continue (depth - 1, lines))
+
+/-- Every distinct step of `p`. -/
+def steps (p : s.Proof pc) : s.Proofs pc := Id.run do
+  let mut all := #[]
+  for q in p do all := all.push q
+  return all
 
 
 
@@ -90,16 +133,17 @@ children  : 1
 
 /-! ## Walking the tree
 
-`getChildren` is the premises of the root step, so a proof is walked by recursion. The refutation
-of `b ∧ ¬b` is the whole tree below.
+`getChildren` is the premises of the root step; `fold` walks them all, and `view` takes each step
+apart. The refutation of `b ∧ ¬b` is the whole tree below: the outer scope discharges nothing, the
+inner one the two assertions, which `CONTRA` refutes.
 -/
 
 /-- info:
-SCOPE
-  SCOPE
-    CONTRA
-      ASSUME
-      ASSUME
+scope, discharging #[]
+  scope, discharging #[b, (not b)]
+    CONTRA, 2 premises
+      assume b
+      assume (not b)
 steps : 5
 leaves: 2
 -/
@@ -107,8 +151,8 @@ leaves: 2
   let s ← solver
   let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
   for p in proofs do
-    for line in rules 20 p do println! "{line}"
-    let all := steps 20 p
+    for line in render p do println! "{line}"
+    let all := steps p
     println! "steps : {all.size}"
     println! "leaves: {(all.filter (·.getChildren.isEmpty)).size}"
 
@@ -193,7 +237,7 @@ total form agrees         : true
   Term.add x zero >>= (Term.distinct · x) >>= s.assert
 
   let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
-  let all := proofs.flatMap (steps 100 ·)
+  let all := proofs.flatMap steps
   let carries (p : s.Proof .full) : Bool :=
     p.getRule == .DSL_REWRITE || p.getRule == .THEORY_REWRITE
   println! "steps with a rewrite rule : {!(all.filter (·.getRewriteRule?.isSome)).isEmpty}"
@@ -228,6 +272,270 @@ printed       : true
   for p in proofs do
     println! "sat component : {proofs.size} proof(s), rule {p.getRule}"
     println! "printed       : {!(← p.toStringFmt .no).isEmpty}"
+
+/-! ## Taking a step apart
+
+`view` answers a step as a `Cvc.Proof.View`: its rule as a constructor, its premises and arguments
+as fields, decoded from the layout cvc5 documents for the rule. The refutation below goes through
+arithmetic, congruence and rewriting, which is most of what a proof is made of. A step shared by
+several others is shown once, where it is first reached. The two arithmetic rules are not decoded,
+and come out as `other` with everything cvc5 gives.
+-/
+
+/-- info: scope, discharging #[]
+  scope, discharging #[(>= x 1), (<= x 1), (distinct (f x) (f 1))]
+    chainMResolution of 4, steps #[(true, (= (f x) (f 1))), (true, (>= x 2)), (false, (>= x 1))]
+      REORDERING, 1 premises
+        EQ_RESOLVE, 2 premises
+          resolution on (and (>= x 1) (not (>= x 2))), polarity true
+            cnfAndNeg (and (>= x 1) (not (>= x 2)))
+            IMPLIES_ELIM, 1 premises
+              scope, discharging #[(>= x 1), (not (>= x 2))]
+                MODUS_PONENS, 2 premises
+                  MODUS_PONENS, 2 premises
+                    AND_INTRO, 2 premises
+                      assume (>= x 1)
+                      EQ_RESOLVE, 2 premises
+                        assume (<= x 1)
+                        TRANS, 2 premises
+                          dslRewrite arith-leq-norm #[x, 1]
+                          cong of 1 on (not (>= x (+ 1 1)))
+                            cong of 2 on (>= x (+ 1 1))
+                              refl x
+                              evaluate (+ 1 1)
+                    scope, discharging #[(>= x 1), (not (>= x 2))]
+                      other ARITH_TRICHOTOMY: 2 premises, 0 arguments
+                        assume (>= x 1)
+                        other INT_TIGHT_UB: 1 premises, 0 arguments
+                          EQ_RESOLVE, 2 premises
+                            EQ_RESOLVE, 2 premises
+                            SYMM, 1 premises
+                              dslRewrite arith-elim-lt #[x, 2]
+                  scope, discharging #[(= x 1)]
+                    cong of 1 on (f x)
+                      assume (= x 1)
+          naryCong of 3 on (or (not (>= x 1)) (not (not (>= x 2))) (= (f x) (f 1)))
+            refl (not (>= x 1))
+            dslRewrite bool-double-not-elim #[(>= x 2)]
+            refl (= (f x) (f 1))
+      EQ_RESOLVE, 2 premises
+        assume (distinct (f x) (f 1))
+        theoryRewrite distinct-elim
+      EQ_RESOLVE, 2 premises
+      assume (>= x 1)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    for line in render p do println! "{line}"
+
+/-! Which rules come out as `other` is what a cvc5 upgrade would change first, so it is pinned: a
+decoded rule whose layout moved would show up here. -/
+
+/-- info: b ∧ ¬b: #[]
+congruence: #[ARITH_TRICHOTOMY, INT_TIGHT_UB]
+-/
+#guard_msgs in #eval Env.runIO do
+  for (name, problem) in [("b ∧ ¬b", contradiction), ("congruence", congruence)] do
+    let s ← solverWith problem
+    let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+    let others := proofs.fold #[] (m := Id) (pre := fun _ v acc => return .descend <|
+      match v with
+      | .other rule .. => if acc.contains rule then acc else acc.push rule
+      | _ => acc)
+    println! "{name}: {others}"
+
+/-! ## Sharing
+
+cvc5 shares a sub-proof between the steps that use it, and proofs are equal by identity, so every
+traversal visits a shared step once. `revisit` visits it on every path instead.
+-/
+
+/-- info: distinct steps : 41
+every path     : 55
+steps equal to themselves only : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    let reached := p.fold 0 (m := Id) (revisit := true)
+      (pre := fun _ _ n => return .descend (n + 1))
+    println! "distinct steps : {p.size}"
+    println! "every path     : {reached}"
+    println! "steps equal to themselves only : {(steps p).all fun q => (steps p).count q == 1}"
+
+/-! ## Ending early
+
+`pre` answers `stop` to end the fold and `skip` to leave a step's premises out; `post` can stop too.
+`break` ends a `for` loop over the steps.
+-/
+
+/-- info: clauses resolved : #[(or (>= x 2) (= (f x) (f 1)) (not (>= x 1))), (not (= (f x) (f 1))), (not (>= x 2)), (>= x 1)]
+steps, lemmas skipped : 16 of 41
+first rewrite rule : (some arith-leq-norm)
+first leaf at depth : 7
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    -- the clauses the SAT solver resolved: the premises of the first resolution step reached
+    let clauses := p.fold #[] (m := Id) (pre := fun _ v acc => return match v with
+      | .chainMResolution ps _ => .stop (ps.map (·.getResult))
+      | _ => .descend acc)
+    println! "clauses resolved : {clauses}"
+    -- the steps outside the theory lemmas, which are below the clauses being reordered
+    let outside := p.fold 0 (m := Id) (pre := fun _ v n => return match v with
+      | .reordering _ => .skip (n + 1)
+      | _ => .descend (n + 1))
+    println! "steps, lemmas skipped : {outside} of {p.size}"
+    -- the first rewrite rule reached
+    let mut first := none
+    for q in p do
+      if let some rule := q.getRewriteRule? then
+        first := some rule
+        break
+    println! "first rewrite rule : {first}"
+    -- the depth of the first leaf, stopping on leaving it
+    let depth := p.fold (0, 0) (m := Id)
+      (pre := fun _ _ (d, _) => return .descend (d + 1, d + 1))
+      (post := fun q _ (d, deepest) =>
+        return if q.getChildren.isEmpty then .stop (d, deepest) else .continue (d - 1, deepest))
+    println! "first leaf at depth : {depth.1}"
+
+/-! ## In any monad
+
+The fold's functions run in the caller's monad, here `Env`, printing as they go.
+-/
+
+/-- info: assumption 12 : (>= x 1)
+assumption 14 : (<= x 1)
+assumption 23 : (>= x 1)
+assumption 31 : (= x 1)
+assumption 37 : (distinct (f x) (f 1))
+assumption 40 : (>= x 1)
+steps entered : 41
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    let n ← p.fold 0 (pre := fun _ v n => do
+      if let .assume f := v then println! "assumption {n} : {f}"
+      return .descend (n + 1))
+    println! "steps entered : {n}"
+
+/-! ## Bottom-up
+
+`foldUp` computes a value for each distinct step from its premises' values, which its view holds in
+place of the premises. It is called once per distinct step, however many paths reach one.
+-/
+
+/-- info: as a term : (λ (λ (contra ⟨b⟩ ⟨(not b)⟩))) -/
+#guard_msgs in #eval Env.runIO do
+  let s ← solver
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    let term := p.foldUp (m := Id) fun _ v => match v with
+      | .assume f => s!"⟨{f}⟩"
+      | .scope body _ => s!"(λ {body})"
+      | .contra h n => s!"(contra {h} {n})"
+      | v => s!"({v.rule} {" ".intercalate v.premises.toList})"
+    println! "as a term : {term}"
+
+/-- info: as a tree : 55 steps
+computed  : 41 times, the distinct steps
+rebuilt   : cannot rebuild INT_TIGHT_UB
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    -- the size of the proof as a tree, every shared step counted on every path to it
+    let (tree, calls) := (p.foldUp fun _ v => do
+      modify (· + 1)
+      return v.premises.foldl (· + ·) 1 : StateM Nat Nat).run 0
+    println! "as a tree : {tree} steps"
+    println! "computed  : {calls} times, the distinct steps"
+    -- giving up on the first step that is not decoded, as a reconstruction would
+    let rebuilt : Except String Unit := p.foldUp fun q v => match v with
+      | .other .. => throw s!"cannot rebuild {q.getRule}"
+      | _ => return ()
+    println! "rebuilt   : {match rebuilt with | .ok () => "yes" | .error e => e}"
+
+/-! ## Questions about a proof
+
+A `full` proof leaves no assumption open — its root scope discharges the assertions — but the
+refutation below that scope does, and those are the assertions it uses.
+-/
+
+/-- info: rules : #[(SCOPE, 5), (CHAIN_M_RESOLUTION, 1), (REORDERING, 1), (EQ_RESOLVE, 6), (RESOLUTION, 1), (CNF_AND_NEG, 1), (IMPLIES_ELIM, 1), (MODUS_PONENS, 2), (AND_INTRO, 1), (ASSUME, 6), (TRANS, 1), (DSL_REWRITE, 3), (CONG, 3), (REFL, 3), (EVALUATE, 1), (ARITH_TRICHOTOMY, 1), (INT_TIGHT_UB, 1), (SYMM, 1), (NARY_CONG, 1), (THEORY_REWRITE, 1)]
+open  : #[]
+used  : #[(<= x 1), (distinct (f x) (f 1)), (>= x 1)]
+trusted steps : 0
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
+  for p in proofs do
+    println! "rules : {p.ruleCounts}"
+    println! "open  : {p.freeAssumptions}"
+    if let .scope outer _ := p.view then
+      if let .scope refutation _ := outer.view then
+        println! "used  : {refutation.freeAssumptions}"
+    println! "trusted steps : {p.trusted.size}"
+
+/-! ## Several proofs
+
+A component other than `full` can answer several proofs — one per theory lemma, for the
+`theoryLemmas` component — and `Solver.Proofs.fold`/`foldUp` go over all of them, a step they share
+being visited once in all. Each lemma is its proof's conclusion.
+-/
+
+/-- info: lemma : (or (>= x 2) (= (f x) (f 1)) (not (>= x 1)))
+assumed within : #[(>= x 1), (not (>= x 2)), (>= x 1), (not (>= x 2)), (= x 1)]
+tree sizes : #[28]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let lemmas ← s.checkSat (ifUnsat := do return ← s.getUnsatProof .theoryLemmas)
+  for p in lemmas do println! "lemma : {p.getResult}"
+  let assumed := lemmas.fold #[] (m := Id) (pre := fun _ v acc => return .descend <|
+    match v with
+    | .assume f => acc.push f
+    | _ => acc)
+  println! "assumed within : {assumed}"
+  let sizes := lemmas.foldUp (m := Id) fun _ v => return v.premises.foldl (· + ·) 1
+  println! "tree sizes : {sizes}"
+
+/-! ## Every step answers
+
+No proof cvc5 hands back is the null proof: every step of every component answers its rule, its
+conclusion, its arguments and its view.
+-/
+
+/-- info: Cvc.Proof.Component.rawPreprocess: 4 proofs, 13 steps, 13 arguments, views agree: true
+Cvc.Proof.Component.preprocess: 3 proofs, 12 steps, 12 arguments, views agree: true
+Cvc.Proof.Component.sat: 1 proofs, 5 steps, 7 arguments, views agree: true
+Cvc.Proof.Component.theoryLemmas: 1 proofs, 28 steps, 20 arguments, views agree: true
+Cvc.Proof.Component.full: 1 proofs, 41 steps, 39 arguments, views agree: true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solverWith congruence
+  let lines ← s.checkSat (ifUnsat := do
+    let mut lines := #[]
+    for pc in [Proof.Component.rawPreprocess, .preprocess, .sat, .theoryLemmas, .full] do
+      let proofs ← s.getUnsatProof pc
+      let (steps, args, agree) := proofs.fold (0, 0, true) (m := Id)
+        (pre := fun q v (n, args, agree) =>
+          let agree := agree && v.rule == q.getRule && q.getResult == q.getResult
+          return .descend (n + 1, args + q.getArguments.size, agree))
+      lines := lines.push
+        s!"{repr pc}: {proofs.size} proofs, {steps} steps, {args} arguments, views agree: {agree}"
+    return lines)
+  for line in lines do println! line
 
 /-! ## What fails -/
 

@@ -113,23 +113,19 @@ The delaborator below closes that gap for every abbrev whose index goes through 
 -/
 
 open Lean PrettyPrinter Delaborator SubExpr in
-/-- Shows a signature in the form it computes to.
+/-- Shows a signature in the form it computes to, once that form has no metavariables left.
 
-Three details are load-bearing. The first `guard` stops a signature that *cannot* reduce — one over
-a variable spine — from delaborating to itself and re-entering this delaborator forever; failing it
-hands the expression back to the default printer. It compares the whole expression rather than its
-head, which is what lets a partly concrete spine show how far it got: `push x bvs` reduces to
+A signature over a variable spine shows as far as it reduces: `push x bvs` as
 `signatureTo (Int → Int) bvs`, saying that `x` is already accounted for.
-
-The second guard is about *when* reducing is an improvement. Mid-elaboration — a hover inside a
-`do` block, before the pushed variables' types are solved — the reduced form is `?m → ?m → Int`,
-which says less than the application it came from, that one naming `x` and `y`. So the reduction is
-shown only once it has no metavariables left in it.
 -/
 @[delab app.Cvc.Typed.BVars.signatureTo]
 public meta def delabSignatureTo : Delab := do
   let e ← getExpr
   let e' ← instantiateMVars (← Meta.whnf e)
+  -- a signature that *cannot* reduce, over a variable spine, would otherwise delaborate to itself
+  -- and re-enter this delaborator forever; failing hands it back to the default printer. Comparing
+  -- the whole expression rather than its head is what lets a partly concrete spine show how far it
+  -- got
   guard <| e' != e
   -- a signature whose variables are not yet elaborated reduces to `?m → ?m → Int`, which says
   -- *less* than the application it came from: that at least names the variables. So the reduced

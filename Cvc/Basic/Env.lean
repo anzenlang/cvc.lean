@@ -83,24 +83,26 @@ private def liftRes5 (code : Except Error5 α) : Except Error α := code.mapErro
 
 /-- Argument of the `Env` monad representing a specific term manager.
 
-A `Type`, deliberately not a `Prop`. Any two proofs of a `Prop` are definitionally equal, so a
-`Prop`-valued `Ω` made a sort of one scope the same type as a sort of any other, and nested
-`Env.run`s could mix, or leak into each other, their sorts and terms. Two instances of this class
-bound by two runs are distinct variables, so `@Srt ω` and `@Srt ω'` are distinct types.
-
-Its one field is a *type*, and that is load-bearing twice over. A structure with no field, or a
-field of type `Unit`, would be distinct in name only: structure eta makes all its values equal,
-as proof irrelevance did. And a field holding a type is erased by the compiler, so an instance is
-represented as a constant scalar — no allocation, no reference counting — and is dropped entirely
-from the body of every function that does not use it.
-
-`@[nospecialize]` because, as data, an instance would otherwise be a specialization candidate like
-any other: the compiler would copy bodies from this module — private helpers included, which other
-modules may not reference — into its callers, to specialize them on an argument every scope gives
-the same constant value.
+Each run of an `Env` computation binds an instance of its own, and nothing else can make one. Two
+runs' instances are distinct variables, so `@Srt ω` and `@Srt ω'` are distinct types: a sort or a
+term cannot leave the run it was made in, nor meet one made in another run, nested runs included.
 -/
 @[nospecialize]
 class Ω : Type 1 where private mk :: private scope : Type
+-- A `Type`, deliberately not a `Prop`. Any two proofs of a `Prop` are definitionally equal, so a
+-- `Prop`-valued `Ω` made a sort of one scope the same type as a sort of any other, and nested
+-- `Env.run`s could mix, or leak into each other, their sorts and terms.
+--
+-- Its one field is a *type*, and that is load-bearing twice over. A structure with no field, or a
+-- field of type `Unit`, would be distinct in name only: structure eta makes all its values equal,
+-- as proof irrelevance did. And a field holding a type is erased by the compiler, so an instance is
+-- represented as a constant scalar — no allocation, no reference counting — and is dropped entirely
+-- from the body of every function that does not use it.
+--
+-- `@[nospecialize]` because, as data, an instance would otherwise be a specialization candidate
+-- like any other: the compiler would copy bodies from this module — private helpers included,
+-- which other modules may not reference — into its callers, to specialize them on an argument
+-- every scope gives the same constant value.
 
 /-- What an `Env` threads.
 

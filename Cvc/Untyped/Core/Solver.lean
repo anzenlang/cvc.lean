@@ -51,12 +51,24 @@ def Solver.Proof [Ω] : (solver : Solver) → (pc : Proof.Component) → Type :=
 abbrev Solver.Proofs [Ω] (solver : Solver) (pc : Proof.Component) : Type :=
   Array (solver.Proof pc)
 
+/-- Two proofs are equal when they are the same step: cvc5 compares proofs by identity.
+
+cvc5 shares a sub-proof between the steps that use it, so a step reached along two paths is equal
+to itself. It also builds the same step twice on occasion, and the two copies are different proofs
+that happen to conclude the same thing: identity, not structure.
+-/
+instance Solver.Proof.instBEq [Ω] {solver : Solver} : BEq (solver.Proof pc) :=
+  inferInstanceAs (BEq cvc5.Proof)
+
+/-- A proof's hash, consistent with its identity. -/
+instance Solver.Proof.instHashable [Ω] {solver : Solver} : Hashable (solver.Proof pc) :=
+  inferInstanceAs (Hashable cvc5.Proof)
+
 /-- A SyGuS grammar.
 
 A grammar belongs to the scope, as a term does: cvc5 builds one through a solver
 (`Solver.mkGrammar`), but any solver of the same term manager accepts it. The rule builders live in
-`Cvc.Untyped.Grammar`; the type is declared here because the interpolant and abduct queries
-below take one.
+`Cvc.Untyped.Grammar`.
 -/
 structure Grammar [Ω] where private mk' ::
   private raw : cvc5.Grammar
@@ -72,6 +84,8 @@ structure Grammar [Ω] where private mk' ::
   grammar is built; it is what lets the grammar be typed after the fact.
   -/
   startSrt : Srt
+-- Declared here rather than beside its builders because the interpolant and abduct queries below
+-- take one.
 
 /-- String representation, as the SyGuS pre-declaration and rule set. -/
 protected def Grammar.toString [Ω] (g : Grammar) : String := toString g.raw

@@ -153,12 +153,10 @@ open Lean
 /-- Integer literal. -/
 syntax:max (name := smtNum) num : smtTerm
 
-/-- Real literal, `1.5` or `1.5e-3`.
-
-The literal is handed to `mkReal` unascribed, so Lean elaborates it against that function's `Rat`
-argument through `OfScientific`. Nothing here has to name `Rat`.
--/
+/-- Real literal, `1.5` or `1.5e-3`. -/
 syntax:max (name := smtSci) scientific : smtTerm
+-- The literal is handed to `mkReal` unascribed, so Lean elaborates it against that function's `Rat`
+-- argument through `OfScientific`. Nothing here has to name `Rat`.
 
 namespace Ext open Cvc.Ext
 

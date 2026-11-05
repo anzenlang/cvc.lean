@@ -59,26 +59,17 @@ def symbolsSharedAliases : Array (Name × Bool) :=
     (`Terms, true), (`TermsAt, true), (`BVars, true), (`ValueTerms, true), (`ValueTermsAt, true)]
 
 /-- The body of a generated `foldM syms acc f`: `f acc syms.a >>= fun acc => f acc syms.b >>= …`,
-over the given fields in order.
-
-A chain of binds rather than a `do` block, since a `do` whose items are all spliced elaborates as
-empty.
--/
+over the given fields in order. -/
 def foldChain [Monad m] [MonadQuotation m] (fields : Array Name) : m (TSyntax `term) := do
   let mut body ← `(pure acc)
   for f in fields.reverse do
     body ← `(f acc syms.$(mkIdent f):ident >>= fun acc => $body)
   return body
+-- A chain of binds rather than a `do` block, since a `do` whose items are all spliced elaborates
+-- as empty.
 
 open Lean.Parser.Command in
-/-- `structure <id> (<w> : <wrap>) where <binders>`, assembled node by node.
-
-A quotation cannot splice a variable number of fields into `structFields`: that position is a
-`manyIndent`, and an antiquotation there is read as the *name* of a single field. Two shapes have
-to be right and are easy to get wrong — `structFields` holds its binders in a null node rather than
-as direct children, and `declModifiers`' first slot is a null node holding the doc comment, empty
-when there is none.
--/
+/-- `structure <id> (<w> : <wrap>) where <binders>`, with `doc?` as its doc comment. -/
 def mkSymbolsStructure (doc? : Option Syntax) (id w wrap : Syntax) (binders : Array Syntax)
 : Syntax :=
   let nulls := Array.replicate 7 mkNullNode
@@ -92,6 +83,11 @@ def mkSymbolsStructure (doc? : Option Syntax) (id w wrap : Syntax) (binders : Ar
     mkNullNode,
     mkNullNode #[mkAtom "where", mkNullNode, mkNode ``structFields #[mkNullNode binders]],
     mkNode ``optDeriving #[mkNullNode]]]
+-- Assembled node by node: a quotation cannot splice a variable number of fields into
+-- `structFields`, that position being a `manyIndent`, where an antiquotation is read as the *name*
+-- of a single field. Two shapes have to be right and are easy to get wrong — `structFields` holds
+-- its binders in a null node rather than as direct children, and `declModifiers`' first slot is a
+-- null node holding the doc comment, empty when there is none.
 
 /-- One field, rebuilt with its type wrapped in `w`.
 

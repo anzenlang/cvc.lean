@@ -7,6 +7,8 @@ Authors: Adrien Champion
 
 module
 
+public import Cvc
+
 import all Cvc.Gen.Term
 import all Cvc.Defs
 
@@ -21,6 +23,7 @@ import all Cvc.Untyped.Core.Defs
 import all Cvc.Untyped.Theory.Arith
 
 public import VersoManual
+public import CvcManual.Decl
 
 import CvcManual.Terms.TypedTermsExamples
 import CvcManual.Terms.UntypedTermsExamples
@@ -29,6 +32,7 @@ import CvcManual.Terms.Views
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
 open Verso.Code.External
+open CvcManual
 
 open Cvc
 
@@ -54,26 +58,26 @@ Terms can be constructed by calling constructor-functions, but cvc.lean also pro
 
 # Typed Terms
 
-{docstring Typed.Term}
+{decl Typed.Term}
 
 Typed terms have a type parameter for the actual `Srt` of that term. We saw previously that `ToTyp` links types to `Srt`-s, and it is precisely the mechanism used here. Typing terms lets us check statically that term constructors are invoked in a valid way, and makes their signature as precise as it can be.
 
-{docstring Typed.Term.mkBool}
-{docstring Typed.Term.and}
-{docstring Typed.Term.mkInt}
+{decl Typed.Term.mkBool}
+{decl Typed.Term.and}
+{decl Typed.Term.mkInt}
 
 Some term operators are polymorphic: addition for instance works on any arithmetic terms as long as they have the same sort.
 
-{docstring Typed.Term.add}
+{decl Typed.Term.add}
 
 Notice that the type-class constraint `IsArith α` must hold, which asks for a proof that the `Typ` associated to `α` is actually arithmetic.
 
-{docstring IsArith}
+{decl IsArith}
 
 We can declare function symbols by either letting type inference figure out the type for us, or by providing it explicitly.
 
-{docstring Typed.Term.mkSymbol}
-{docstring Typed.Term.mkSymbolAs}
+{decl Typed.Term.mkSymbol}
+{decl Typed.Term.mkSymbolAs}
 
 {include 2 CvcManual.Terms.TypedTermsExamples}
 
@@ -81,21 +85,21 @@ We can declare function symbols by either letting type inference figure out the 
 
 # Untyped Terms
 
-{docstring Untyped.Term}
+{decl Untyped.Term}
 
 Untyped terms do not have a type parameter corresponding to their sort, which means untyped term constructors do not provide any static guarantee that the result is a valid term. Instead, invalid terms will fail at runtime.
 
-{docstring Untyped.Term.mkBool}
-{docstring Untyped.Term.and}
-{docstring Untyped.Term.mkInt}
+{decl Untyped.Term.mkBool}
+{decl Untyped.Term.and}
+{decl Untyped.Term.mkInt}
 
 Unlike the typed API, the sort of an untyped term for a function symbol cannot be inferred and must be given explicitly. The first way to do so is to pass the actual sort.
 
-{docstring Untyped.Term.mkSymbol}
+{decl Untyped.Term.mkSymbol}
 
 The second way is to pass the Lean type that we would use to create a typed term.
 
-{docstring Untyped.Term.mkSymbolAs}
+{decl Untyped.Term.mkSymbolAs}
 
 {include 2 CvcManual.Terms.UntypedTermsExamples}
 
@@ -123,12 +127,12 @@ conversion does:
 {lean}`Untyped.Term.toTypedAs` checks, at runtime, an untyped term against (the sort associated to)
 a static type to produce a typed term.
 
-{docstring Untyped.Term.toTypedAs}
+{decl Untyped.Term.toTypedAs}
 
 If the term's type can be inferred from context, `Untyped.Term.toTyped` is a more concise
 alternative.
 
-{docstring Untyped.Term.toTyped}
+{decl Untyped.Term.toTyped}
 
 Under their aliases, {lean}`Untyped.Term.typeCheckAs` and `Untyped.Term.typeCheck`, the
 same two functions say what they do. For example:
@@ -172,7 +176,7 @@ cannot type the following term as `Int`, term has sort `Bool`:
 This direction cannot fail: a typed term already *is* a sort-erased one, and
 {lean}`Typed.Term.toUntyped` merely forgets its index.
 
-{docstring Typed.Term.toUntyped}
+{decl Typed.Term.toUntyped}
 
 For example:
 
@@ -197,9 +201,10 @@ erase:       (or x false)
 
 ## Every conversion
 
-Going down is always free. Going up checks sorts at runtime, except for solvers and proofs, which
-are the same type in both layers. Where the sort-erased counterpart has no type of its own, there
-is no way back up.
+Going down is always free. Going up checks sorts at runtime, except for solvers and proofs, where
+there is nothing to check: a solver is the same type in both layers, and a typed proof is a
+sort-erased one under a type of its own. Where the sort-erased counterpart has no type of its own,
+there is no way back up.
 
 | typed | sort-erased | down | up |
 |---|---|---|---|
@@ -233,11 +238,11 @@ variable [Ω]
 
 Cvc.lean's typed API types bound variables just like it types terms.
 
-{docstring Cvc.Typed.BVar}
+{decl Cvc.Typed.BVar}
 
 It also provides a type for collections of {lean}`BVar`-s.
 
-{docstring Cvc.Typed.BVars}
+{decl Cvc.Typed.BVars}
 
 > The untyped API for bound variables is very similar but with no type information. {lean}`Cvc.Untyped.BVars` is thus simply an array of untyped bound variables, and all checks are performed at runtime. We only present the typed API in this section.
 
@@ -245,7 +250,7 @@ As long as this list of bound variables (and their type) is known statically, fu
 
 ## Lambdas
 
-{docstring Cvc.Typed.Term.lambda}
+{decl Cvc.Typed.Term.lambda}
 
 This first example builds the bound variables list and the lambda term by hand, see below for a much more concise version using `smt!`.
 
@@ -315,8 +320,8 @@ sat
 
 Unlike lambdas, quantifier terms simply have sort `Bool` which makes typing much easier.
 
-{docstring Cvc.Typed.Term.mkForall}
-{docstring Cvc.Typed.Term.mkExists}
+{decl Cvc.Typed.Term.mkForall}
+{decl Cvc.Typed.Term.mkExists}
 
 Here is an example of building quantified terms by hand, `smt!` version below.
 

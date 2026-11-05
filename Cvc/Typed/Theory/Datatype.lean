@@ -43,12 +43,10 @@ open Cvc renaming Untyped.Term → T
 
 namespace Datatype
 
-/-- The constructor arguments of one application, each carrying its own index.
-
-Shaped like `BVars`, down to the `ToTyp` field: without it the sigma's layout is not known across a
-module boundary and the erasure below does not compile.
--/
+/-- The constructor arguments of one application, each carrying its own index. -/
 abbrev Args := List ((β : Type) × ToTyp β × Term β)
+-- Shaped like `BVars`, down to the `ToTyp` field: without it the sigma's layout is not known across
+-- a module boundary and the erasure below does not compile.
 
 namespace Args
 
@@ -79,14 +77,15 @@ structure Ctor (α : Type) where
 
 /-- One field of a datatype constructor, at the datatype's index and the field's.
 
-Named `Field` rather than `Selector` so it does not collide with `Datatype.Selector`, the
-sort-erased reflection type it is built from.
+The typed counterpart of the selector `Cvc.Datatype.Selector`, which reflects a field sort-erased.
 -/
 structure Field (α β : Type) where
   private mk ::
   private sel : Cvc.Datatype.Selector
   private term : Untyped.Term
   private updater : Untyped.Term
+-- Named `Field` rather than `Selector` so it does not collide with `Datatype.Selector`, the
+-- sort-erased reflection type it is built from.
 
 /-- The datatype the index names, reflected.
 

@@ -78,12 +78,10 @@ def liftIO [MonadLiftT BaseIO m] (ioCode : IO α) : $envT s m α := .wrap ioCode
 
 instance [MonadLiftT BaseIO m] : MonadLift IO ($envT s m) := ⟨liftIO⟩
 
-/-- Lifts `EnvT` code.
-
-Private on purpose: it would let a check-sat run inside a block that only holds because of an
-earlier answer.
--/
+/-- Lifts `EnvT` code. -/
 private def lift : EnvT m α → $envT s m α := .wrap
+-- Private on purpose: it would let a check-sat run inside a block that only holds because of an
+-- earlier answer.
 
 private instance : MonadLift (EnvT m) ($envT s m) := ⟨lift⟩
 

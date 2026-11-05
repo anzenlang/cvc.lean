@@ -62,10 +62,8 @@ op% seqSuffix {α} (suf s : seq α) : bool := SEQ_SUFFIX
 
 /-! ## Constructors -/
 
-/-- The empty sequence.
-
-The `tmSortOf` clause is about cvc5's method, not the generated signature: every constructor of a
-polymorphic sort takes the element sorts, but `mkEmptySequence` happens to want that sort directly
-where `mkEmptySet` wants the set sort built from it.
--/
+/-- The empty sequence. -/
 op% mkEmptySeq {α} : seq α := CONST_SEQUENCE tmSortOf mkEmptySequence α
+-- The `tmSortOf` clause is about cvc5's method, not the generated signature: every constructor of a
+-- polymorphic sort takes the element sorts, but `mkEmptySequence` happens to want that sort
+-- directly where `mkEmptySet` wants the set sort built from it.

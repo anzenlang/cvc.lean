@@ -12,10 +12,12 @@ import all Cvc.Defs
 public import Cvc
 public meta import Cvc
 public import VersoManual
+public import CvcManual.Decl
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
 open Verso.Code.External
+open CvcManual
 
 open Cvc
 
@@ -66,7 +68,7 @@ f2           := (-> Real Bool Real)
 
 Cvc.lean associates some Lean types to cvc5-sorts `Srt` through the `ToTyp` class.
 
-{docstring ToTyp}
+{decl ToTyp}
 
 `ToTyp α` specifies a `Typ`-value for `α` that corresponds to a `Srt`.{margin}[But is _not_ a `Srt` as constructing one requires to be in `Env`: a `Srt` value is tied to a specific manager.] This lets us go from compatible Lean types to `Srt` easily.
 

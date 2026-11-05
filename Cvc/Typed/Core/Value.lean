@@ -64,13 +64,11 @@ class ValueToTerm (α : Type) where
 /-- A Lean type usable as a sort, in both directions. -/
 class abbrev SrtLike (α : Type) (β : Type := α) := ToTyp α, TermToValue α, ValueToTerm α
 
-/-- The sort-erased conversion an instance of this layer's class induces.
-
-`reducible` so that instance resolution sees through it where a sort-erased conversion is what a
-delegation needs.
--/
+/-- The sort-erased conversion an instance of this layer's class induces. -/
 @[reducible]
 def TermToValue.toUntyped [A : TermToValue α] : Untyped.TermToValue α := ⟨A.termToValue⟩
+-- `reducible` so that instance resolution sees through it where a sort-erased conversion is what a
+-- delegation needs.
 
 @[inherit_doc TermToValue.toUntyped, reducible]
 def ValueToTerm.toUntyped [A : ValueToTerm α] : Untyped.ValueToTerm α := ⟨A.valueToTerm⟩

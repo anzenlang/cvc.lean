@@ -9,6 +9,7 @@ module
 
 public import Cvc.Untyped.Core
 public import Cvc.Untyped.Grammar
+public import Cvc.Untyped.Proof
 public import Cvc.Untyped.Synth
 public import Cvc.Untyped.Theory
 public import Cvc.Untyped.Extra

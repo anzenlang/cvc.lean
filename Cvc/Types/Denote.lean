@@ -146,11 +146,10 @@ end
 It reduces on a known `Typ`, which is what makes matching on a view's `Typ` refine the kids'
 index: `Term (Typ.Denote .int)` *is* `Term Int`, and `Term (Typ.Denote (.set .int))` is
 `Term (Set Int)`, with the very `Ord Int` a user's `Set Int` has.
-
-Reducible, as is everything it is computed with, so that instance resolution sees through it too: a
-record's `FieldOf` instances are found on the field list it reduces to.
 -/
 @[expose, reducible] def Typ.Denote (τ : Typ) : Type := τ.denoteWithOrd.1
+-- Reducible, as is everything it is computed with, so that instance resolution sees through it
+-- too: a record's `FieldOf` instances are found on the field list it reduces to.
 
 /-- A denotation's sort is the sort it denotes. -/
 instance (τ : Typ) : ToTyp τ.Denote := ⟨τ⟩
@@ -170,11 +169,8 @@ instance Typ.arrowsToTyp [ToTyp β] : (doms : List Typ) → ToTyp (Typ.arrows do
 open Lean PrettyPrinter Delaborator SubExpr in
 /-- Shows a denotation, or a function type over denotations, as the type it reduces to.
 
-`Typ.Denote (.set .int)` is `Set Int`, and a reader should see `Set Int`. It reduces by `dsimp`
-with the denotation's own definitions only: `whnf` would also unfold `Set`, an abbreviation, and
-show `Std.TreeSet Int compare`. A sort bound by an unmatched pattern does not reduce, or only
-part-way: the guards hand it back to the default printer, `τ.Denote`, rather than show it stuck
-inside `denoteWithOrd` — and without them the delaborator would re-enter itself forever.
+`Typ.Denote (.set .int)` shows as `Set Int`. A sort that does not reduce, or only part-way — one
+bound by an unmatched pattern — shows as `τ.Denote`.
 -/
 @[delab app.Cvc.Typ.Denote, delab app.Cvc.Typ.arrows]
 public meta def delabDenote : Delab := do
@@ -194,6 +190,10 @@ public meta def delabDenote : Delab := do
     x.isAppOf ``Typ.denoteWithOrd || x.isAppOf ``Typ?.denoteWithOrd ||
       x.isAppOf ``Typ.denoteFieldsWithOrd || x.isAppOf ``Typ.denoteProdWithOrd).isNone
   withTheReader SubExpr (fun c => { c with expr := e' }) delab
+-- It reduces by `dsimp` with the denotation's own definitions only: `whnf` would also unfold `Set`,
+-- an abbreviation, and show `Std.TreeSet Int compare`. The guards hand a sort that does not reduce
+-- back to the default printer, rather than show it stuck inside `denoteWithOrd` — and without them
+-- the delaborator would re-enter itself forever.
 
 
 end

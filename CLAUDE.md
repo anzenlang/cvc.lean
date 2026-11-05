@@ -137,6 +137,11 @@ Cvc/{Untyped,Typed}/Core/Symbols.lean → the record-of-symbols API, symbols at 
                                       (`Symbols.At k`) + `structure.symbols`
 Cvc/{Untyped,Typed}/Extra/Sys.lean  → transition systems and BMC over them
 Cvc/Gen/Symbols.lean        → what both layers' `structure.symbols` share
+Cvc/Basic/Traverse.lean     → `FoldPre`/`FoldPost`/`WalkPre`/`WalkPost`, what a traversal does next
+Cvc/Proof.lean              → layer-neutral proofs: `Proof.View`, one step taken apart, and the
+                              traversal engine `foldWith`/`foldUpWith`
+Cvc/{Untyped,Typed}/Proof.lean → proof inspection: the step decoder, `view`, `fold`, `foldUp`,
+                              `ForIn`, `freeAssumptions`/`ruleCounts`/`trusted`
 Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as data, by category, with
                               each one's value type (`argType`) and `toStrings` for `setOption`,
                               plus a flat `abbrev` per option (`.smt_produceModels`).
@@ -359,8 +364,9 @@ goes down and `toTyped` goes up, and two families of aliases say what the conver
   going down; going
   up, `toTypedAs` takes the index explicitly and `toTyped` infers it, aliased `typeCheckAs` and
   `typeCheck`;
-- **unindexed types with both APIs** — `Solver`, `Solver.Proof`, the same type in both layers —
-  answer to `relax` going down, and have a plain `toTyped`.
+- **unindexed types with both APIs** — `Solver`, the same type in both layers, and
+  `Solver.Proof`, a type of its own in each over one cvc5 proof — answer to `relax` going down,
+  and have a plain `toTyped`, free since there is nothing to check.
 
 Going down is free. Going up is a **runtime sort check**, a `throwUser` on mismatch, never an
 `Option`. Where the sort-erased counterpart has no type of its own — the heterogeneous lists, the
@@ -948,25 +954,89 @@ proof without leaving the mode monad; printing is `Env`, so a branch that wants 
 carry the proofs out first — the lift into a mode monad being private, as with
 `getValueAs`/`getValuesAs`.
 
-Typed, only two of them change: `getResult : Term Bool`, a conclusion being a formula, and
-`getChildren : s.Proofs pc`. **`getArguments` deliberately stays sort-erased** — cvc5 documents that
-a rule's arguments may be of any sort, strings included, so there is no index to give them and
-`typeCheck` is the way to put one on. Everything else mentions no term and is restated only so that
-its signature names this layer's `Proof`.
+**The typed proof is a type of its own** — `def Typed.Solver.Proof := Untyped.Solver.Proof`, not
+an abbreviation — so a sort-erased function refuses it and dot notation can never fall back on a
+sort-erased accessor. `toUntyped`/`relax` and `toTyped` cross for free (nothing to check: a
+conclusion is a formula whatever the layer). Typed, `getResult : Term Bool` and `getChildren :
+s.Proofs pc`; **`getArguments` deliberately stays sort-erased** — cvc5 documents that a rule's
+arguments may be of any sort, strings included, so there is no index to give them and `typeCheck` is
+the way to put one on. Everything else mentions no term and is restated so that its signature names
+this layer's `Proof`.
 
 `getRewriteRule?` answers `none` unless the rule is `DSL_REWRITE` or `THEORY_REWRITE`;
 `getRewriteRule` is the same thing taking that as a hypothesis, which a `match h : p.getRule`
 supplies as `.inl h`/`.inr h`.
 
+**Proofs are equal by identity**, cvc5's own `operator==` (`BEq`/`Hashable` on `Solver.Proof` in
+both layers). cvc5 shares a sub-proof between the steps using it, so a proof is a DAG; it *also*
+builds the same sub-proof more than once when the copies sit under different nestings of `SCOPE`s
+— in the tests' congruence proof, three `ASSUME (>= x 1)` and three `EQ_RESOLVE` steps above them,
+under two, three and four scopes. Its merging post-processor (`proof-pp-merge`, on by default,
+taking that proof from 52 distinct steps to 41) leaves those apart, so this is how cvc5 builds
+proofs rather than a bug. Identity is what cvc5 offers and what the traversals use; the copies count
+separately.
+
+### Inspection
+
+Three modules. [Cvc/Proof.lean](Cvc/Proof.lean) is layer-neutral: **`Cvc.Proof.View P F T`**, one
+constructor per decoded rule (~70: assumptions, rewriting, trusted steps, resolution, Boolean
+eliminations, every `CNF_*`, equality) plus `other rule premises args`, and the traversal engine
+`foldWith`/`foldUpWith`. [Cvc/Untyped/Proof.lean](Cvc/Untyped/Proof.lean) holds the decoder and the
+API; [Cvc/Typed/Proof.lean](Cvc/Typed/Proof.lean) the typed API on top of it.
+
+- **The view is parametric in what a premise, a formula and a term are.** Sort-erased it is
+  `View (s.Proof pc) Term Term` (`Solver.ProofView s pc`), typed `View (s.Proof pc) (Term Bool)
+  Untyped.Term`. The point of `P` is `foldUp`: the decoder `Proof.viewWith p premises` is generic in
+  the premise type, so `foldUp` decodes each step *at its premises' computed values* and hands the
+  user `View β F T` — `.modusPonens h imp` with `h imp : β`, which is the catamorphism a proof
+  rebuild wants. No lookup from premise to value, so nothing partial.
+- **Decoding is total.** A rule is decoded only when its step has cvc5's documented layout
+  (premise and argument counts, polarities as Boolean constants, indices and identifiers as
+  integer constants, chain-resolution polarities/pivots as `SEXPR` lists); anything else is
+  `other`, holding what cvc5 gave. Arguments that only restate the conclusion (`REORDERING`'s
+  clause, `THEORY_REWRITE`'s equality, `TRUST`'s formula) are dropped. Typed, each formula is
+  checked Boolean (pure `getSort?`), and a step failing that is `other` too — a `Term Bool` is never
+  a guess. Terms of other sorts stay sort-erased, as `getArguments` does.
+- **Which rules are decoded can grow**, and a rule leaving `other` breaks a pattern `.other .R …` —
+  the docstring says to match on `getRule` for undecoded rules. `View`, `View.rule`,
+  `View.premises` and `View.mapM` were generated once from a table and are ordinary source now:
+  adding a rule means one constructor, one line in each of those three, and a decoder case.
+- **Traversals**: `fold` (pre/post with `FoldPre`/`FoldPost` — the term traversal's controls,
+  moved to [Cvc/Basic/Traverse.lean](Cvc/Basic/Traverse.lean) — any monad, early exit, each
+  distinct step entered once unless `revisit`), the `ForIn` instance (`for step in p`, `break`), and
+  `foldUp` (bottom-up, memoized, any monad, early exit by throwing). `Solver.Proofs.fold`/`foldUp`
+  do several roots at once, sharing what they visit — what non-`full` components answer. Queries:
+  `size`, `ruleCounts` (an array in first-reached order, deterministic for tests), `freeAssumptions`
+  (`ASSUME`s no enclosing `SCOPE` discharges, via `foldUp`), `trusted`.
+- **Lemmas and unsat explanations** need no dedicated API: the `theoryLemmas` component answers one
+  proof per lemma; below the `full` proof's two root scopes, `freeAssumptions` is the set of
+  assertions the refutation uses; the first `chainMResolution` reached holds the clauses resolved.
+- Engine traps: both loops are worklists (`repeat` over a task list), never recursion, since proofs
+  can be deep; in this Lean `ForIn.forIn` has no `[Monad m]` binder, so the *instance* takes it.
+
+Observed with cvc5 1.3.2 on the tests' problems: the `full` proof comes out with `DSL_REWRITE` and
+`THEORY_REWRITE` steps even though `proof-granularity` defaults to `macro`, while the other
+components keep coarse `MACRO_SR_PRED_*` steps (`other`); at `rewrite` granularity rewriting is a
+single `MACRO_REWRITE`, also `other`. `ARITH_TRICHOTOMY` and `INT_TIGHT_UB` are the undecoded rules
+the tests meet. **Every decoded rule but three has been seen decoded** on a real proof, pinned in
+`CvcTests/ProofRules.lean`: `SAT_REFUTATION` (documented for assumption-based unsat cores, where
+cvc5 produces a `TRUST` step of that very shape instead), `SPLIT` (a tautology a refutation never
+needs) and `PAIRWISE_CONG` (cvc5 rewrites `distinct` away before any congruence under it) are
+decoded from the documentation alone — entry 10 of [Cvc5Issues.md](.notes/Cvc5Issues.md). Producing
+the eliminations takes `simplification` off, so unit assertions are not substituted away;
+`FACTORING` takes `proof-chain-m-res` off; `TRUST` comes from `proof-mode pp-only`. In
+`TRUST_THEORY_REWRITE` the first identifier is a *theory* id (4 for bit-vectors, 10 for sets).
+`produce-unsat-cores` with `proof-mode sat-proof` makes `getUnsatProof` abort the process (entry
+9); the library sets neither option, and cannot stop a user from setting both.
+
 **Two traps, both verified:**
 
-- **A re-typing is only reachable if it is named where dot notation looks.** Three things have to
-  agree for `p.getResult` to answer `Term Bool`: the abbreviation is `Typed.Solver.Proof`, matching
-  the namespace the re-typings live in; `getUnsatProof` is re-typed here rather than inherited, so
-  what it answers is headed by this layer; and `Typed.Solver.Proofs` is `Array (Solver.Proof s)`
-  rather than an alias of the sort-erased array, since `for`/`map`/`getElem` unfold the container
-  and would surface a sort-erased element. Get any one wrong and the sort-erased accessor answers
-  instead, **silently** — nothing fails to compile. `Terms` is `Array (Term α)` for the same reason.
+- **A re-typing is only reachable if it is named where dot notation looks.** `getUnsatProof` is
+  re-typed rather than inherited, so what it answers is headed by this layer, and
+  `Typed.Solver.Proofs` is `Array (Solver.Proof s)` rather than an alias of the sort-erased array,
+  since `for`/`map`/`getElem` unfold the container and would surface a sort-erased element.
+  `Terms` is `Array (Term α)` for the same reason. (The typed `Proof` being its own type now makes
+  a slip here a type error rather than a silent sort-erased answer.)
 - **Printing a non-`full` proof in a real format segfaults**, so the pairing is a *type*
   obligation rather than a runtime check. `toString` prints in `Proof.Format.no`, legal whatever
   the component, and asks nothing. `toStringFmt` takes the format and an autoparam'd
@@ -2039,6 +2109,11 @@ builds the `?` form *from* the `Except` form, so it is `none` on error, never `s
   `someOrThrowUser` in `Basic/Error.lean`, so the two cannot disagree. This is a second meaning of
   `!` beside the unchecked modal twins under "The solver"; both mark the form that can fail where
   its counterpart could not.
+- **Proofs.** lean-cvc5's `Proof.null` and its null-backed `Inhabited cvc5.Proof` are the only null
+  proofs there are, and neither is reachable: `Solver.Proof` is a `def` in both layers, which
+  instance resolution does not unfold, so `proofs[0]!` does not compile (pinned in both `Proof`
+  tests). `getProof` and `getChildren` build proofs from cvc5's proof nodes, never null, and the
+  tests walk every step of every component through every accessor.
 - **`Inhabited`.** Every *wrapped* type is clean — all ten reject `inferInstance`, because
   `def0%`–`def3%` deliberately emit no `Inhabited` where cvc5 has null-backed ones for eight of its
   types. That absence is load-bearing: it is why `terms[i]!` does not compile and why no
@@ -2126,7 +2201,14 @@ tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still o
   `Solver` test covers recursive definitions: `defineFunRec`, `defineFunRecTerm`, mutual
   `defineFunsRec`, `global` across `pop`. A sat answer over one needs `fmf-fun` (`unknown`
   without), which enforces a definition only on the applications assertions mention, so values are
-  read off asserted equations — `getValue` of an unconstrained `fact 5` answered `1`.
+  read off asserted equations — `getValue` of an unconstrained `fact 5` answered `1`. The `Proof`
+  tests also cover inspection: each step's view of a refutation through arithmetic, congruence and
+  rewriting (pinning which rules come out `other`), sharing, early exit, folding in `Env`,
+  `foldUp` (a rebuild giving up through `Except`), the queries, the `theoryLemmas` component, and
+  that every step of every component answers; typed, the view's indices and that a typed proof is
+  refused by a sort-erased function.
+- `CvcTests/ProofRules.lean` — one small problem per decoded rule the other proof tests do not
+  meet, each step shown as both layers decode it, so a layout cvc5 changes shows up as a diff.
 - `CvcTests/{Untyped,Typed}/View.lean` — the aggregate's signatures, taking terms apart, kind
   ownership; typed, the record/tuple/nullable helpers, wrong-sort matches as errors, containers
   denoting their own types. `CvcTests/View.lean` — the two `View` modules alone, with no theory.
@@ -2234,6 +2316,20 @@ directory from its cache for that reason.
   errors: those live in sub-pages with plain imports, `{include}`d (`CvcManual.Terms.*Examples`,
   `CvcManual.Env.SafetyErrors`). Verso's external `anchor`/`anchorError` examples, compiled in a
   separate project, would allow inline error examples instead; nothing uses them yet.
+- **Every docstring in the manual is included with `{decl X}`**, `{docstring X}` with a foldable
+  body, defined in `CvcManual/CvcManual/Decl.lean` (a page needs `public import CvcManual.Decl` and
+  `open CvcManual`). The box keeps Verso's signature line; the docstring, fields or constructors,
+  and a definition's **equations** (one per equation theorem `getEqnsFor?` generates, shown as
+  `lhs = rhs`) sit in a `<details>` block. Defaults: a type (a definition whose type ends in a
+  sort) starts open and shows its equations if its body is exposed; a structure or inductive starts
+  folded beyond two fields or constructors; anything else — every function — starts folded, with no
+  equations. `+folded`/`-folded` and `+equations`/`-equations` override, but an **unexposed** body
+  (`Term`, `Srt`, `Solver.Proof`) is never shown: `+equations` on one is an error. Exposure is read
+  through the page's public scope, so a page needs `public import Cvc` (Terms had none, and every
+  alias there looked unexposed); `{decl}` errors rather than guess when the name is missing from it.
+  It mirrors Verso's `docstring` command and copies its `getExtras`, which Verso does not export,
+  so a Verso bump may need the copy refreshed. Equations need `import all` of the declaring module,
+  as docstrings do.
 
 ## The lean-cvc5 dependency
 

@@ -144,9 +144,6 @@ refused here rather than left as a second spelling of the same thing.
 can then select unambiguously.
 
 The order is part of the sort: `{a : Int, b : Bool}` and `{b : Bool, a : Int}` are different.
-
-Both checks sit here rather than on the callers, so every path to a record sort inherits them —
-`Typ.toSrt` reaches cvc5 only through this function.
 -/
 def record (fields : Array (String × Srt)) : Env Srt := do
   if fields.isEmpty then
@@ -154,6 +151,8 @@ def record (fields : Array (String × Srt)) : Env Srt := do
   if let some name := firstDuplicate (fields.toList.map Prod.fst) then
     throwUser s!"record sort has more than one field named `{name}`"
   lift% mkRecordSort fields
+-- Both checks sit here rather than on the callers, so every path to a record sort inherits them —
+-- `Typ.toSrt` reaches cvc5 only through this function.
 
 @[inherit_doc Tm.mkParamSort]
 def param (symbol : String) : Env Srt := lift% mkParamSort symbol
@@ -467,20 +466,13 @@ mutual
 
 /-- Conversion to `Typ`, the inverse of `Typ.toSrt` wherever a `Typ` can describe the sort.
 
-`partial` because the recursion is on `Srt`, which is opaque: it is cvc5's `Sort` under the hood,
-so nothing here is structurally smaller to Lean.
+A function sort comes back curried, `(-> α β γ)` as `function α (function β γ)`. A declared sort —
+a datatype or an uninterpreted sort — converts only if it is the sort this scope registered under
+its name.
 
-**The order of the tests is load-bearing.** cvc5 implements tuples, records and nullables *as*
-datatypes, so `isDatatype` is true of all three and the narrower testers have to be asked first.
-
-Two shapes are rebuilt rather than read off, both because `Typ.toSrt` flattens them:
-
-- a **function** sort's domain is n-ary in cvc5 and curried in `Typ`, so the spine is folded back
-  to the right — `(-> α β γ)` becomes `function α (function β γ)`;
-- a **tuple**'s components are already flat on both sides, so `prod` takes them as they come.
-
-Sorts that no `Typ` case describes fail rather than approximate: records, uninterpreted sort
-constructors and their instantiations, and the datatype-operator sorts.
+Sorts that no `Typ` describes fail rather than approximate: the abstract sorts, which `toTyp?`
+accepts, instantiated parametric datatypes, uninterpreted sort constructors and their
+instantiations, and the datatype-operator sorts.
 -/
 public partial def toTyp (srt : Srt) : Env Typ := do
   if srt.isBool then return .bool
@@ -551,12 +543,19 @@ public partial def toTyp (srt : Srt) : Env Typ := do
     -- a datatype sort has no *symbol*; its name is the declaration's
     return .datatype (← srt.checkDeclared (← (← srt.getDatatype).getName))
   else throwUser s!"`Typ` has no case for the sort `{srt}` (sort kind `{← srt.getKind}`)"
+-- `partial` because the recursion is on `Srt`, which is opaque: it is cvc5's `Sort` under the hood,
+-- so nothing here is structurally smaller to Lean.
+--
+-- **The order of the tests is load-bearing.** cvc5 implements tuples, records and nullables *as*
+-- datatypes, so `isDatatype` is true of all three and the narrower testers have to be asked first.
+--
+-- Two shapes are rebuilt rather than read off, both because `Typ.toSrt` flattens them:
+--
+-- - a **function** sort's domain is n-ary in cvc5 and curried in `Typ`, so the spine is folded back
+--   to the right — `(-> α β γ)` becomes `function α (function β γ)`;
+-- - a **tuple**'s components are already flat on both sides, so `prod` takes them as they come.
 
-/-- Conversion to `Typ?`, which unlike `toTyp` accepts the abstract sorts.
-
-Only reached where cvc5 permits a non-first-class sort — a container element, an array parameter,
-a function codomain — so `.any` and `.abstract` land exactly where they are legal.
--/
+/-- Conversion to `Typ?`, which unlike `toTyp` accepts the abstract sorts. -/
 public partial def toTyp? (srt : Srt) : Env Typ? := do
   if srt.isAbstract then
     let kind ← srt.getAbstractedKind
