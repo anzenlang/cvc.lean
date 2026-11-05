@@ -18,13 +18,41 @@ lake run buildManual  / serveManual    # the Verso manual, see "Documentation" b
 lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
 ```
 
-- Toolchain: `leanprover/lean4:v4.34.1`.
+- Toolchain: `leanprover/lean4:v4.35.0`, and the same in `CvcManual` — keep the two in step,
+  with Verso's `rev` pinned to the same version tag. The API reference's project is generated and
+  follows `lean-toolchain` on its own (see "Documentation").
 - One dependency: `cvc5 @ 41e4779` (`inputRev = "main"`, so `lake update` moves it).
   `precompileModules := true` on the `cvc` package.
-- README warns you must run `lake update cvc` before the dependency builds properly.
-- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on macOS: `lake update`, `lake
-  build`, `lake test` — but only on `main`/PRs to `main`, so a topic branch is **not** covered. Note
-  CI runs a bare `lake update`, which will bump `cvc5` to whatever `main` is at that moment.
+- **No `lake update` is needed to build.** A fresh clone builds with `lake build` alone: Lake
+  clones lean-cvc5 at the manifest's revision, and lean-cvc5's `cvc5Enums` build target downloads
+  the precompiled cvc5 for the platform — verified on a clean clone. The README still says
+  otherwise. lean-cvc5 has no post-update hook.
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
+  PRs to `main` only, so a topic branch is **not** covered. Jobs:
+  - `build` first runs `.github/scripts/check_versions.py` — the manual on the root's toolchain,
+    Verso pinned to it, and every package the projects sharing `.lake/packages` have in common at
+    one revision — then `lake build`, saving `.lake` to the cache keyed by commit;
+  - `test` (`lake test`, restoring that cache) and `manual` (`lake run buildManual`, which fails
+    on any example whose output drifts) then run in parallel;
+  - on `main` only, `api-docs` (`lake run buildApiDocs`, then the version check again with the
+    generated project's manifest) runs beside them, and `deploy` waits for `test`, `manual` and
+    `api-docs`, takes the manual and the reference they built as artifacts, renders the README as
+    the site's `index.html` (`.github/scripts/render_readme.sh`, through GitHub's Markdown API) and
+    publishes `api/` and `manual/` with `actions/deploy-pages`. No branch: the repository's Pages
+    source must be "GitHub Actions", and each deployment replaces the whole site.
+
+  `manual` and `api-docs` keep caches of their own, Verso and doc-gen4 living in the shared
+  packages directory and so absent from `build`'s; they are saved only from `main` and restored
+  everywhere, since each is over a gigabyte and GitHub keeps 10 GB per repository. `api-docs`
+  excludes the generated project's build directory, so the reference is always regenerated
+  (doc-gen4 never drops the page of a removed module). A newer push cancels a superseded run, on
+  `main` too. There is no `lake update` step: CI follows the committed manifest. The manual's
+  `apiRoot` points at upstream's site whatever repository builds it.
+- [.github/workflows/lean-release.yml](.github/workflows/lean-release.yml) checks daily for a stable
+  Lean release newer than `lean-toolchain` and opens one "Bump to Lean vX" issue per release,
+  saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually
+  and with a delay, so an automated bump would nearly always fail. Dependabot
+  ([.github/dependabot.yml](.github/dependabot.yml)) keeps the actions' versions current.
 
 ## Lean 4 module system
 
@@ -97,6 +125,8 @@ Cvc/SolverOptions.lean      → `Solver.Option`: cvc5's non-expert options as da
                               plus a flat `abbrev` per option (`.smt_produceModels`).
                               Publicly imported by `Untyped/Core/Solver.lean`, so `Cvc` exposes it
 CvcExamples/{Untyped,Typed}/* → worked examples, built by `lake test` as the tests are
+CvcManual/                 → the Verso manual: a Lake project of its own (it requires Verso, which
+                              the library must not impose), sources under `CvcManual/CvcManual/`
 CvcTests/*                 → the test library (`lake test`)
 ```
 
@@ -232,11 +262,11 @@ order — `__cvc5_record_a_Int_b_Bool` — and that is how `Srt.toTyp` reads one
 
 **Distinct field names are our check, not cvc5's**, and so is **non-emptiness**. `Srt.record`
 refuses two fields of one name — cvc5 accepts them and builds a datatype with two identically-named
-selectors, which nothing can select unambiguously, logged in [Cvc5Issues.md](Cvc5Issues.md) — and
-refuses the empty record, which cvc5 builds happily but which denotes what the empty tuple already
-denotes. Both checks sit on `Srt.record` rather than on its callers, because `Typ.toSrt` reaches
-cvc5 only through it and so inherits them; an autoparam could not, `toSrt` passing an array it
-computes. The value spines make non-emptiness structural besides, `last`/`cons` as `Components`
+selectors, which nothing can select unambiguously, logged in [Cvc5Issues.md](.notes/Cvc5Issues.md) —
+and refuses the empty record, which cvc5 builds happily but which denotes what the empty tuple
+already denotes. Both checks sit on `Srt.record` rather than on its callers, because `Typ.toSrt`
+reaches cvc5 only through it and so inherits them; an autoparam could not, `toSrt` passing an array
+it computes. The value spines make non-emptiness structural besides, `last`/`cons` as `Components`
 does.
 
 Two consequences of `List (String × Typ)` worth knowing before editing:
@@ -836,7 +866,7 @@ any other theory.
 **The heap is solver state, and that is the whole problem.** `declareSepHeap` fixes the location
 and data sorts once per solver, and cvc5 checks nothing against them at construction: `(pto 1 true)`
 builds happily against a `Loc × Int` heap and fails at check-sat with a type error naming
-`set.union` — its heap-as-sets encoding showing through. See [Cvc5Issues.md](Cvc5Issues.md).
+`set.union` — its heap-as-sets encoding showing through. See [Cvc5Issues.md](.notes/Cvc5Issues.md).
 
 So `declareSepHeap` answers a **handle**, and the two heap-dependent constructors hang off it:
 
@@ -925,7 +955,7 @@ supplies as `.inl h`/`.inr h`.
   `fmt = .no ∨ pc = .full`, which `grind` discharges whenever both are literals — so a correct call
   reads as though there were no obligation, and the crashing one does not compile. The component
   index exists for this. cvc5 taking the process down rather than throwing is logged as a cvc5 bug
-  in [Cvc5Issues.md](Cvc5Issues.md); it is the reason a type is worth spending here at all.
+  in [Cvc5Issues.md](.notes/Cvc5Issues.md); it is the reason a type is worth spending here at all.
 
 ## Synthesis
 
@@ -1310,7 +1340,7 @@ parenthesized.
 Each pinned by a test or documented in the code:
 
 - **`WITNESS` is not wrapped**: asserting a term containing one *aborts the process* (`WITNESS
-  should never appear in asserted terms`), logged in [Cvc5Issues.md](Cvc5Issues.md).
+  should never appear in asserted terms`), logged in [Cvc5Issues.md](.notes/Cvc5Issues.md).
 - **`SET_COMPREHENSION` needs all three children** (variables, predicate, element) and solving over
   one needs `sets-exp`; even then cvc5 answers `unknown` on a simple membership. Typed, the index is
   the element term's, the bound variables' sorts never reaching it.
@@ -1631,7 +1661,7 @@ and reused.
   type error, there being no instance left to end the chain.
 - **Not a `Fin` position with a computed component type.** `Fin`'s `OfNat` reduces modulo the
   bound, so position `4` of a four-component tuple would silently become column *zero*, and every
-  derived index would display unreduced. See [TODO.md](TODO.md).
+  derived index would display unreduced. See [TODO.md](.notes/TODO.md).
 - `col%` and `cols%` are `scoped` and declared at **maximum precedence**, so they need no
   parentheses as function arguments.
 - A position is resolved by the shape of the component list, so an abstract tail —
@@ -1935,11 +1965,12 @@ load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` 
   reflow them.
 - **Never reference a markdown file from Lean source.** Not from a docstring, not from a `/-! … -/`
   module doc, not from an ordinary comment — and never as a markdown link, which does not even
-  render in generated documentation. `CLAUDE.md`, `MISSING.md`, `TODO.md` and `Cvc5Issues.md` are
-  notes *about* the project; the source is the project, it is what users read, and it must stand on
-  its own. Say the fact instead of pointing at where it is written down: "cvc5 answers a segfault
-  here, which is a cvc5 bug" rather than "see `Cvc5Issues.md`". Cross-referencing another *Lean*
-  declaration or module is fine, spelled as a name (`Cvc.Untyped.Theory.Sep`), not as a link.
+  render in generated documentation. `CLAUDE.md` and the notes under `.notes/` (`MISSING.md`,
+  `TODO.md`, `Cvc5Issues.md`, `LeanIssues.md`) are notes *about* the project; the source is the
+  project, it is what users read, and it must stand on its own. Say the fact instead of pointing at
+  where it is written down: "cvc5 answers a segfault here, which is a cvc5 bug" rather than "see
+  `Cvc5Issues.md`". Cross-referencing another *Lean* declaration or module is fine, spelled as a
+  name (`Cvc.Untyped.Theory.Sep`), not as a link.
 
 ## Conventions
 
@@ -2086,22 +2117,22 @@ tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still o
 
 ## What is left
 
-[MISSING.md](MISSING.md) tracks the **API-surface** gap against lean-cvc5, area by area, with the
-scripts that regenerate its counts. **Keep it updated as things land.** This section is the
+[MISSING.md](.notes/MISSING.md) tracks the **API-surface** gap against lean-cvc5, area by area, with
+the scripts that regenerate its counts. **Keep it updated as things land.** This section is the
 different list: the library's own design work, ordered by dependency.
 
-[TODO.md](TODO.md) is a third list — designs worked out far enough to be worth keeping and then
-deliberately not started, so neither a gap nor a plan. A **SQL API over relations and tables** is
-the entry there.
+[TODO.md](.notes/TODO.md) is a third list — designs worked out far enough to be worth keeping and
+then deliberately not started, so neither a gap nor a plan. A **SQL API over relations and tables**
+is the entry there.
 
-[Cvc5Issues.md](Cvc5Issues.md) is a fourth, and is about cvc5 rather than about this library:
+[Cvc5Issues.md](.notes/Cvc5Issues.md) is a fourth, and is about cvc5 rather than about this library:
 problems found in the **C++ API** itself, each with a standalone C++ reproduction. Anything a
 wrapper has to work around belongs there, with the workaround pointing back at it.
 
-[LeanIssues.md](LeanIssues.md) is its Lean counterpart: sharp edges in Lean itself, each with a
-standalone Lake reproduction, and the action to take upstream. Its first entry is the "not unfolded
-because their definition is not exposed" note every typed sort error carries — pending a post on
-the Lean Zulip. Rewriting the phantom types as structures to avoid it is ruled out.
+[LeanIssues.md](.notes/LeanIssues.md) is its Lean counterpart: sharp edges in Lean itself, each with
+a standalone Lake reproduction, and the action to take upstream. Its first entry is the "not
+unfolded because their definition is not exposed" note every typed sort error carries — pending a
+post on the Lean Zulip. Rewriting the phantom types as structures to avoid it is ruled out.
 
 Term construction and the solver are done — every theory is covered, and the solver is at parity
 with lean-cvc5. What follows is everything that is *not* term construction or solver driving:
@@ -2123,7 +2154,7 @@ with lean-cvc5. What follows is everything that is *not* term construction or so
 2. **Instantiation patterns** — the `INST_*` annotations a quantifier carries as a third child.
    See "Quantifiers" for where they would go.
 3. **Leftovers** — the cvc5 corners never wrapped (pools, oracles, the parser, operator
-   reflection, statistics). See [MISSING.md](MISSING.md).
+   reflection, statistics). See [MISSING.md](.notes/MISSING.md).
 
 Two enum wrappers in [Cvc/Basic.lean](Cvc/Basic.lean) are currently unused by anything —
 `Option.Category` and `InputLanguage` — since the code that consumed them was the option-info and
@@ -2131,40 +2162,59 @@ parser surface. They are kept because the areas that want them are on the list a
 
 ## Documentation
 
-`Docs/Manual` and `Docs/Api` are Lake projects of their own that `require` the library by path, and
-four scripts in the root `lakefile.lean` drive them: `lake run buildManual`/`serveManual` and
-`lake run buildApiDocs`/`serveApiDocs`. Serving builds first, then serves with `python3 -m
+The manual and the API reference are Lake projects of their own that `require` the library by
+path, and four scripts in the root `lakefile.lean` drive them: `lake run buildManual`/`serveManual`
+and `lake run buildApiDocs`/`serveApiDocs`. Serving builds first, then serves with `python3 -m
 http.server` on port 8000 until interrupted, or on the port given as argument (`lake run
 serveApiDocs 8001`) so that both can be served at once.
 
-| | `Docs/Manual` | `Docs/Api` |
+| | manual | API reference |
 |---|---|---|
-| tool | Verso | doc-gen4 `v4.34.1` |
-| toolchain | `v4.35.0-rc4` (Verso's) | `v4.34.1`, the library's |
-| sources | `CvcManual.lean`, `CvcManual/` | none: it documents `Cvc` |
+| project | `CvcManual`, in the repository | `.lake/docbuild`, generated by the script |
+| tool | Verso `v4.35.0` | doc-gen4, the tag `lean-toolchain` names |
+| toolchain | `v4.35.0`, the library's | the library's, copied from `lean-toolchain` |
+| sources | `CvcManual/CvcManual.lean`, `CvcManual/CvcManual/` | none: it documents `Cvc` |
 | built with | `lake exe docs` | `lake build Cvc:docs` |
-| output | `_out/html-multi` | `.lake/build/doc` |
+| output | `CvcManual/_out/html-multi` | `.lake/docbuild/.lake/build/doc` |
+
+**The API reference's project is generated, not committed** — `generateApiDocsProject` in the
+lakefile, the same thing `leanprover-community/docgen-action` does (that action cannot be used here:
+it reads only a `lakefile.toml`, and this one is a `lakefile.lean` for the scripts). It writes a
+`lakefile.toml` sharing `.lake/packages` and requiring doc-gen4 at `docGenRev`'s answer — the
+toolchain's version tag, `main` for anything else — plus a copy of `lean-toolchain`. When that file
+changes, or there is no manifest yet, it runs `lake update doc-gen4`: doc-gen4 alone, which leaves
+the shared `cvc5` at the root manifest's revision (verified; Lake pins it from the library's own
+manifest). Otherwise it does nothing, so a rebuild costs nothing extra. A toolchain bump therefore
+carries doc-gen4 along with no edit. doc-gen4 never deletes the page of a module that is gone, so a
+local output keeps stale pages across versions; the Pages workflow excludes the project's build
+directory from its cache for that reason.
 
 - **The scripts run each project under its own toolchain**, through `elan run --install
   <lean-toolchain> lake …` with the outer `lake`'s variables cleared (`lakeEnvVars`, the list Verso
   uses for the same purpose). Without that the inner `lake` inherits the root's toolchain.
-- **A path dependency builds in the dependency's own `.lake`**, so a project on another toolchain
-  rebuilds the library under it. `Docs/Api` is on the library's toolchain for that reason, and
-  shares its packages directory (`packagesDir = "../../.lake/packages"`) so that cvc5 is fetched
-  once. The manual is not: every manual build recompiles the library under `v4.35.0-rc4`, and the
-  next root build recompiles it back. Pinning Verso to a revision for the library's toolchain would
-  end that.
+- **A path dependency builds in the dependency's own `.lake`**, so a sub-project rebuilds the
+  library there unless its build traces match the root's — and a separate packages directory, with
+  its own cvc5 checkout, is enough to make them differ. So **both documentation projects share the
+  root's packages directory**: the generated API project with `packagesDir = "../packages"` (from
+  `.lake/docbuild`), the manual with `packagesDir = "../.lake/packages"` in `CvcManual`'s
+  `lakefile.toml`. Measured: a manual or API build after a root build rebuilds none of the library,
+  and the next root build none either; before the manual shared it, each manual build rebuilt all
+  126 library modules and each root build rebuilt them back. Verso and its dependencies therefore
+  live in `.lake/packages`. **The cost is that the three projects must agree** on every package
+  they share — `cvc5` with the root, `Cli` and `MD4Lean` between doc-gen4 and Verso. They do at
+  `v4.35.0`; a toolchain bump that moves one project's revision but not another's has them check
+  out different revisions of one directory in turn.
 - **The manual links code into the published API reference**, `apiTargets` in
-  `Docs/Manual/Main.lean`, rooted at `apiRoot` (`https://adrienchampion.github.io/cvc.lean/api`). A
-  constant goes through doc-gen4's `find/?pattern=<name>#doc`, since rendering does not know its
-  module. The links are appended after Verso's own, so a constant whose docstring the manual shows
-  links there first and to the API from the hover menu. A definition made in a manual example gets
-  no API link.
+  `CvcManual/Main.lean`, rooted at `apiRoot` (`https://www.anzenlang.io/cvc.lean/api`, upstream's
+  site, so a fork's manual links to upstream's reference). A constant goes through doc-gen4's
+  `find/?pattern=<name>#doc`, since rendering does not know its module. The links are appended after
+  Verso's own, so a constant whose docstring the manual shows links there first and to the API from
+  the hover menu. A definition made in a manual example gets no API link.
 - **Docstrings need `import all`** — under the module system a docstring travels with a module's
   non-exported data, public declaration or not — and `import all` exposes `Term α`'s definition,
   which erases the typed layer's errors. So a manual page showing docstrings cannot also show sort
-  errors: those live in sub-pages with plain imports, `{include}`d (`CvcManual/Terms/*Examples`,
-  `CvcManual/Env/SafetyErrors`). Verso's external `anchor`/`anchorError` examples, compiled in a
+  errors: those live in sub-pages with plain imports, `{include}`d (`CvcManual.Terms.*Examples`,
+  `CvcManual.Env.SafetyErrors`). Verso's external `anchor`/`anchorError` examples, compiled in a
   separate project, would allow inline error examples instead; nothing uses them yet.
 
 ## The lean-cvc5 dependency

@@ -63,7 +63,7 @@ def tocStyle : CSS := r#"
 "#
 
 /-- Where the API reference built by doc-gen4 is published. -/
-def apiRoot : String := "https://adrienchampion.github.io/cvc.lean/api"
+def apiRoot : String := "https://www.anzenlang.io/cvc.lean/api"
 
 /-- Links into the API reference, for every constant and module the manual's code mentions.
 

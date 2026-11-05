@@ -26,12 +26,13 @@ lean_lib cvcTests {
 
 /-! ## Documentation
 
-The manual (`Docs/Manual`, written with Verso) and the API reference (`Docs/Api`, built by
-doc-gen4) are Lake projects of their own, each on its own toolchain. These scripts build and serve
-them from here: `lake run buildManual`, `lake run serveManual`, `lake run buildApiDocs` and
-`lake run serveApiDocs`. Serving builds first, then serves on `http://localhost:8000` until
-interrupted; a port given as argument replaces 8000 (`lake run serveApiDocs 8001`), so that both
-can be served at once.
+The manual (`CvcManual`, written with Verso) and the API reference (built by doc-gen4) are Lake
+projects of their own. The manual's is part of the repository; the API reference's is generated
+under `.lake`, being nothing but a doc-gen4 dependency matched to this project's toolchain. These
+scripts build and serve them from here: `lake run buildManual`, `lake run serveManual`,
+`lake run buildApiDocs` and `lake run serveApiDocs`. Serving builds first, then serves on
+`http://localhost:8000` until interrupted; a port given as argument replaces 8000
+(`lake run serveApiDocs 8001`), so that both can be served at once.
 -/
 
 /-- Variables the outer `lake` sets for its children. Left in place, they would make the `lake` of a
@@ -70,12 +71,60 @@ def portOf (args : List String) : IO Nat :=
   | _ => throw <| .userError "expected at most one argument, the port to serve on"
 
 /-- The manual's project. -/
-def manualDir : System.FilePath := __dir__ / "Docs" / "Manual"
+def manualDir : System.FilePath := __dir__ / "CvcManual"
 
-/-- The API reference's project. -/
-def apiDocsDir : System.FilePath := __dir__ / "Docs" / "Api"
+/-- Where the API reference's project is generated: under `.lake`, with the build artifacts. -/
+def apiDocsDir : System.FilePath := __dir__ / ".lake" / "docbuild"
 
-/-- Builds the manual into `Docs/Manual/_out/html-multi`. -/
+/-- The doc-gen4 revision for a toolchain: the release's tag, `main` for anything else.
+
+doc-gen4 tags one revision per Lean release and release candidate, named after it.
+-/
+def docGenRev (toolchain : String) : String :=
+  match toolchain.splitOn ":" with
+  | ["leanprover/lean4", version] => if version.startsWith "v4." then version else "main"
+  | _ => "main"
+
+/-- Generates the API reference's project, a doc-gen4 build of `Cvc` on this project's toolchain.
+
+It shares this project's packages directory, so cvc5 is not fetched twice and the library is not
+rebuilt, and pins doc-gen4 to the revision `docGenRev` reads off `lean-toolchain`, so a toolchain
+bump carries doc-gen4 along. On the first run, and whenever that revision changes, doc-gen4 is
+updated alone, which leaves the shared `cvc5` at the revision this project's manifest pins.
+-/
+def generateApiDocsProject : IO UInt32 := do
+  let toolchain := (← IO.FS.readFile (__dir__ / "lean-toolchain")).trimAscii.toString
+  let config := s!"name = \"docbuild\"
+reservoir = false
+packagesDir = \"../packages\"
+
+[[require]]
+name = \"cvc\"
+path = \"../..\"
+
+[[require]]
+scope = \"leanprover\"
+name = \"doc-gen4\"
+rev = \"{docGenRev toolchain}\"
+"
+  IO.FS.createDirAll apiDocsDir
+  IO.FS.writeFile (apiDocsDir / "lean-toolchain") s!"{toolchain}\n"
+  let configFile := apiDocsDir / "lakefile.toml"
+  -- nested, not `&&`: an action in a condition runs before the condition is evaluated, so reading a
+  -- file that does not exist yet has to sit behind its own check
+  if (← configFile.pathExists) && (← (apiDocsDir / "lake-manifest.json").pathExists) then
+    if (← IO.FS.readFile configFile) == config then
+      return 0
+  IO.FS.writeFile configFile config
+  lakeIn apiDocsDir #["update", "doc-gen4"]
+
+/-- Generates the API reference's project, then builds the reference. -/
+def buildApiDocsProject : IO UInt32 := do
+  let code ← generateApiDocsProject
+  if code != 0 then return code
+  lakeIn apiDocsDir #["build", "Cvc:docs"]
+
+/-- Builds the manual into `CvcManual/_out/html-multi`. -/
 script buildManual do
   lakeIn manualDir #["exe", "docs"]
 
@@ -86,13 +135,13 @@ script serveManual (args) do
   if code != 0 then return code
   serveDir (manualDir / "_out" / "html-multi") port
 
-/-- Builds the API reference into `Docs/Api/.lake/build/doc`. -/
+/-- Builds the API reference into `.lake/docbuild/.lake/build/doc`. -/
 script buildApiDocs do
-  lakeIn apiDocsDir #["build", "Cvc:docs"]
+  buildApiDocsProject
 
 /-- Builds the API reference, then serves it. -/
 script serveApiDocs (args) do
   let port ← portOf args
-  let code ← lakeIn apiDocsDir #["build", "Cvc:docs"]
+  let code ← buildApiDocsProject
   if code != 0 then return code
   serveDir (apiDocsDir / ".lake" / "build" / "doc") port

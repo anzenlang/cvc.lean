@@ -1,0 +1,22 @@
+name = "cvc-manual"
+defaultTargets = ["CvcManual", "docs"]
+# share the library's packages: with its own, the manual has its own cvc5 checkout, and the library's
+# build traces then differ, so each manual build would rebuild the library, and each root build
+# would rebuild it back
+packagesDir = "../.lake/packages"
+
+[[require]]
+scope = "leanprover"
+name = "verso"
+rev = "v4.35.0"
+
+[[require]]
+name = "cvc"
+path = ".."
+
+[[lean_lib]]
+name = "CvcManual"
+
+[[lean_exe]]
+name = "docs"
+root = "Main"
