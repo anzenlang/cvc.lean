@@ -153,7 +153,7 @@ where loop miner : List Terms → Env Miner
     loop miner tail
 
 def scanTypedTerm (t : Typed.Term α) (skipNewSorts : Bool := false) : Env Miner :=
-  miner.scanTerm t.relax (skipNewSorts := skipNewSorts)
+  miner.scanTerm t.erase (skipNewSorts := skipNewSorts)
 
 def extractGrammarFor (srt : Srt)
   (allowAnyConstant : Srt → Bool := 𝕂 false)

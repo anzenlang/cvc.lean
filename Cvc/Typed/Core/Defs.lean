@@ -37,8 +37,9 @@ namespace Cvc.Typed public section variable [Ω]
 constructor states its sorts through the index, so a sort mistake is a Lean type error rather than
 a cvc5 error at runtime, and a value read out of a model comes back as an `α`.
 
-The index is phantom: at runtime a `Term α` is exactly a `Cvc.Untyped.Term`. `relax` goes down for
-free, and `Cvc.Untyped.Term.typeCheck` goes up by checking the term's sort.
+The index is phantom: at runtime a `Term α` is exactly a `Cvc.Untyped.Term`. `toUntyped` (or
+`erase`) goes down for free, and `Cvc.Untyped.Term.toTyped` (or `typeCheck`) goes up by checking
+the term's sort.
 -/
 def3% Term α ← Cvc.Untyped.Term (ofUntypedUnsafe / toUntypedUnsafe)
 
@@ -47,10 +48,13 @@ abbrev Terms (α : Type) := Array (Term α)
 
 namespace Term
 
-/-- Relaxes it to the sort-erased term it is, for free. -/
-def relax (t : Term α) : Untyped.Term := t
+/-- The sort-erased term it is, for free: the index is forgotten, nothing is checked. -/
+def toUntyped (t : Term α) : Untyped.Term := t
 
-instance : CoeDep (Term α) t Untyped.Term := ⟨t.relax⟩
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
+
+instance : CoeDep (Term α) t Untyped.Term := ⟨t.erase⟩
 
 /-- Types an untyped term. -/
 def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
@@ -95,29 +99,39 @@ def substitute'
   (valid : src.size = tgt.size := by
     (try grind) <;> fail "failed to prove there are as many replacements as sub-terms")
 : Env (Term α) :=
-  t.relax.substitute' src tgt valid
+  t.erase.substitute' src tgt valid
 
 /-- Simultaneously replaces the first of each pair by the second throughout `t`.
 
 Every pair is at one index `β`. Use `heteroSubstitute` to replace terms of several sorts at once.
 -/
 def substitute (t : Term α) (terms : Array (Term β × Term β)) : Env (Term α) :=
-  t.relax.substitute terms
+  t.erase.substitute terms
 
 /-- `substitute` where the pairs need not share an index, only agree within each pair. -/
 def heteroSubstitute (t : Term α) (terms : Array ((β : Type) × Term β × Term β)) : Env (Term α) :=
-  let terms := terms.map fun ⟨_, src, tgt⟩ => (src.relax, tgt.relax)
-  t.relax.substitute terms
+  let terms := terms.map fun ⟨_, src, tgt⟩ => (src.erase, tgt.erase)
+  t.erase.substitute terms
 
 end Term
 
-@[inherit_doc Typed.Term.ofUntypedAs]
-def _root_.Cvc.Untyped.Term.typeCheckAs (α : Type) [ToTyp α] (t : Untyped.Term)
+/-- Types a sort-erased term at `α`, checking its sort against `α`'s.
+
+`toTyped` infers `α` from the expected type; `typeCheckAs` and `typeCheck` are the same two
+functions under the names that say what they do.
+-/
+def _root_.Cvc.Untyped.Term.toTypedAs (α : Type) [ToTyp α] (t : Untyped.Term)
 : Env (Term α) := Typed.Term.ofUntypedAs α t
 
-@[inherit_doc Untyped.Term.typeCheckAs]
-def _root_.Cvc.Untyped.Term.typeCheck [ToTyp α] (t : Untyped.Term)
-: Env (Term α) := t.typeCheckAs α
+@[inherit_doc Untyped.Term.toTypedAs]
+def _root_.Cvc.Untyped.Term.toTyped [ToTyp α] (t : Untyped.Term)
+: Env (Term α) := t.toTypedAs α
+
+@[inherit_doc Untyped.Term.toTypedAs]
+abbrev _root_.Cvc.Untyped.Term.typeCheckAs := @Untyped.Term.toTypedAs
+
+@[inherit_doc Untyped.Term.toTypedAs]
+abbrev _root_.Cvc.Untyped.Term.typeCheck := @Untyped.Term.toTyped
 
 namespace Terms
 

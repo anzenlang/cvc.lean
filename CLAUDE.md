@@ -302,17 +302,38 @@ Both term types are rooted at lean-cvc5 and at nothing else — `def3% Term ← 
 `import` keeps each opaque, which is what makes the layers distinct to a user. `Terms` is `Array
 Term` in both, with private `ofUnsafe`/`toUnsafe` at `id`.
 
-Going down is `Typed.Term.relax`, free. **Every typed-to-sort-erased conversion is named
-`relax`**: `Term`, `BVar`/`BVars`, `NT`/`NTs`, `Grammar`, `Solver.Heap`, `Solver` (the identity,
-the two layers sharing one solver type), and the datatype and record `Args`/`Fields` spines, which
-relax to `Untyped.Terms`. `FiniteField.erase` and `Float.erase` are not conversions between layers
-— they drop a value-level size index — and keep their name.
+**Every type with a counterpart in the other layer converts under one naming scheme.** `toUntyped`
+goes down and `toTyped` goes up, and two families of aliases say what the conversion does:
 
-Going up is a **runtime check** comparing the term's sort against `Srt.of α`, under two pairs of
-names: `Typed.Term.ofUntypedAs α t` / `ofUntyped t`, and the dot-notation spelling
-`Untyped.Term.typeCheckAs α t` / `typeCheck t`, which is what the rest of the library uses. The
-`…As` forms take the index **first**, so `t.typeCheckAs Int` reads naturally. A mismatch is a
-`throwUser`; there is no `Option`-answering variant.
+- **sort-indexed types** — `Term α`, `BVar α`, `NT α`, `Grammar σ`, `Solver.Heap s α β`,
+  datatype `Ctor α`/`Field α β`/`Case α β`, record `Fields`, and the spines (`BVars`, `NTs`,
+  datatype `Args`, tuple `Components`, `Tup.Components`, application `Args`) — answer to `erase`
+  going down; going
+  up, `toTypedAs` takes the index explicitly and `toTyped` infers it, aliased `typeCheckAs` and
+  `typeCheck`;
+- **unindexed types with both APIs** — `Solver`, `Solver.Proof`, the same type in both layers —
+  answer to `relax` going down, and have a plain `toTyped`.
+
+Going down is free. Going up is a **runtime sort check**, a `throwUser` on mismatch, never an
+`Option`. Where the sort-erased counterpart has no type of its own — the heterogeneous lists, the
+spines (a plain `Terms`), a datatype case (a plain `Term`) — only `toUntyped` exists. The `…As`
+forms take the index **first**, so `t.toTypedAs Int` reads naturally under dot notation; the
+up-conversions are declared in the typed modules as `_root_.Cvc.Untyped.….toTypedAs`, and the
+datatype ones on the layer-neutral reflection types (`Cvc.Datatype.Ctor.toTypedAs`,
+`Cvc.Datatype.Selector.toTypedAs`). An alias is an `abbrev` of the primary (`abbrev erase :=
+@toUntyped`), so a proof unfolding one must name the primary too (`simp_all [BVars.erase,
+BVars.toUntyped]`). `CvcTests/Conversions.lean` pins every signature. `Typed.Term.ofUntypedAs` /
+`ofUntyped` remain as the non-dot spelling of going up. `FiniteField.erase` and `Float.erase` are
+not conversions between layers — they drop a value-level size index — and keep their name.
+
+**Name collisions to keep clear of:** a typed structure wrapping a sort-erased value holds it in a
+private field named `untyped` (`Grammar`, `Solver.Heap`, `NT`), never `toUntyped`, which is the
+public conversion. And datatype `Args`, `BVars` and `NTs` are abbreviations of `List`, so
+`args.erase` resolves to `List.erase` wherever the namespaced `erase` is not in scope. The value
+classes convert both ways too: `TermToValue.toUntyped`/`ValueToTerm.toUntyped` and
+`Untyped.TermToValue.toTyped`/`Untyped.ValueToTerm.toTyped`, with bridging instances in both
+directions (the `ValueToTerm` ones at low priority, so a direct instance wins; the bridge up checks
+the term it builds).
 
 Each `Defs.lean` also declares the layer's `scoped syntax "smt!"`, expanding to `smtU!`/`smtT!`, so
 opening a layer gives the short spelling of the DSL.
@@ -967,7 +988,7 @@ appears inside its own rules) but *not* to a `BVar`, which is the mistake worth 
 `NT` is a **structure**, not a `def` alias. An alias needs `BVar`, and so `Term`, `@[expose]`d for
 its identity conversions to compile across a module boundary — and exposing `Term` would make the
 two layers the same type to every downstream module. A one-field structure costs nothing and stops
-the cascade. The typed `NT α` wraps `Untyped.NT` rather than `BVar α`, so relaxing is a projection
+the cascade. The typed `NT α` wraps `Untyped.NT` rather than `BVar α`, so erasing is a projection
 instead of a private-constructor call.
 
 **A grammar belongs to the scope, not to a solver.** cvc5 builds one through a solver
@@ -993,9 +1014,9 @@ with `BVars.signatureTo`, exactly as `Solver.defineFun` folds its own. With no p
 the start symbol's sort, which is the shape `getInterpolant`/`getAbduct` want — both take `Option
 (Grammar Bool)`. It is a `structure` wrapping the sort-erased grammar and nothing else — that one
 already carries the parameters and the start sort, and holding them is what lets `synthFun` take
-nothing but the grammar, so the two cannot disagree. `Grammar.relax` hands it over, free; the two
-views share one cvc5 grammar, so a rule added through either shows in both and the freeze applies
-to both.
+nothing but the grammar, so the two cannot disagree. `Grammar.toUntyped` (or `erase`) hands it over,
+free; the two views share one cvc5 grammar, so a rule added through either shows in both and the
+freeze applies to both.
 
 **Going up is a runtime check, as for terms.** The sort-erased `Grammar` also records `startSrt`,
 the start symbol's sort, because cvc5 offers no way to read a grammar's non-terminals back; with it,
@@ -1156,8 +1177,8 @@ Three things to know:
   one of the same name is picked up ahead of it wherever both are open.
 - **`Args` carries a `ToTyp` field** it does not otherwise need — `List ((β : Type) × ToTyp β ×
   Term β)`, shaped exactly like `BVars`. Without it the sigma's layout is unknown across a module
-  boundary and `Args.relax` fails to compile.
-- **`Args.relax` folds left**, where `BVars.relax` folds right: `Args.cons` reads in field order,
+  boundary and `Args.erase` fails to compile.
+- **`Args.erase` folds left**, where `BVars.erase` folds right: `Args.cons` reads in field order,
   `BVars.push` prepends. Getting this wrong silently reverses a constructor's arguments — the sort
   check caught it.
 
@@ -1715,7 +1736,7 @@ be pinned by a build.
 
 **`BVars` collects in reverse**:
 `BVars.push acc (BVars.push t [])` is the lambda `t → acc → _`, which is the order `signatureTo`
-folds and the order `relax` restores. Getting it backwards silently reverses the parameters.
+folds and the order `erase` restores. Getting it backwards silently reverses the parameters.
 
 `Cvc/{Untyped,Typed}/Theory/Fun.lean` hold application. `applyHo` (`HO_APPLY`, one argument at a
 time) is kept and is genuinely different — it does require a higher-order logic. Everything else is
@@ -2011,6 +2032,10 @@ elaboration error verbatim. There is no assertion harness.
 - `CvcTests/Srt.lean`, `CvcTests/Logic.lean` — the sort layer and the SMT-LIB logic builder.
 - `CvcTests/Scope.lean` — that `Ω` keeps scopes apart statically: a sort cannot leave its run,
   cannot escape into an enclosing run, and cannot meet a sort of another open scope.
+- `CvcTests/Conversions.lean` — the signature of every typed/sort-erased conversion and alias, so
+  a missing alias or an index turned implicit fails; plus the spines going down, solver and proof
+  round trips, and a type given sort-erased value conversions alone used typed. Each type's checked
+  conversions (a wrong sort refused) are tested beside that type.
 **The test tree mirrors the source tree**, `Core`/`Theory` split included, so a module's tests sit
 where the module does. Namespaces inside the test files were *not* renamed with it, nor when the
 tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still opens

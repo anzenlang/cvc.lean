@@ -78,7 +78,7 @@ declareConst  : p : Pair
   println! "Int × Pair    : {← (Srt.of (Int × Pair) : Env Srt)}"
 
   let p ← s.declareConstAs Pair "p"
-  println! "declareConst  : {p.relax} : {← p.relax.getSort}"
+  println! "declareConst  : {p.erase} : {← p.erase.getSort}"
 
 -- naming a datatype before declaring it is an error, not a fresh incompatible sort
 /-- info: undeclared : caught -/
@@ -116,10 +116,10 @@ model    : 7
   let fst ← mkC.field Int "fst"
 
   let p ← mkC.apply2 (← Term.mkInt 7) (← Term.mkTrue)
-  println! "value    : {p.relax}"
-  println! "fst      : {(← fst.get p).relax}"
-  println! "is mk    : {(← mkC.is p).relax}"
-  println! "updated  : {(← fst.update p (← Term.mkInt 9)).relax}"
+  println! "value    : {p.erase}"
+  println! "fst      : {(← fst.get p).erase}"
+  println! "is mk    : {(← mkC.is p).erase}"
+  println! "updated  : {(← fst.update p (← Term.mkInt 9)).erase}"
 
   -- the indices are exact, so the model read needs no `typeCheck`
   let x ← s.declareConstAs Pair "x"
@@ -215,7 +215,7 @@ head of l : 7
     ← consC.case2 h t h.toTerm,
     ← nilC.case0 (← Term.mkInt 0),
   ]
-  println! "match     : {m.relax}"
+  println! "match     : {m.erase}"
 
   -- `l` is a one-element list, so the match takes the `cons` branch
   let seven ← consC.apply2 (← Term.mkInt 7) (← nilC.apply)
@@ -304,7 +304,7 @@ head of l : 15
     match l with
     | cons h t => h * 2 + 1
     | nil => 0
-  println! "match     : {m.relax}"
+  println! "match     : {m.erase}"
 
   let consC ← Datatype.ctor Lst "cons"
   let seven ← consC.apply2 (← Term.mkInt 7) (← (← Datatype.ctor Lst "nil").apply)
@@ -327,7 +327,7 @@ ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
     match l with
     | cons h t => h
     | _ => 0
-  println! "catch-all : {anyCase.relax}"
+  println! "catch-all : {anyCase.erase}"
 
   -- `t` states its index because the only thing mentioning it is the match that wants it; the
   -- inner `h` states its own because its index reaches it only through the outer match's expected
@@ -340,13 +340,13 @@ ascribed  : (match l (((cons h t) (+ h 1)) (_ 0)))
       | cons (h : Int) t => h
       | _ => 0
     | _ => 0
-  println! "nested    : {nested.relax}"
+  println! "nested    : {nested.erase}"
 
   -- an ascription is a check against the declaration
   println! "ascribed  : {(← smt!
     match l with
     | cons (h : Int) t => h + 1
-    | _ => 0).relax}"
+    | _ => 0).erase}"
 
 /-! The index a match carries, and what it rejects. -/
 
@@ -388,8 +388,47 @@ wrong width: caught: constructor `cons` takes 2 field(s), bound 1
   println! "wrong sort : {← caught do pure s!"{(← smt!
     match l with
     | cons (h : Lst) t => 0
-    | _ => 0).relax}"}"
+    | _ => 0).erase}"}"
   println! "wrong width: {← caught do pure s!"{(← smt!
     match l with
     | cons h => h
-    | _ => 0).relax}"}"
+    | _ => 0).erase}"}"
+
+
+
+/-! ## Between the layers
+
+A typed constructor and field relax to the reflection values they were read from, and go back up
+from them with a check: a constructor must build the index, a selector must select from it at the
+field's index. A case relaxes to the case term the sort-erased `mkMatch` takes, with no way back,
+a sort-erased case being a plain term. -/
+
+/-- info:
+ctor        : mk
+ctor up     : (mk 7 true)
+field       : fst
+field up    : (fst (mk 7 true))
+case        : (match (mk 7 true) ((v 0)))
+wrong ctor  : cannot type constructor `mk` at `Lst`, it builds `Pair`
+wrong field : cannot type selector `fst` at `Bool`, it selects `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let _ ← declarePair s
+  let _ ← declareLst
+  let mkC ← Datatype.ctor Pair "mk"
+  println! "ctor        : {← mkC.erase.getName}"
+  let mkC' ← mkC.toUntyped.toTypedAs Pair
+  let p ← mkC'.apply2 (← Term.mkInt 7) (← Term.mkTrue)
+  println! "ctor up     : {p.erase}"
+  let fst ← mkC.field Int "fst"
+  println! "field       : {← fst.erase.getName}"
+  let fst' : Datatype.Field Pair Int ← fst.toUntyped.toTyped
+  println! "field up    : {(← fst'.get p).erase}"
+  let v ← BVar.mk (α := Pair) "v"
+  let c ← Datatype.caseAny v (← Term.mkInt 0)
+  println! "case        : {← Untyped.Term.mkMatch p.erase #[c.erase]}"
+  try discard <| mkC.erase.typeCheckAs Lst
+  catch e => println! "wrong ctor  : {e}"
+  try discard <| fst.erase.typeCheckAs Pair Bool
+  catch e => println! "wrong field : {e}"

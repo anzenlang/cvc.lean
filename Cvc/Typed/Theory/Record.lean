@@ -11,6 +11,8 @@ import all Cvc.Basic.Env
 import all Cvc.Srt
 import all Cvc.Untyped.Core.Defs
 import all Cvc.Typed.Core.Defs
+-- the sort-erased spine's constructor is private, and `Fields.toUntyped` builds one
+import all Cvc.Untyped.Theory.Record
 
 public import Cvc.Srt
 public import Cvc.Types.Record
@@ -70,12 +72,12 @@ records do.
 private def nil : Fields [] := ⟨#v[]⟩
 
 /-- A record's last field. -/
-def last (name : String) (value : Term gamma) : Fields [(name, gamma)] := ⟨#v[value.relax]⟩
+def last (name : String) (value : Term gamma) : Fields [(name, gamma)] := ⟨#v[value.erase]⟩
 
 /-- Adds a field in front of the ones collected so far. -/
 def cons (name : String) (value : Term gamma) (rest : Fields fields)
 : Fields ((name, gamma) :: fields) :=
-  ⟨⟨#[value.relax] ++ rest.values.toArray, by simp; omega⟩⟩
+  ⟨⟨#[value.erase] ++ rest.values.toArray, by simp; omega⟩⟩
 
 /-- A field's term, at the type the index gives it.
 
@@ -85,13 +87,19 @@ def get (name : String) [F : FieldOf fields name gamma] : Term gamma := fs.value
 
 /-- The same fields, with one field's term replaced. -/
 def set (name : String) [F : FieldOf fields name gamma] (value : Term gamma) : Fields fields :=
-  ⟨fs.values.set F.idx value.relax⟩
+  ⟨fs.values.set F.idx value.erase⟩
 
-/-- Relaxes them to sort-erased terms, in the order the fields are. -/
-def relax : Untyped.Terms := fs.values.toArray
+/-- The terms, sort-erased, in the order the fields are. -/
+def terms : Untyped.Terms := fs.values.toArray
 
 /-- The fields as name/term pairs, sort-erased, in the order the fields are. -/
-def pairs : Array (String × Untyped.Term) := (fields.map Prod.fst).toArray.zip fs.relax
+def pairs : Array (String × Untyped.Term) := (fields.map Prod.fst).toArray.zip fs.terms
+
+/-- The sort-erased spine, its field names read off the index; free. -/
+def toUntyped : Untyped.Fields (fields.map Prod.fst) := ⟨fs.values.cast (by simp)⟩
+
+@[inherit_doc toUntyped]
+abbrev erase : Untyped.Fields (fields.map Prod.fst) := fs.toUntyped
 
 instance : ToString (Fields fields) where
   toString fs :=
@@ -99,6 +107,39 @@ instance : ToString (Fields fields) where
     "{" ++ ", ".intercalate fields ++ "}"
 
 end Fields
+
+/-- Types a sort-erased spine at `fields`, checking each field's term against its type's sort.
+
+The names are the sort-erased spine's index, so that they agree with `fields` is a proof, which
+`rfl` finds whenever both are written out. `toTyped` infers `fields` from the expected type;
+`typeCheckAs` and `typeCheck` are the same two functions under the names that say what they do.
+-/
+def _root_.Cvc.Untyped.Fields.toTypedAs (fields : List (String × Type)) [Fs : ToTypFields fields]
+  (fs : Untyped.Fields names)
+  (_sameNames : names = fields.map Prod.fst := by
+    first | rfl | fail "failed to prove the field names are the ones the index gives")
+: Env (Fields fields) := do
+  let want ← Typ.toSrtFields Fs.typs
+  let terms := fs.terms
+  for h : idx in [0 : terms.size] do
+    let actual ← terms[idx].getSort
+    let some (name, w) := want[idx]?
+      | throwInternal "a record's terms and its field sorts disagree in number"
+    if actual != w then
+      throwUser s!"cannot type field `{name}` at `{w}`, its term has sort `{actual}`"
+  return ⟨fs.values.cast (by subst _sameNames; simp)⟩
+
+@[inherit_doc Untyped.Fields.toTypedAs]
+def _root_.Cvc.Untyped.Fields.toTyped [ToTypFields fields] (fs : Untyped.Fields names)
+  (_sameNames : names = fields.map Prod.fst := by
+    first | rfl | fail "failed to prove the field names are the ones the index gives")
+: Env (Fields fields) := fs.toTypedAs fields _sameNames
+
+@[inherit_doc Untyped.Fields.toTypedAs]
+abbrev _root_.Cvc.Untyped.Fields.typeCheckAs := @Untyped.Fields.toTypedAs
+
+@[inherit_doc Untyped.Fields.toTypedAs]
+abbrev _root_.Cvc.Untyped.Fields.typeCheck := @Untyped.Fields.toTyped
 
 
 
@@ -131,12 +172,12 @@ def checkFieldSrt [ToTyp gamma] (field : String) (expected : Srt) (term : Term g
 /-- Reads a field out of a record value. -/
 def recordGet (record : Term (Record fields)) (name : String) [FieldOf fields name gamma]
 : Env (Term gamma) :=
-  T.recordGet record.relax name
+  T.recordGet record.erase name
 
 /-- The record value with one field replaced. -/
 def recordSet (record : Term (Record fields)) (name : String) [FieldOf fields name gamma]
 (value : Term gamma) : Env (Term (Record fields)) :=
-  T.recordSet record.relax name value.relax
+  T.recordSet record.erase name value.erase
 
 /-- Reads a record value apart, into all of its fields.
 
@@ -149,7 +190,7 @@ where
   go : (remaining : List (String × Type)) → Env (Fields remaining)
     | [] => return .nil
     | (name, _) :: rest => do
-      return Fields.cons name (← T.recordGet record.relax name) (← go rest)
+      return Fields.cons name (← T.recordGet record.erase name) (← go rest)
 
 /-- A record's fields, if the term is a record literal: `fs.get "a"` then reads one, by a name
 checked at compile time.
@@ -158,7 +199,7 @@ checked at compile time.
 `ite` of a record sort is not one. Generic code meets records through the datatype view instead.
 -/
 def recordFields? (t : Term (Record fields)) : Env (Option (Fields fields)) := do
-  let raw := t.relax
+  let raw := t.erase
   unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
   -- the first kid is the constructor
   let args := raw.getKids.extract 1
@@ -212,11 +253,11 @@ instance : ValuesToTerm [] := ⟨fun _ => return []⟩
 instance [A : ValueToTerm gamma] [R : ValuesToTerm fields]
 : ValuesToTerm ((_name, gamma) :: fields) where
   toTerms | (value, values) => do
-    return (← A.valueToTerm value).relax :: (← R.toTerms values)
+    return (← A.valueToTerm value).erase :: (← R.toTerms values)
 
 instance [R : TermToValues fields] : TermToValue (Record fields) where
   termToValue record := do
-    let term := record.relax
+    let term := record.erase
     unless term.getKind? = some .APPLY_CONSTRUCTOR do
       throwUser s!"`{term}` is not a record value"
     -- an `APPLY_CONSTRUCTOR`'s first child is the constructor, the fields follow it

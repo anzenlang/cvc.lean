@@ -85,7 +85,7 @@ for `some x`.
 by their arity, the first kid being the constructor.
 -/
 def nullableCases? (t : Term (Option α)) : Env (Option (Option (Term α))) := do
-  let raw := t.relax
+  let raw := t.erase
   unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
   match raw.getKids.toList with
   | [_] => return some none

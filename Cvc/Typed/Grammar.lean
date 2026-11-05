@@ -90,35 +90,48 @@ def toTerm (nt : NT α) : Term α := nt.untyped.toTerm
 
 instance : Coe (NT α) (Term α) := ⟨toTerm⟩
 
-/-- Relaxes it to the sort-erased non-terminal it wraps. -/
-def relax (nt : NT α) : Untyped.NT := nt.untyped
+/-- The sort-erased non-terminal it wraps, for free. -/
+def toUntyped (nt : NT α) : Untyped.NT := nt.untyped
+
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
 
 end NT
 
 /-- Types a sort-erased non-terminal at `α`, checking its sort against `α`'s.
 
-The non-terminal counterpart of `Untyped.Term.typeCheckAs`, so that the non-terminals a sort-erased
-grammar was built with can be given rules through the typed `Grammar.addRule`.
+The non-terminal counterpart of `Untyped.Term.toTypedAs`, so that the non-terminals a sort-erased
+grammar was built with can be given rules through the typed `Grammar.addRule`. `toTyped` infers
+`α` from the expected type; `typeCheckAs` and `typeCheck` are the same two functions under the
+names that say what they do.
 -/
-def _root_.Cvc.Untyped.NT.typeCheckAs (α : Type) [ToTyp α] (nt : Untyped.NT) : Env (NT α) := do
+def _root_.Cvc.Untyped.NT.toTypedAs (α : Type) [ToTyp α] (nt : Untyped.NT) : Env (NT α) := do
   let srt ← nt.toTerm.getSort
   let srt' ← Srt.of α
   if srt != srt' then
     throwUser s!"cannot type non-terminal `{nt}` as `{srt'}`, it has sort `{srt}`"
   return ⟨nt⟩
 
-@[inherit_doc Untyped.NT.typeCheckAs]
-abbrev _root_.Cvc.Untyped.NT.typeCheck [ToTyp α] (nt : Untyped.NT) : Env (NT α) :=
-  nt.typeCheckAs α
+@[inherit_doc Untyped.NT.toTypedAs]
+def _root_.Cvc.Untyped.NT.toTyped [ToTyp α] (nt : Untyped.NT) : Env (NT α) := nt.toTypedAs α
+
+@[inherit_doc Untyped.NT.toTypedAs]
+abbrev _root_.Cvc.Untyped.NT.typeCheckAs := @Untyped.NT.toTypedAs
+
+@[inherit_doc Untyped.NT.toTypedAs]
+abbrev _root_.Cvc.Untyped.NT.typeCheck := @Untyped.NT.toTyped
 
 namespace NTs
 
 /-- Adds a non-terminal. -/
 abbrev push (nt : NT α) (nts : NTs) : NTs := ⟨α, nt⟩ :: nts
 
-/-- Relaxes them to sort-erased non-terminals, keeping the order. -/
-def relax (nts : NTs) : Untyped.NTs :=
-  nts.foldr (init := Array.mkEmpty nts.length) fun ⟨_, nt⟩ acc => acc.push nt.relax
+/-- The sort-erased non-terminals, in the same order. -/
+def toUntyped (nts : NTs) : Untyped.NTs :=
+  nts.foldr (init := Array.mkEmpty nts.length) fun ⟨_, nt⟩ acc => acc.push nt.erase
+
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
 
 end NTs
 
@@ -140,19 +153,21 @@ the rules may mention.
 -/
 def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
 : Env (Grammar (boundVars.signatureTo α)) := do
-  return ⟨← Untyped.Solver.mkGrammar s boundVars.relax start.relax others.relax⟩
+  return ⟨← Untyped.Solver.mkGrammar s boundVars.erase start.erase others.erase⟩
 
 end Solver
 
 /-- Types a sort-erased grammar at signature `σ`, checking it against what the grammar generates.
 
-The grammar counterpart of `Untyped.Term.typeCheckAs`. `σ` is compared with the grammar's
+The grammar counterpart of `Untyped.Term.toTypedAs`. `σ` is compared with the grammar's
 `Untyped.Grammar.signatureSrt`: its parameters' sorts arrowed onto its start symbol's, or the start
 symbol's sort alone when there are no parameters. Arrows flatten, so a one-parameter grammar whose
 start symbol is a function checks against the same `σ` as a grammar taking those arguments as
-parameters; that is harmless, the typed grammar keeping the parameters it was actually built with.
+parameters; that is harmless, cvc5 flattening a function sort the same way, so the function
+`synthFun` declares has sort `σ` either way. `toTyped` infers `σ` from the expected type;
+`typeCheckAs` and `typeCheck` are the same two functions under the names that say what they do.
 -/
-def _root_.Cvc.Untyped.Grammar.typeCheckAs (σ : Type) [ToTyp σ] (g : Untyped.Grammar)
+def _root_.Cvc.Untyped.Grammar.toTypedAs (σ : Type) [ToTyp σ] (g : Untyped.Grammar)
 : Env (Grammar σ) := do
   let srt ← g.signatureSrt
   let srt' ← Srt.of σ
@@ -160,9 +175,15 @@ def _root_.Cvc.Untyped.Grammar.typeCheckAs (σ : Type) [ToTyp σ] (g : Untyped.G
     throwUser s!"cannot type the following grammar as `{srt'}`, it generates `{srt}`:\n{g}"
   return ⟨g⟩
 
-@[inherit_doc Untyped.Grammar.typeCheckAs]
-abbrev _root_.Cvc.Untyped.Grammar.typeCheck [ToTyp σ] (g : Untyped.Grammar) : Env (Grammar σ) :=
-  g.typeCheckAs σ
+@[inherit_doc Untyped.Grammar.toTypedAs]
+def _root_.Cvc.Untyped.Grammar.toTyped [ToTyp σ] (g : Untyped.Grammar) : Env (Grammar σ) :=
+  g.toTypedAs σ
+
+@[inherit_doc Untyped.Grammar.toTypedAs]
+abbrev _root_.Cvc.Untyped.Grammar.typeCheckAs := @Untyped.Grammar.toTypedAs
+
+@[inherit_doc Untyped.Grammar.toTypedAs]
+abbrev _root_.Cvc.Untyped.Grammar.typeCheck := @Untyped.Grammar.toTyped
 
 namespace Grammar variable (g : Grammar σ)
 
@@ -173,19 +194,19 @@ non-terminal belongs to *this* grammar is a property of a value rather than a ty
 checked when the rule is added.
 -/
 def addRule (nt : NT α) (rule : Term α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addRule nt.relax rule.relax}
+  return {g with untyped := ← g.untyped.addRule nt.erase rule.erase}
 
 @[inherit_doc addRule]
 def addRules (nt : NT α) (rules : Terms α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addRules nt.relax (rules.map Term.relax)}
+  return {g with untyped := ← g.untyped.addRules nt.erase (rules.map Term.erase)}
 
 /-- Allows any constant of the non-terminal's sort. -/
 def addAnyConstant (nt : NT α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addAnyConstant nt.relax}
+  return {g with untyped := ← g.untyped.addAnyConstant nt.erase}
 
 /-- Allows any of the grammar's parameters that has the non-terminal's sort. -/
 def addAnyVariable (nt : NT α) : Env (Grammar σ) := do
-  return {g with toUntyped := ← g.toUntyped.addAnyVariable nt.relax}
+  return {g with untyped := ← g.untyped.addAnyVariable nt.erase}
 
 end Grammar
 

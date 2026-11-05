@@ -63,11 +63,17 @@ def last [ToTyp α] (component : Term α)
     (try simp [Typ.isFlat, Typ.of, ToTyp.typ, Srt.prod]) <;>
       fail "a tuple's last component cannot itself be a tuple: its components would flatten into \
         the tuple being built. Nest to the left instead.")
-: Components α := ⟨#[component.relax]⟩
+: Components α := ⟨#[component.erase]⟩
 
 /-- Adds a component in front of the ones collected so far. -/
 def cons [ToTyp α] (component : Term α) (rest : Components β) : Components (α × β) :=
-  ⟨#[component.relax] ++ rest.terms⟩
+  ⟨#[component.erase] ++ rest.terms⟩
+
+/-- The components' terms, sort-erased and flat, as the sort-erased `Term.mkTuple` takes them. -/
+def toUntyped (cs : Components α) : Untyped.Terms := cs.terms
+
+@[inherit_doc toUntyped]
+abbrev erase (cs : Components α) : Untyped.Terms := cs.toUntyped
 
 end Components
 
@@ -77,7 +83,7 @@ A tuple has at least two components, which is why the first is separate: `Compon
 describes a single index, and only `α × β` describes a tuple.
 -/
 def mkTuple [ToTyp α] (fst : Term α) (rest : Components β) : Env (Term (α × β)) :=
-  T.mkTuple (#[fst.relax] ++ rest.terms)
+  T.mkTuple (#[fst.erase] ++ rest.terms)
 
 /-- The tuple of the components at the given indices, in the order given.
 
@@ -125,7 +131,7 @@ Sound at any arity: whatever else a tuple holds, its first component is what the
 factor describes.
 -/
 def fst (t : Term (α × β)) : Env (Term α) := do
-  t.relax.tupleSelect 0
+  t.erase.tupleSelect 0
 
 /-- Everything but the first component, as Lean's `Prod.snd`.
 
@@ -138,7 +144,7 @@ The tail is rebuilt from its components rather than projected, so the term reads
 solver proves it.
 -/
 def snd [B : ToTyp β] (t : Term (α × β)) : Env (Term β) := do
-  let t := t.relax
+  let t := t.erase
   match B.typ with
   -- `β` is itself a product, so the tuple runs past two components and the tail is a tuple
   | .prod tys =>
@@ -161,7 +167,7 @@ def pairComponents? [ToTyp β] (t : Term (α × β))
     (try simp [Typ.isFlat, Typ.of, ToTyp.typ, Srt.prod]) <;>
       fail "the second component is a tuple, so this is not a pair")
 : Env (Option (Term α × Term β)) := do
-  let raw := t.relax
+  let raw := t.erase
   unless raw.getKind? == some .APPLY_CONSTRUCTOR do return none
   -- the first kid is the constructor
   match raw.getKids.toList with

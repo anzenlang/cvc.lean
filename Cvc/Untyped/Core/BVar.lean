@@ -22,7 +22,7 @@ namespace Cvc.Untyped public section variable [Ω]
 
 /-- A bound variable. -/
 def BVar := Term
-deriving BEq, Ord, Hashable, Inhabited
+deriving BEq, Ord, Hashable
 
 /-- An array of bound variables. -/
 abbrev BVars := Array BVar

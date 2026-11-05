@@ -65,6 +65,15 @@ section variable [Monad m] [MonadExcept Error m] (msg : String)
 def throwUser : m α := do
   throw <| Error.user msg
 
+/-- Unwraps an `Option`, throwing an `Error.user` on `none`.
+
+What the `!` form of an `Option`-answering query goes through, `none` standing for cvc5's
+null term.
+-/
+def someOrThrowUser : Option α → m α
+  | some a => return a
+  | none => throwUser msg
+
 /-- Throws an `Error.internal`. -/
 def throwInternal : m α := do
   throw <| Error.internal msg
@@ -86,7 +95,7 @@ end
 
 end Error
 
-export Error (throwUser throwInternal throwTodo throwUnreachable throwIO)
+export Error (throwUser someOrThrowUser throwInternal throwTodo throwUnreachable throwIO)
 
 
 

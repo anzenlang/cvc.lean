@@ -66,7 +66,7 @@ The grammar carries the parameters and the start sort, so its index *is* the sig
 function this declares.
 -/
 def synthFun (symbol : String) (g : Grammar σ) : Env (Term σ) :=
-  U.synthFun s symbol g.relax.boundVars g.relax.startSrt g.relax
+  U.synthFun s symbol g.erase.boundVars g.erase.startSrt g.erase
 
 /-- Declares a function to synthesize, unrestricted.
 
@@ -76,7 +76,7 @@ its own.
 -/
 def synthAnyFun' (symbol : String) (boundVars : BVars) (α : Type) [ToTyp α]
 : Env (Term (boundVars.signatureTo α)) := do
-  U.synthFun s symbol boundVars.relax (← Srt.of α)
+  U.synthFun s symbol boundVars.erase (← Srt.of α)
 
 @[inherit_doc synthAnyFun']
 abbrev synthAnyFun [ToTyp α] (symbol : String) (boundVars : BVars)
@@ -145,26 +145,37 @@ def getSynthSolution (fn : Term σ) : s.EnvSolved (Term σ) := U.getSynthSolutio
 @[inherit_doc getSynthSolution]
 def getSynthSolutions (fns : Terms σ) : s.EnvSolved (Terms σ) := U.getSynthSolutions s fns
 
-/-- Enumerates a term of interest, rather than solving a conjecture.
+/-- Enumerates a term of interest, rather than solving a conjecture, `none` if cvc5 finds none.
 
 The grammar says what may be enumerated, and its start sort is what comes back.
 -/
-def findSynth (target : Cvc.Synth.FindTarget) (g : Grammar σ) : Env (Term σ) :=
-  U.findSynth s target g.toUntyped
+def findSynth (target : Cvc.Synth.FindTarget) (g : Grammar σ) : Env (Option (Term σ)) :=
+  U.findSynth s target g.erase
 
-/-- Enumerates a term of interest with no grammar to restrict it.
+/-- `findSynth`, failing rather than answering `none`. -/
+def findSynth! (target : Cvc.Synth.FindTarget) (g : Grammar σ) : Env (Term σ) :=
+  U.findSynth! s target g.erase
+
+/-- Enumerates a term of interest with no grammar to restrict it, `none` if cvc5 finds none.
 
 Sort-erased: without a grammar nothing says what sort the answer has.
 `Untyped.Term.typeCheck` puts an index back on once you know.
 -/
-def findAnySynth (target : Cvc.Synth.FindTarget) : Env Untyped.Term := U.findSynth s target
+def findAnySynth (target : Cvc.Synth.FindTarget) : Env (Option Untyped.Term) :=
+  U.findSynth s target
 
-/-- Enumerates the next term of interest.
+/-- `findAnySynth`, failing rather than answering `none`. -/
+def findAnySynth! (target : Cvc.Synth.FindTarget) : Env Untyped.Term := U.findSynth! s target
+
+/-- Enumerates the next term of interest, `none` if cvc5 finds none.
 
 Sort-erased for the same reason as `findAnySynth`: which enumeration this continues is solver
 state, not something a signature sees.
 -/
-def findSynthNext : Env Untyped.Term := U.findSynthNext s
+def findSynthNext : Env (Option Untyped.Term) := U.findSynthNext s
+
+/-- `findSynthNext`, failing rather than answering `none`. -/
+def findSynthNext! : Env Untyped.Term := U.findSynthNext! s
 
 end Solver
 

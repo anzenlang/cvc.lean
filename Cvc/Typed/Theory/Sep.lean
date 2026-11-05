@@ -70,10 +70,41 @@ Produced by `declareSepHeap`, and the only way to `Heap.pto` or `Heap.nil`. Inde
 as the sort-erased handle is, and by the two types the sort-erased one carries as `Srt`s.
 -/
 structure Heap (solver : Solver) (α β : Type) where private mk ::
-  private toUntyped : U.Heap solver
+  private untyped : U.Heap solver
 
-/-- Relaxes it to the sort-erased heap it wraps, which carries `α` and `β` as `Srt`s. -/
-def Heap.relax {solver : Solver} (h : Heap solver α β) : U.Heap solver := h.toUntyped
+/-- The sort-erased heap it wraps, which carries `α` and `β` as `Srt`s; free. -/
+def Heap.toUntyped {solver : Solver} (h : Heap solver α β) : U.Heap solver := h.untyped
+
+@[inherit_doc Heap.toUntyped]
+abbrev Heap.erase {solver : Solver} (h : Heap solver α β) : U.Heap solver := h.toUntyped
+
+/-- Types a sort-erased heap at locations `α` and data `β`, checking its two sorts against theirs.
+
+`toTyped` infers `α` and `β` from the expected type; `typeCheckAs` and `typeCheck` are the same two
+functions under the names that say what they do.
+-/
+def _root_.Cvc.Untyped.Solver.Heap.toTypedAs (α β : Type) [ToTyp α] [ToTyp β] {solver : Solver}
+  (h : U.Heap solver)
+: Env (Heap solver α β) := do
+  let (loc, data) := h.sorts
+  let loc' ← Srt.of α
+  let data' ← Srt.of β
+  if loc != loc' then
+    throwUser s!"cannot type this heap's locations as `{loc'}`, they have sort `{loc}`"
+  if data != data' then
+    throwUser s!"cannot type this heap's data as `{data'}`, it has sort `{data}`"
+  return ⟨h⟩
+
+@[inherit_doc Untyped.Solver.Heap.toTypedAs]
+def _root_.Cvc.Untyped.Solver.Heap.toTyped [ToTyp α] [ToTyp β] {solver : Solver}
+  (h : U.Heap solver)
+: Env (Heap solver α β) := h.toTypedAs α β
+
+@[inherit_doc Untyped.Solver.Heap.toTypedAs]
+abbrev _root_.Cvc.Untyped.Solver.Heap.typeCheckAs := @Untyped.Solver.Heap.toTypedAs
+
+@[inherit_doc Untyped.Solver.Heap.toTypedAs]
+abbrev _root_.Cvc.Untyped.Solver.Heap.typeCheck := @Untyped.Solver.Heap.toTyped
 
 variable (s : Solver)
 
@@ -86,10 +117,10 @@ def declareSepHeap (α β : Type) [ToTyp α] [ToTyp β] : Env (Heap s α β) := 
 namespace Heap variable {s : Solver} (h : Heap s α β)
 
 /-- The location sort and the data sort, in that order. -/
-def sorts : Srt × Srt := h.toUntyped.sorts
+def sorts : Srt × Srt := h.untyped.sorts
 
 @[inherit_doc U.Heap.nil]
-def nil : Env (Term α) := h.toUntyped.nil
+def nil : Env (Term α) := h.untyped.nil
 
 /-- The points-to constraint: `loc` points to `data` in a heap holding nothing else.
 
@@ -97,7 +128,7 @@ The operands are the heap's own indices, so the mismatch the sort-erased version
 not expressible here.
 -/
 def pto (loc : Term α) (data : Term β) : Env (Term Bool) :=
-  h.toUntyped.pto loc.relax data.relax
+  h.untyped.pto loc.erase data.erase
 
 end Heap
 

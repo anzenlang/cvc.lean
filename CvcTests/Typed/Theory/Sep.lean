@@ -144,21 +144,35 @@ pinning `h.pto`'s signature are what would catch that.
   let h ← s.declareSepHeap Int Bool
   println! "sorts: {h.sorts}"
 
-/-! `relax` hands over the sort-erased handle, whose `pto` checks its operands at run time against
+/-! `erase` hands over the sort-erased handle, whose `pto` checks its operands at run time against
 the sorts the indices fixed. -/
 
 /-- info:
-relaxed sorts: (Int, Bool)
+erased sorts : (Int, Bool)
 pto          : (pto x v)
 wrong data   : this heap's data has sort `Bool`, but `x` has sort `Int`
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← solver
   let h ← s.declareSepHeap Int Bool
-  let uh := h.relax
-  println! "relaxed sorts: {uh.sorts}"
+  let uh := h.erase
+  println! "erased sorts : {uh.sorts}"
   let x ← s.declareConstAs Int "x"
   let v ← s.declareConstAs Bool "v"
-  println! "pto          : {← uh.pto x.relax v.relax}"
-  try discard <| uh.pto x.relax x.relax
+  println! "pto          : {← uh.pto x.erase v.erase}"
+  try discard <| uh.pto x.erase x.erase
   catch e => println! "wrong data   : {e}"
+
+/-! Going back up checks the handle's two sorts against the indices. -/
+
+/-- info:
+round trip : (Int, Bool)
+wrong data : cannot type this heap's data as `Int`, it has sort `Bool`
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← solver
+  let h ← s.declareSepHeap Int Bool
+  let h' ← h.erase.toTypedAs Int Bool
+  println! "round trip : {h'.sorts}"
+  try discard <| h.toUntyped.typeCheckAs Int Int
+  catch e => println! "wrong data : {e}"

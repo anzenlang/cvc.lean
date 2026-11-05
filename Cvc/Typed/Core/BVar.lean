@@ -50,8 +50,11 @@ def mkAs (α : Type) : [ToTyp α] → (name : String) → Env (BVar α) := mk
 /-- Turns itself into a term. -/
 def toTerm : (bv : BVar α) → Term α := id
 
-/-- Relaxes it to the sort-erased bound variable it is, for free. -/
-def relax : (bv : BVar α) → Untyped.BVar := id
+/-- The sort-erased bound variable it is, for free: the index is forgotten, nothing is checked. -/
+def toUntyped : (bv : BVar α) → Untyped.BVar := id
+
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
 
 @[inherit_doc Untyped.BVar.lambda]
 def lambda : (bv : BVar α) → (body : Term β) → Env (Term (α → β)) := Untyped.BVar.lambda
@@ -59,6 +62,29 @@ def lambda : (bv : BVar α) → (body : Term β) → Env (Term (α → β)) := U
 instance : Coe (BVar α) (Term α) := ⟨toTerm⟩
 
 end BVar
+
+/-- Types a sort-erased bound variable at `α`, checking its sort against `α`'s.
+
+What lets a variable made sort-erased bind in a typed lambda, definition, grammar or match case.
+`toTyped` infers `α` from the expected type; `typeCheckAs` and `typeCheck` are the same two
+functions under the names that say what they do.
+-/
+def _root_.Cvc.Untyped.BVar.toTypedAs (α : Type) [ToTyp α] (bv : Untyped.BVar) : Env (BVar α) := do
+  let srt ← bv.toTerm.getSort
+  let srt' ← Srt.of α
+  if srt != srt' then
+    throwUser s!"cannot type bound variable `{bv}` as `{srt'}`, it has sort `{srt}`"
+  return bv
+
+@[inherit_doc Untyped.BVar.toTypedAs]
+def _root_.Cvc.Untyped.BVar.toTyped [ToTyp α] (bv : Untyped.BVar) : Env (BVar α) :=
+  bv.toTypedAs α
+
+@[inherit_doc Untyped.BVar.toTypedAs]
+abbrev _root_.Cvc.Untyped.BVar.typeCheckAs := @Untyped.BVar.toTypedAs
+
+@[inherit_doc Untyped.BVar.toTypedAs]
+abbrev _root_.Cvc.Untyped.BVar.typeCheck := @Untyped.BVar.toTyped
 
 /-- A typed-list of `BVar`s. -/
 abbrev BVars := List ((α : Type) × ToTyp α × BVar α)
@@ -111,12 +137,15 @@ public meta def delabSignatureTo : Delab := do
   guard <| !e'.hasExprMVar
   withTheReader SubExpr (fun c => { c with expr := e' }) delab
 
-/-- Relaxes them to sort-erased bound variables, keeping the order. -/
-def relax (bvs : BVars) : Untyped.BVars :=
-  bvs.foldr (init := Array.mkEmpty bvs.length) fun ⟨_, _, bv⟩ acc => acc.push bv.relax
+/-- The sort-erased bound variables, in the same order. -/
+def toUntyped (bvs : BVars) : Untyped.BVars :=
+  bvs.foldr (init := Array.mkEmpty bvs.length) fun ⟨_, _, bv⟩ acc => acc.push bv.erase
+
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
 
 @[inherit_doc Untyped.BVars.lambda]
-def lambda (bv : BVars) : (body : Term β) → Env (Term (bv.signatureTo β)) := bv.relax.lambda
+def lambda (bv : BVars) : (body : Term β) → Env (Term (bv.signatureTo β)) := bv.erase.lambda
 
 end BVars
 
@@ -163,14 +192,14 @@ def LambdaBinder.nameAt (names : List String) (i : Nat) : String := names[i]?.ge
 instance [ToTyp α] : LambdaBinder (Term α → Env (Term β)) (α → β) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (LambdaBinder.nameAt names i)
-    return (#[bv.relax], (← f bv.toTerm).relax)
+    return (#[bv.erase], (← f bv.toTerm).erase)
 
 /-- The binder for a body taking a bound variable and more. -/
 instance [ToTyp α] [LambdaBinder ψ σ] : LambdaBinder (Term α → ψ) (α → σ) where
   bind names i f := do
     let bv ← BVar.mk (α := α) (LambdaBinder.nameAt names i)
     let (bvs, body) ← LambdaBinder.bind names (i + 1) (f bv.toTerm)
-    return (#[bv.relax] ++ bvs, body)
+    return (#[bv.erase] ++ bvs, body)
 
 /-- A lambda whose body is written as a Lean function of its variables.
 

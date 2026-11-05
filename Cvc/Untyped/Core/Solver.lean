@@ -377,7 +377,8 @@ def defineFunsRec (funs : Terms) (bvs : Array BVars) (bodies : Terms)
 
 cvc5 answers the null term when there is no interpolant or abduct to give, and when an enumeration
 is exhausted. The functions that can be answered that way return an `Option`, `none` standing for
-the null term, so that no null term ever reaches a caller.
+the null term, so that no null term ever reaches a caller. Each has a `!` form answering the term
+itself and failing with a user error where the `Option` one answers `none`.
 -/
 
 /-- `none` for the null term, the term itself otherwise. -/
@@ -394,6 +395,10 @@ calls compute the full elimination incrementally.
 def qeDisjunct (q : Term) : Env (Option Term) :=
   runUnsafe' do return nonNull? (← s.toUnsafe.getQuantifierEliminationDisjunct q)
 
+/-- `qeDisjunct`, failing rather than answering `none`. -/
+def qeDisjunct! (q : Term) : Env Term :=
+  s.qeDisjunct q >>= someOrThrowUser s!"cvc5 answered no quantifier-elimination disjunct for `{q}`"
+
 /-- An interpolant of the assertions and `conj`, `none` if cvc5 finds none.
 
 An interpolant is a formula `I` over the symbols the assertions `A` and `conj` share, such that
@@ -406,6 +411,11 @@ def getInterpolant (conj : Term) (grammar : Option Grammar := none) : Env (Optio
       | some g => s.toUnsafe.getInterpolantOfGrammar conj g.raw
     return nonNull? t
 
+/-- `getInterpolant`, failing rather than answering `none`. -/
+def getInterpolant! (conj : Term) (grammar : Option Grammar := none) : Env Term :=
+  s.getInterpolant conj grammar
+  >>= someOrThrowUser s!"cvc5 found no interpolant of the assertions and `{conj}`"
+
 /-- The next interpolant, `none` when there is no other.
 
 Only legal right after a successful `getInterpolant` or `getNextInterpolant`. Needs
@@ -413,6 +423,10 @@ Only legal right after a successful `getInterpolant` or `getNextInterpolant`. Ne
 -/
 def getNextInterpolant : Env (Option Term) :=
   runUnsafe' do return nonNull? (← s.toUnsafe.getInterpolantNext)
+
+/-- `getNextInterpolant`, failing rather than answering `none`. -/
+def getNextInterpolant! : Env Term :=
+  s.getNextInterpolant >>= someOrThrowUser "cvc5 found no further interpolant"
 
 /-- An abduct of the assertions and `conj`, `none` if cvc5 finds none.
 
@@ -429,6 +443,11 @@ def getAbduct (conj : Term) (grammar : Option Grammar := none) : Env (Option Ter
       | some g => s.toUnsafe.getAbductOfGrammar conj g.raw
     return nonNull? t
 
+/-- `getAbduct`, failing rather than answering `none`. -/
+def getAbduct! (conj : Term) (grammar : Option Grammar := none) : Env Term :=
+  s.getAbduct conj grammar
+  >>= someOrThrowUser s!"cvc5 found no abduct of the assertions and `{conj}`"
+
 /-- The next abduct, `none` when there is no other.
 
 Only legal right after a successful `getAbduct` or `getNextAbduct`. Needs `incremental`, which
@@ -436,6 +455,10 @@ is on by default.
 -/
 def getNextAbduct : Env (Option Term) :=
   runUnsafe' do return nonNull? (← s.toUnsafe.getAbductNext)
+
+/-- `getNextAbduct`, failing rather than answering `none`. -/
+def getNextAbduct! : Env Term :=
+  s.getNextAbduct >>= someOrThrowUser "cvc5 found no further abduct"
 
 
 

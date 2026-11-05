@@ -463,3 +463,24 @@ Hint: Type class instance resolution failures can be inspected with the `set_opt
 -/
 #guard_msgs in
 example [Ω] (r : Term (Record [("a", Int), ("b", Bool)])) : Env (Term Int) := smt! ![pure r] |>.zzz
+
+
+
+/-! ## Between the layers
+
+The typed spine relaxes to the sort-erased one, its names read off the index. Going back up checks
+each field's term against its type; that the names agree is a proof, found by `rfl`. -/
+
+/-- info:
+relaxed    : #[7, true]
+round trip : {a := 7, b := true}
+wrong sort : cannot type field `b` at `Bool`, its term has sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let fs ← fields
+  let ufs : Untyped.Fields ["a", "b"] := fs.erase
+  println! "relaxed    : {ufs.terms}"
+  println! "round trip : {← ufs.toTypedAs [("a", Int), ("b", Bool)]}"
+  let bad := Untyped.Fields.last "b" (← Term.mkInt 1).erase |>.cons "a" (← Term.mkInt 7).erase
+  try discard <| bad.typeCheckAs [("a", Int), ("b", Bool)]
+  catch e => println! "wrong sort : {e}"

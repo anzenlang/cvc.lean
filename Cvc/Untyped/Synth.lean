@@ -263,16 +263,31 @@ def getSynthSolution (fn : Term) : s.EnvSolved Term :=
 def getSynthSolutions (fns : Terms) : s.EnvSolved Terms :=
   runUnsafe' do s.toUnsafe.getSynthSolutions fns
 
-/-- Enumerates a term of interest, rather than solving a conjecture.
+/-- Enumerates a term of interest, rather than solving a conjecture, `none` if cvc5 finds none.
 
-A `grammar` restricts what may be enumerated.
+A `grammar` restricts what may be enumerated. cvc5 answers the null term when the search fails,
+which is `none` here, so that no null term reaches a caller.
 -/
-def findSynth (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none) : Env Term :=
-  runUnsafe' do s.toUnsafe.findSynth target.toUnsafe (grammar.map (·.raw))
+def findSynth (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none)
+: Env (Option Term) := runUnsafe' do
+  let t ← s.toUnsafe.findSynth target.toUnsafe (grammar.map (·.raw))
+  return if t.isNull then none else some t
 
-@[inherit_doc findSynth]
-def findSynthNext : Env Term :=
-  runUnsafe' do s.toUnsafe.findSynthNext
+/-- `findSynth`, failing rather than answering `none`. -/
+def findSynth! (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none) : Env Term :=
+  s.findSynth target grammar >>= someOrThrowUser "cvc5 found no term of interest"
+
+/-- Enumerates the next term of interest, `none` if cvc5 finds none.
+
+Continues the enumeration the last `findSynth` or `findSynthNext` started.
+-/
+def findSynthNext : Env (Option Term) := runUnsafe' do
+  let t ← s.toUnsafe.findSynthNext
+  return if t.isNull then none else some t
+
+/-- `findSynthNext`, failing rather than answering `none`. -/
+def findSynthNext! : Env Term :=
+  s.findSynthNext >>= someOrThrowUser "cvc5 found no further term of interest"
 
 end Solver
 

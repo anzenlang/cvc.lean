@@ -39,8 +39,26 @@ abbrev Solver [Ω] := Cvc.Untyped.Solver
 @[inherit_doc Untyped.Solver.Proof]
 abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
 
-/-- Relaxes it to the sort-erased solver it is, for free: the two layers share one solver type. -/
-abbrev Solver.relax [Ω] : Solver → Untyped.Solver := id
+/-- The sort-erased solver it is, for free: the two layers share one solver type. -/
+abbrev Solver.toUntyped [Ω] : Solver → Untyped.Solver := id
+
+@[inherit_doc Solver.toUntyped]
+abbrev Solver.relax [Ω] : Solver → Untyped.Solver := Solver.toUntyped
+
+/-- The typed solver it is, for free: the two layers share one solver type. -/
+abbrev _root_.Cvc.Untyped.Solver.toTyped [Ω] : Untyped.Solver → Solver := id
+
+/-- The sort-erased proof it is, for free: the two layers share one proof type. -/
+abbrev Solver.Proof.toUntyped [Ω] {s : Solver}
+: Solver.Proof s pc → Untyped.Solver.Proof s pc := id
+
+@[inherit_doc Solver.Proof.toUntyped]
+abbrev Solver.Proof.relax [Ω] {s : Solver} : Solver.Proof s pc → Untyped.Solver.Proof s pc :=
+  Solver.Proof.toUntyped
+
+/-- The typed proof it is, for free: the two layers share one proof type. -/
+abbrev _root_.Cvc.Untyped.Solver.Proof.toTyped [Ω] {s : Untyped.Solver}
+: Untyped.Solver.Proof s pc → Solver.Proof s pc := id
 
 /-- An array of `Solver.Proof`.
 
@@ -60,17 +78,20 @@ abduct queries below take one.
 -/
 structure Grammar [Ω] (σ : Type) where
   private mk ::
-  private toUntyped : Untyped.Grammar
+  private untyped : Untyped.Grammar
 
-/-- Relaxes it to the sort-erased grammar it wraps, parameters and start sort included.
+/-- The sort-erased grammar it wraps, parameters and start sort included.
 
 Free, and the two share one cvc5 grammar: a rule added through either shows in both, and once either
-has been used by a solver, neither accepts more rules. `Untyped.Grammar.typeCheckAs` goes back up.
+has been used by a solver, neither accepts more rules. `Untyped.Grammar.toTypedAs` goes back up.
 -/
-def Grammar.relax [Ω] (g : Grammar σ) : Untyped.Grammar := g.toUntyped
+def Grammar.toUntyped [Ω] (g : Grammar σ) : Untyped.Grammar := g.untyped
+
+@[inherit_doc Grammar.toUntyped]
+abbrev Grammar.erase [Ω] (g : Grammar σ) : Untyped.Grammar := g.toUntyped
 
 /-- String representation, as the SyGuS pre-declaration and rule set. -/
-protected def Grammar.toString [Ω] (g : Grammar σ) : String := toString g.toUntyped
+protected def Grammar.toString [Ω] (g : Grammar σ) : String := toString g.untyped
 
 instance [Ω] : ToString (Grammar σ) := ⟨Grammar.toString⟩
 
@@ -120,7 +141,7 @@ abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := false) : Env (Te
 def defineFun [ToTyp β]
   (symbol : String) (bvs : BVars) (body : Term β)
 : Env (Term (bvs.signatureTo β)) := do
-  Untyped.Solver.defineFun s symbol bvs.relax (← Srt.of β) body
+  Untyped.Solver.defineFun s symbol bvs.erase (← Srt.of β) body
 
 /-- Re-types a solver function, narrowing the terms it mentions.
 
@@ -152,16 +173,27 @@ def getLearnedLiterals (t : LearnedLitType := LearnedLitType.input) : Env (Terms
 
 def% qe : (s : Solver) → (q : Term Bool) → Env (Term Bool) ← qe
 def% qeDisjunct : (s : Solver) → (q : Term Bool) → Env (Option (Term Bool)) ← qeDisjunct
+def% qeDisjunct! : (s : Solver) → (q : Term Bool) → Env (Term Bool) ← qeDisjunct!
 @[inherit_doc U.getInterpolant]
 def getInterpolant (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
 : Env (Option (Term Bool)) :=
-  U.getInterpolant s conj (grammar.map Grammar.toUntyped)
+  U.getInterpolant s conj (grammar.map Grammar.erase)
+@[inherit_doc U.getInterpolant!]
+def getInterpolant! (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
+: Env (Term Bool) :=
+  U.getInterpolant! s conj (grammar.map Grammar.erase)
 def% getNextInterpolant : (s : Solver) → Env (Option (Term Bool)) ← getNextInterpolant
+def% getNextInterpolant! : (s : Solver) → Env (Term Bool) ← getNextInterpolant!
 @[inherit_doc U.getAbduct]
 def getAbduct (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
 : Env (Option (Term Bool)) :=
-  U.getAbduct s conj (grammar.map Grammar.toUntyped)
+  U.getAbduct s conj (grammar.map Grammar.erase)
+@[inherit_doc U.getAbduct!]
+def getAbduct! (conj : Term Bool) (grammar : Option (Grammar Bool) := none)
+: Env (Term Bool) :=
+  U.getAbduct! s conj (grammar.map Grammar.erase)
 def% getNextAbduct : (s : Solver) → Env (Option (Term Bool)) ← getNextAbduct
+def% getNextAbduct! : (s : Solver) → Env (Term Bool) ← getNextAbduct!
 
 
 

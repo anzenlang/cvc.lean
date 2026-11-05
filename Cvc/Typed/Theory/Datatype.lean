@@ -58,10 +58,13 @@ abbrev nil : Args := []
 /-- Adds an argument in front of the ones collected so far, so a spine reads in field order. -/
 abbrev cons [ToTyp β] (arg : Term β) (rest : Args) : Args := ⟨β, inferInstance, arg⟩ :: rest
 
-/-- Relaxes them to sort-erased terms, keeping field order. -/
-def relax (args : Args) : Untyped.Terms :=
+/-- The sort-erased terms, in field order. -/
+def toUntyped (args : Args) : Untyped.Terms :=
   -- `foldl`, not `foldr`: `cons` reads in field order here, unlike `BVars.push` which prepends
-  args.foldl (init := Array.mkEmpty args.length) fun acc ⟨_, _, arg⟩ => acc.push arg.relax
+  args.foldl (init := Array.mkEmpty args.length) fun acc ⟨_, _, arg⟩ => acc.push arg.erase
+
+@[inherit_doc toUntyped]
+abbrev erase := @toUntyped
 
 end Args
 
@@ -81,6 +84,7 @@ sort-erased reflection type it is built from.
 -/
 structure Field (α β : Type) where
   private mk ::
+  private sel : Cvc.Datatype.Selector
   private term : Untyped.Term
   private updater : Untyped.Term
 
@@ -98,6 +102,38 @@ def reflect (α : Type) [ToTyp α] : Env Cvc.Datatype := do
 def ctor (α : Type) [ToTyp α] (name : String) : Env (Ctor α) := do
   let c ← (← reflect α).getCtorNamed name
   return ⟨c, ← c.getTerm, ← c.getTesterTerm⟩
+
+/-- The sort-erased constructor it reflects, for free. -/
+def Ctor.toUntyped (c : Ctor α) : Cvc.Datatype.Ctor := c.ctor
+
+@[inherit_doc Ctor.toUntyped]
+abbrev Ctor.erase (c : Ctor α) : Cvc.Datatype.Ctor := c.toUntyped
+
+/-- Types a reflected constructor at the datatype `α`, checking that `α` is what it builds.
+
+The reflection counterpart of `Datatype.ctor`, which looks a constructor up by name. A constructor
+of a parametric datatype read off the uninstantiated declaration builds the parametric sort, not an
+instance of it, and is refused. `toTyped` infers `α` from the expected type; `typeCheckAs` and
+`typeCheck` are the same two functions under the names that say what they do.
+-/
+def _root_.Cvc.Datatype.Ctor.toTypedAs (α : Type) [ToTyp α] (c : Cvc.Datatype.Ctor)
+: Env (Ctor α) := do
+  let term ← c.getTerm
+  let built ← (← term.getSort).getDatatypeConstructorCodomainSort
+  let want ← Srt.of α
+  if built != want then
+    throwUser s!"cannot type constructor `{← c.getName}` at `{want}`, it builds `{built}`"
+  return ⟨c, term, ← c.getTesterTerm⟩
+
+@[inherit_doc Cvc.Datatype.Ctor.toTypedAs]
+def _root_.Cvc.Datatype.Ctor.toTyped [ToTyp α] (c : Cvc.Datatype.Ctor) : Env (Ctor α) :=
+  c.toTypedAs α
+
+@[inherit_doc Cvc.Datatype.Ctor.toTypedAs]
+abbrev _root_.Cvc.Datatype.Ctor.typeCheckAs := @Cvc.Datatype.Ctor.toTypedAs
+
+@[inherit_doc Cvc.Datatype.Ctor.toTypedAs]
+abbrev _root_.Cvc.Datatype.Ctor.typeCheck := @Cvc.Datatype.Ctor.toTyped
 
 end Datatype
 
@@ -128,7 +164,7 @@ field sorts are a property of its declaration and not of any index.
 -/
 def apply (args : Args := .nil) : Env (Term α) := do
   let expected ← c.fieldSorts
-  let terms := args.relax
+  let terms := args.erase
   if terms.size != expected.size then
     throwUser s!"constructor `{← c.getName}` takes {expected.size} argument(s), got {terms.size}"
   for h : idx in [0 : terms.size] do
@@ -151,7 +187,7 @@ def apply3 [ToTyp β₁] [ToTyp β₂] [ToTyp β₃] (fst : Term β₁) (snd : T
   c.apply (.cons fst (.cons snd (.cons thd .nil)))
 
 /-- Whether a value was built by this constructor. -/
-def is (t : Term α) : Env (Term Bool) := T.applyTester c.tester t.relax
+def is (t : Term α) : Env (Term Bool) := T.applyTester c.tester t.erase
 
 /-- The selector of the given name, at the field index `β`.
 
@@ -166,7 +202,7 @@ def field (β : Type) [ToTyp β] (name : String) : Env (Field α β) := do
   if actual != want then
     throwUser
       s!"selector `{name}` of constructor `{← c.getName}` has sort `{actual}`, not `{want}`"
-  return ⟨← sel.getTerm, ← sel.getUpdaterTerm⟩
+  return ⟨sel, ← sel.getTerm, ← sel.getUpdaterTerm⟩
 
 end Datatype.Ctor
 
@@ -193,6 +229,16 @@ builds the catch-all that discharges it.
 structure Case (α β : Type) where
   private mk ::
   private term : Untyped.Term
+
+/-- The sort-erased case term it wraps, for free, as the sort-erased `Term.mkMatch` takes one.
+
+There is no way back: a sort-erased case is an ordinary `Term`, with no type of its own to hang a
+conversion on.
+-/
+def Case.toUntyped (c : Case α β) : Untyped.Term := c.term
+
+@[inherit_doc Case.toUntyped]
+abbrev Case.erase (c : Case α β) : Untyped.Term := c.toUntyped
 
 end Datatype
 
@@ -233,8 +279,8 @@ def caseErased (vars : Untyped.BVars) (body : Term β) : Env (Case α β) := do
   -- a constructor with no field binds nothing, and cvc5 wants the unbound form there
   let term ←
     if vars.isEmpty
-    then T.matchCase pattern body.relax
-    else T.matchBindCase vars pattern body.relax
+    then T.matchCase pattern body.erase
+    else T.matchBindCase vars pattern body.erase
   return ⟨term⟩
 
 /-- The case taken when the scrutinee was built by this constructor.
@@ -242,7 +288,7 @@ def caseErased (vars : Untyped.BVars) (body : Term β) : Env (Case α β) := do
 `args` binds the constructor's fields, and `body` is free to mention them. Their sorts are checked
 against the constructor's, so a `Case` that exists is one whose pattern is well formed.
 -/
-def case (args : BVars := []) (body : Term β) : Env (Case α β) := c.caseErased args.relax body
+def case (args : BVars := []) (body : Term β) : Env (Case α β) := c.caseErased args.erase body
 
 /-- The case taken when the scrutinee was built by this constructor, which takes no field. -/
 def case0 (body : Term β) : Env (Case α β) := c.case [] body
@@ -275,8 +321,8 @@ namespace Datatype
 cases already cover every constructor.
 -/
 def caseAny [ToTyp α] (v : BVar α) (body : Term β) : Env (Case α β) := do
-  let vars := (BVars.push v []).relax
-  return ⟨← T.matchBindCase vars v.toTerm.relax body.relax⟩
+  let vars := (BVars.push v []).erase
+  return ⟨← T.matchBindCase vars v.toTerm.erase body.erase⟩
 
 end Datatype
 
@@ -302,7 +348,7 @@ def mkMatch
   (scrutinee : Term α) (cases : Array (Case α β))
   (_h : 0 < cases.size := by (try grind) <;> fail "failed to prove there is at least one case")
 : Env (Term β) :=
-  T.mkMatch scrutinee.relax (cases.map Datatype.Case.term) (by simpa using _h)
+  T.mkMatch scrutinee.erase (cases.map Datatype.Case.term) (by simpa using _h)
 
 end Term
 
@@ -310,18 +356,55 @@ end Term
 
 namespace Datatype.Field variable (sel : Field α β)
 
+/-- The sort-erased selector it was built from, for free. -/
+def toUntyped : Cvc.Datatype.Selector := sel.sel
+
+@[inherit_doc toUntyped]
+abbrev erase : Cvc.Datatype.Selector := sel.toUntyped
+
 /-- Reads the field out of a value.
 
 Undefined where the value was not built by the selector's own constructor, which is what
 `Ctor.is` is for.
 -/
-def get (t : Term α) : Env (Term β) := T.applySelector sel.term t.relax
+def get (t : Term α) : Env (Term β) := T.applySelector sel.term t.erase
 
 /-- The value with this field replaced. -/
 def update (t : Term α) (v : Term β) : Env (Term α) :=
-  T.applyUpdater sel.updater t.relax v.relax
+  T.applyUpdater sel.updater t.erase v.erase
 
 end Datatype.Field
+
+/-- Types a reflected selector at the datatype `α` and the field `β`, checking both sorts.
+
+The reflection counterpart of `Datatype.Ctor.field`, which looks a selector up by name. `toTyped`
+infers `α` and `β` from the expected type; `typeCheckAs` and `typeCheck` are the same two functions
+under the names that say what they do.
+-/
+def _root_.Cvc.Datatype.Selector.toTypedAs (α β : Type) [ToTyp α] [ToTyp β]
+  (sel : Cvc.Datatype.Selector)
+: Env (Field α β) := do
+  let term ← sel.getTerm
+  let srt ← term.getSort
+  let dom ← srt.getDatatypeSelectorDomainSort
+  let cod ← srt.getDatatypeSelectorCodomainSort
+  let dom' ← Srt.of α
+  let cod' ← Srt.of β
+  if dom != dom' then
+    throwUser s!"cannot type selector `{← sel.getName}` on `{dom'}`, it selects from `{dom}`"
+  if cod != cod' then
+    throwUser s!"cannot type selector `{← sel.getName}` at `{cod'}`, it selects `{cod}`"
+  return ⟨sel, term, ← sel.getUpdaterTerm⟩
+
+@[inherit_doc Cvc.Datatype.Selector.toTypedAs]
+def _root_.Cvc.Datatype.Selector.toTyped [ToTyp α] [ToTyp β] (sel : Cvc.Datatype.Selector)
+: Env (Field α β) := sel.toTypedAs α β
+
+@[inherit_doc Cvc.Datatype.Selector.toTypedAs]
+abbrev _root_.Cvc.Datatype.Selector.typeCheckAs := @Cvc.Datatype.Selector.toTypedAs
+
+@[inherit_doc Cvc.Datatype.Selector.toTypedAs]
+abbrev _root_.Cvc.Datatype.Selector.typeCheck := @Cvc.Datatype.Selector.toTyped
 
 
 
@@ -364,7 +447,7 @@ protected inductive View.Datatype : Typ → Type where
 /-- Takes a term of sort `τ` apart one level, if it is a datatype operation whose kids' sorts a
 `Typ` describes. -/
 def View.Datatype.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Datatype τ)) :=
-  match τ, Untyped.View.Datatype.of? t.relax with
+  match τ, Untyped.View.Datatype.of? t.erase with
   | _, some (.construct ctor args) => do
     let some ⟨doms, args⟩ ← go args.toList | return none
     return some (.construct ctor doms args)

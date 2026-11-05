@@ -66,8 +66,8 @@ def id_Cvc_Typed_View_typOfQ : Ident := mkIdent `Cvc.Typed.View.typOf?
 def id_Cvc_Typed_View_proofQ : Ident := mkIdent `Cvc.Typed.View.proof?
 /-- `Cvc.Untyped.Kids.first`. -/
 def id_Cvc_Untyped_Kids_first : Ident := mkIdent `Cvc.Untyped.Kids.first
-/-- `Cvc.Typed.Term.relax`. -/
-def id_Cvc_Typed_Term_relax : Ident := mkIdent `Cvc.Typed.Term.relax
+/-- `Cvc.Typed.Term.erase`. -/
+def id_Cvc_Typed_Term_relax : Ident := mkIdent `Cvc.Typed.Term.erase
 /-- `Cvc.Bag`. -/
 def id_Cvc_Bag : Ident := mkIdent `Cvc.Bag
 /-- `Cvc.Env`. -/

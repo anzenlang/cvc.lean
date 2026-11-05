@@ -49,7 +49,7 @@ instance [inst : TermToValue α] [ToTyp α] : Untyped.TermToValue α where
   termToValue t := t.typeCheckAs α >>= inst.termToValue
 
 instance [inst : Untyped.TermToValue α] : TermToValue α where
-  termToValue t := inst.termToValue t.relax
+  termToValue t := inst.termToValue t.erase
 
 end TermToValue
 
@@ -74,6 +74,28 @@ def TermToValue.toUntyped [A : TermToValue α] : Untyped.TermToValue α := ⟨A.
 
 @[inherit_doc TermToValue.toUntyped, reducible]
 def ValueToTerm.toUntyped [A : ValueToTerm α] : Untyped.ValueToTerm α := ⟨A.valueToTerm⟩
+
+/-- The typed conversion a sort-erased instance induces: the term is relaxed before it is read. -/
+@[reducible]
+def _root_.Cvc.Untyped.TermToValue.toTyped [A : Untyped.TermToValue α] : TermToValue α :=
+  ⟨fun t => A.termToValue t.erase⟩
+
+/-- The typed conversion a sort-erased instance induces: the term built is checked against `α`. -/
+@[reducible]
+def _root_.Cvc.Untyped.ValueToTerm.toTyped [ToTyp α] [A : Untyped.ValueToTerm α]
+: ValueToTerm α :=
+  ⟨fun v => A.valueToTerm v >>= (·.typeCheckAs α)⟩
+
+namespace ValueToTerm
+
+-- low priority both ways, so that an instance written for a layer wins over one bridged from the
+-- other: the bridge from sort-erased checks the term it builds, which a direct instance need not
+instance (priority := low) [ValueToTerm α] : Untyped.ValueToTerm α := ValueToTerm.toUntyped
+
+instance (priority := low) [ToTyp α] [Untyped.ValueToTerm α] : ValueToTerm α :=
+  Untyped.ValueToTerm.toTyped
+
+end ValueToTerm
 
 namespace Term
 

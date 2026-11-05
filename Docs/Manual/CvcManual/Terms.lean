@@ -108,19 +108,32 @@ namespace Conversions
 variable [Ω]
 ```
 
+Every type that exists in both layers converts the same way: `toTyped` goes from the sort-erased
+value to the typed one, and `toUntyped` the other way. Two families of aliases say what the
+conversion does:
+
+- a type indexed by a sort, such as {lean}`Typed.Term Bool` or a bound variable, also answers to
+  `erase` going down, and going up has `toTypedAs`, which takes the index explicitly, besides
+  `toTyped`, which infers it; their aliases are `typeCheckAs` and `typeCheck`;
+- a type with no index but with both a typed and a sort-erased API, such as a solver, answers to
+  `relax` going down.
+
 ## Untyped to typed
 
-The {lean}`Untyped.Term.typeCheckAs` type-checks at runtime an untyped term against (the sort associated to) a static type to produce a typed term.
+{lean}`Untyped.Term.toTypedAs` checks, at runtime, an untyped term against (the sort associated to)
+a static type to produce a typed term.
 
-{docstring Untyped.Term.typeCheckAs}
+{docstring Untyped.Term.toTypedAs}
 
-If the term's type can be inferred from context, `Untyped.Term.typeCheck` is more concise alternative.
+If the term's type can be inferred from context, `Untyped.Term.toTyped` is a more concise
+alternative.
 
-{docstring Untyped.Term.typeCheck}
+{docstring Untyped.Term.toTyped}
 
-For example:
+Under their aliases, {lean}`Untyped.Term.typeCheckAs` and `Untyped.Term.typeCheck`, the
+same two functions say what they do. For example:
 
-```lean (name := ex_Terms_typeCheckAs)
+```lean (name := ex_Terms_toTypedAs)
 open Untyped in
 #eval Env.runIO do
   let bool ← Srt.bool
@@ -129,7 +142,7 @@ open Untyped in
   let boolTerm ← smt! x ∨ false
   println! "boolTerm:  {boolTerm}"
 
-  let typedTerm ← boolTerm.typeCheckAs Bool
+  let typedTerm ← boolTerm.toTypedAs Bool
   println! "typedTerm: {typedTerm}"
 
   let boolToInt (t : Typed.Term Bool) :=
@@ -139,13 +152,13 @@ open Untyped in
 
   println! ""
   try
-    let illTypedTerm ← boolTerm.typeCheckAs Int
-    println! "unexpected: {illTypedTerm}"
+    let illTyped ← boolTerm.typeCheckAs Int
+    println! "unexpected: {illTyped}"
   catch e =>
     println! "{e}"
 ```
 
-```leanOutput ex_Terms_typeCheckAs
+```leanOutput ex_Terms_toTypedAs
 boolTerm:  (or x false)
 typedTerm: (or x false)
 iteTerm:   (ite (or x false) 1 0)
@@ -156,34 +169,56 @@ cannot type the following term as `Int`, term has sort `Bool`:
 
 ## Typed to untyped
 
-This direction is simpler in that it cannot fail: a typed term already *is* a sort-erased one, and
-`relax` merely forgets its index.
+This direction cannot fail: a typed term already *is* a sort-erased one, and
+{lean}`Typed.Term.toUntyped` merely forgets its index.
 
-{docstring Typed.Term.relax}
+{docstring Typed.Term.toUntyped}
 
 For example:
 
-```lean (name := ex_Terms_relax)
+```lean (name := ex_Terms_toUntyped)
 open Typed in
 #eval Env.runIO do
   let x ← Term.mkSymbol "x"
   let typedTerm ← smt! x ∨ false
   --  ^^^^^^^^^~~~~~ `Typed.Term Bool`
   println! "typedTerm:   {typedTerm}"
-  let relaxedTerm := typedTerm.relax
+  let untypedTerm := typedTerm.toUntyped
   --  ^^^^^^^^^^^~~~~ `Untyped.Term`
-  println! "relaxedTerm: {relaxedTerm}"
+  println! "untypedTerm: {untypedTerm}"
+  println! "erase:       {typedTerm.erase}"
 ```
 
-```leanOutput ex_Terms_relax
+```leanOutput ex_Terms_toUntyped
 typedTerm:   (or x false)
-relaxedTerm: (or x false)
+untypedTerm: (or x false)
+erase:       (or x false)
 ```
 
-Every typed value that wraps a sort-erased one relaxes the same way, under the same name: a bound
-variable (`Typed.BVar.relax`), a grammar and its non-terminals (`Typed.Grammar.relax`,
-`Typed.NT.relax`), a separation-logic heap (`Typed.Solver.Heap.relax`), and a solver
-(`Typed.Solver.relax`), which costs nothing at all since both layers share one solver type.
+## Every conversion
+
+Going down is always free. Going up checks sorts at runtime, except for solvers and proofs, which
+are the same type in both layers. Where the sort-erased counterpart has no type of its own, there
+is no way back up.
+
+| typed | sort-erased | down | up |
+|---|---|---|---|
+| `Term α` | `Term` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `BVar α` | `BVar` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `NT α` | `NT` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `Grammar σ` | `Grammar` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `Solver.Heap s α β` | `Solver.Heap s` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `Datatype.Ctor α` | `Datatype.Ctor` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `Datatype.Field α β` | `Datatype.Selector` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| record `Fields fields` | `Fields names` | `toUntyped`, `erase` | `toTyped(As)`, `typeCheck(As)` |
+| `Solver` | `Solver` | `toUntyped`, `relax` | `toTyped` |
+| `Solver.Proof s pc` | `Solver.Proof s pc` | `toUntyped`, `relax` | `toTyped` |
+| `BVars`, `NTs` | `BVars`, `NTs` | `toUntyped`, `erase` | none |
+| datatype `Args`, tuple and application spines | `Terms` | `toUntyped`, `erase` | none |
+| `Datatype.Case α β` | `Term` | `toUntyped`, `erase` | none |
+
+The value classes convert too: a typed `TermToValue` or `ValueToTerm` instance gives a sort-erased
+one and the other way round, so a Lean type given conversions in one layer is usable in both.
 
 ```lean -show
 end Conversions
