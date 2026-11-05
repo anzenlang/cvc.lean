@@ -438,3 +438,49 @@ all distinct : true
       pure "no error"
     catch _ => pure "caught"
   println! "without the option : {outcome}"
+
+/-! `getInterpolant!` answers the interpolant itself, and fails where `getInterpolant` answers
+`none`. -/
+
+/-- info:
+entailed     : (and (<= c (+ a 1)) (not (= a (- c 1))))
+not entailed : cvc5 found no interpolant of the assertions and `(< a c)`
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+  let int ← Srt.int
+  let a ← s.declareConst "a" int
+  let c ← s.declareConst "c" int
+  Term.gt a c >>= s.assert
+  println! "entailed     : {← s.getInterpolant! (← Term.ge a c)}"
+  try println! "not entailed : {← s.getInterpolant! (← Term.lt a c)}"
+  catch e => println! "not entailed : {e}"
+
+
+
+/-! ## Abducts
+
+An abduct of assertions `A` and a conjecture `C` is a formula `B` consistent with `A` such that
+`A ∧ B → C`. Asked for one that does not exist, cvc5 may search forever rather than answer, so no
+`none` case is pinned here; `getAbduct!` fails on `none` exactly as `getInterpolant!` does.
+-/
+
+/-- info:
+abduct      : (some (= y x))
+abduct!     : (= y x)
+A ∧ B → C   : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-abducts" "true"
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let y ← s.declareConst "y" int
+  let hyp ← Term.gt x (← Term.mkInt 0)
+  s.assert hyp
+  let conj ← Term.gt (← Term.add x y) (← Term.mkInt 0)
+  println! "abduct      : {← s.getAbduct conj}"
+  let b ← s.getAbduct! conj
+  println! "abduct!     : {b}"
+  println! "A ∧ B → C   : {← entails #[hyp, b] conj}"

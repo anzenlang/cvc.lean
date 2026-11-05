@@ -200,6 +200,32 @@ I → C       : true
   Term.gt a c >>= s.assert
   println! "not entailed : {← s.getInterpolant (← Term.lt a c)}"
 
+/-! The `!` forms answer a `Term Bool` and fail where the `Option` ones answer `none`. -/
+
+/-- info:
+interpolant! : (and (<= c (+ a 1)) (not (= a (- c 1))))
+not entailed : cvc5 found no interpolant of the assertions and `(< a c)`
+abduct!      : (= y x)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-interpolants" "true"
+  s.setOption "produce-abducts" "true"
+  let a ← s.declareConstAs Int "a"
+  let c ← s.declareConstAs Int "c"
+  Term.gt a c >>= s.assert
+  let i : Term Bool ← s.getInterpolant! (← Term.ge a c)
+  println! "interpolant! : {i}"
+  try println! "not entailed : {← s.getInterpolant! (← Term.lt a c)}"
+  catch e => println! "not entailed : {e}"
+  let s ← Solver.new
+  s.setOption "produce-abducts" "true"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  Term.gt x (← Term.mkInt 0) >>= s.assert
+  let b : Term Bool ← s.getAbduct! (← Term.gt (← Term.add x y) (← Term.mkInt 0))
+  println! "abduct!      : {b}"
+
 /-- info:
 first  : (<= 1 y)
 next   : (not (<= y 1))

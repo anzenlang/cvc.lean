@@ -196,3 +196,64 @@ but is expected to have type
   Env Term -/
 #guard_msgs in
 example [Ω] (s : Solver) (f : Term) : Env Term := s.getSynthSolution f
+
+
+
+/-! ## Enumerating terms
+
+`findSynth` enumerates terms of interest rather than solving a conjecture, and `findSynthNext`
+continues the enumeration. cvc5 answers the null term when one runs out, which is `none` here, and
+the `!` forms fail instead. A grammar with two terms is exhausted on the third call.
+-/
+
+/-- info:
+first : (some true)
+next  : (some false)
+next  : none
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let start ← NT.mk (← Srt.bool) "start"
+  let g ← s.mkGrammar #[] start
+  let g ← g.addRules start #[← Term.mkBool true, ← Term.mkBool false]
+  println! "first : {← s.findSynth .enum g}"
+  println! "next  : {← s.findSynthNext}"
+  println! "next  : {← s.findSynthNext}"
+
+/-- info:
+first! : true
+next!  : false
+next!  : cvc5 found no further term of interest
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let start ← NT.mk (← Srt.bool) "start"
+  let g ← s.mkGrammar #[] start
+  let g ← g.addRules start #[← Term.mkBool true, ← Term.mkBool false]
+  println! "first! : {← s.findSynth! .enum g}"
+  println! "next!  : {← s.findSynthNext!}"
+  try println! "next!  : {← s.findSynthNext!}"
+  catch e => println! "next!  : {e}"
+
+/-! Without a grammar, `findSynth` enumerates over the grammar of the last `synthFun` given one,
+and cvc5 refuses when there is none. -/
+
+/-- info:
+after synthFun : (some true)
+without one    : [internal] No grammar available in call to find-synth. Either provide one or ensure synth-fun has been called.
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let start ← NT.mk (← Srt.bool) "start"
+  let g ← s.mkGrammar #[] start
+  let g ← g.addRules start #[← Term.mkBool true, ← Term.mkBool false]
+  let _ ← s.synthFun "f" #[] (← Srt.bool) g
+  println! "after synthFun : {← s.findSynth .enum}"
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let _ ← s.synthFun "f" #[] (← Srt.bool)
+  try println! "without one    : {← s.findSynth .enum}"
+  catch e => println! "without one    : {e}"

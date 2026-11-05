@@ -774,7 +774,9 @@ throw a user error (optionally dumping all assertions via `dumpAssertions`).
 `getUnsatCore!`, `getTimeoutCore!`, `getValueSepHeap!` — defined as the modal one unwrapped through
 the private `toEnv`, so the two cannot drift. It gives up both guarantees (when, and which
 solver); cvc5 still refuses some wrong-state queries at run time. `Term.getValue!` takes the solver
-explicitly, there being no expected mode monad to infer it from. `unexpected*` have no twin.
+explicitly, there being no expected mode monad to infer it from. `unexpected*` have no twin. A
+second family of `!` forms, the `Option`-answering queries' failing twins (`getInterpolant!`,
+`findSynth!`), is described under "null means two unrelated things in cvc5".
 
 The lift from `EnvT` is private, but each mode monad also has a *public* `liftIO` / `MonadLift IO`,
 so a branch can print or otherwise do IO directly — `println!` inside `ifSat` works, and a branch
@@ -1953,22 +1955,33 @@ next to each other in the same namespaces and sometimes in near-identical names.
 `mkNullableIsNull` is the *second* sense despite reading like the first: it builds a term asking
 whether an `Option` value is `none`.
 
-**Where nulls can still come from.** Audited: nothing in `Term` or `Sort` is documented or observed
-to return one, and the `?` accessors cannot smuggle one — `extern_def!?` builds the `?` form *from*
-the `Except` form, so it is `none` on error, never `some null`. Two sources remain:
+**Where nulls can come from, and how each is closed.** Audited: nothing in `Term` or `Sort` is
+documented or observed to return one, and the `?` accessors cannot smuggle one — `extern_def!?`
+builds the `?` form *from* the `Except` form, so it is `none` on error, never `some null`.
 
-- the **find-synth** pair, `findSynth`/`findSynthNext`, which cvc5 documents as answering the null
-  term when enumeration is done, and still answers a bare `Term`. The interpolant and abduct
-  functions and `qeDisjunct` answer `Option Term` instead, `none` for the null term (`nonNull?` in
-  `Untyped/Core/Solver.lean`); `findSynth*` should follow. Plain `qe` stays a `Term`, cvc5
-  documenting no null answer for it.
+- **The documented null answers** are the interpolant, abduct and find-synth families, and every
+  wrapper of them answers an `Option`, `none` for the null term: `getInterpolant`,
+  `getNextInterpolant`, `getAbduct`, `getNextAbduct`, `findSynth`, `findSynthNext`, typed
+  `findAnySynth`. `qeDisjunct` does too, though cvc5 documents no null answer for it. Plain `qe`
+  stays a `Term`, cvc5 documenting no null answer for it either.
+- **Each such `Option`-answering function has a `!` twin** answering the term itself and failing
+  with a user error on `none` — `getInterpolant!`, `findSynth!`, `qeDisjunct!` — through
+  `someOrThrowUser` in `Basic/Error.lean`, so the two cannot disagree. This is a second meaning of
+  `!` beside the unchecked modal twins under "The solver"; both mark the form that can fail where
+  its counterpart could not.
+- **`Inhabited`.** Every *wrapped* type is clean — all ten reject `inferInstance`, because
+  `def0%`–`def3%` deliberately emit no `Inhabited` where cvc5 has null-backed ones for eight of its
+  types. That absence is load-bearing: it is why `terms[i]!` does not compile and why no
+  `Array.get!`/`getD` can conjure a null term. A `def` over a wrapped type must not derive
+  `Inhabited` either: under `import all` the derivation sees through to lean-cvc5's null-backed
+  instance. `Untyped.BVar` did, so `(default : BVar)` and an out-of-range `bvs[i]!` were the null
+  term; nothing used it, and it is gone.
+- **lean-cvc5's `!` panic variants** return the null `default` after panicking. The library calls
+  one, `Proof.getRewriteRule!`, which answers an enum, under a hypothesis that rules the panic out.
 - **TODO: `Op` leaks a null through `Inhabited`.** `Defs.lean` does `export cvc5 (Kind SortKind
   Op)`, so `Op` keeps cvc5's `instance : Inhabited Op := ⟨null ()⟩` and `(default : Op)` is null.
-  Every *wrapped* type is clean — all ten reject `inferInstance`, because `def0%`–`def3%`
-  deliberately emit no `Inhabited` where cvc5 has null-backed ones for eight of its types. That
-  absence is load-bearing: it is why `terms[i]!` does not compile and why no `Array.get!`/`getD`
-  can conjure a null term. Low severity for now, since an `Op` is only consumed by `mkTermOfOp`,
-  which the library never exposes. Fix by wrapping `Op` or not exporting it.
+  Low severity for now, since an `Op` is only consumed by `mkTermOfOp`, which the library never
+  exposes. Fix by wrapping `Op` or not exporting it.
 
 ## Tests
 
@@ -2020,7 +2033,10 @@ tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still o
   over quantified formulas, `qe`/`qeDisjunct` on them, and `smt! ∀`/`∃`; typed, the compile-time
   rejections (no variable, a non-formula body, a variable at the wrong sort).
 - `CvcTests/{Untyped,Typed}/Grammar.lean` — grammars and the three `smt.grammar!` forms.
-- `CvcTests/{Untyped,Typed}/Synth.lean` — synthesis, `checkSynth`'s branches and `findSynth`.
+- `CvcTests/{Untyped,Typed}/Synth.lean` — synthesis, `checkSynth`'s branches, and `findSynth`
+  over a two-term grammar: `some`, `some`, then `none` where cvc5 answers the null term, with the
+  `!` forms failing there instead. Without a grammar `findSynth` uses the last `synthFun`'s, and
+  cvc5 refuses when that `synthFun` was given none.
 - `CvcTests/{Untyped,Typed}/Theory/{Datatype,Sep,Record}.lean` — the theories that are
   not term constructors alone. The `Record` ones cover the sort's reflection, every rejection's
   message, the `Fields` spine, and (typed) the Lean-value conversions.

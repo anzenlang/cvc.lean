@@ -109,6 +109,7 @@ the whole answer.
 /-- info:
 qe         : (not (>= y 2))
 qeDisjunct : (some (not (>= y 2)))
+qeDisjunct! : (not (>= y 2))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
@@ -119,6 +120,7 @@ qeDisjunct : (some (not (>= y 2)))
     Term.and (← Term.lt y x) (← Term.lt x three)
   println! "qe         : {← s.qe q}"
   println! "qeDisjunct : {← s.qeDisjunct q}"
+  println! "qeDisjunct! : {← s.qeDisjunct! q}"
 
 
 

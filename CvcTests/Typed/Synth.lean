@@ -147,3 +147,44 @@ end signatures
   s.addSygusConstraint (← Term.ge mab b)
 
   s.checkSynth (ifUnsolvable := do println! "branch : unsolvable")
+
+
+
+/-! ## Enumerating terms
+
+`findSynth` answers at the grammar's index, `none` once the enumeration runs out, and the `!` forms
+fail instead. Without a grammar, `findAnySynth` and `findSynthNext` are sort-erased: nothing in
+their signature says which grammar they enumerate.
+-/
+
+/-- info:
+first : (some true)
+next  : (some false)
+next  : none
+next! : cvc5 found no further term of interest
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let start ← NT.mk (α := Bool) "start"
+  let g ← s.mkGrammar [] start
+  let g ← g.addRules start #[← Term.mkBool true, ← Term.mkBool false]
+  let first : Option (Term Bool) ← s.findSynth .enum g
+  println! "first : {first}"
+  println! "next  : {← s.findSynthNext}"
+  println! "next  : {← s.findSynthNext}"
+  let g ← s.mkGrammar [] start
+  let g ← g.addRules start #[← Term.mkBool true]
+  let _ : Term Bool ← s.findSynth! .enum g
+  try println! "next! : {← s.findSynthNext!}"
+  catch e => println! "next! : {e}"
+
+/-- info: any : true -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let start ← NT.mk (α := Bool) "start"
+  let g ← s.mkGrammar [] start
+  let g ← g.addRules start #[← Term.mkBool true]
+  let _ ← s.synthFun "f" g
+  println! "any : {← s.findAnySynth! .enum}"

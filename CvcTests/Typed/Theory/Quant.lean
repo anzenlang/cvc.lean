@@ -114,6 +114,7 @@ info:
 q          : (exists ((x0 Int)) (and (< y x0) (< x0 3)))
 qe         : (not (>= y 2))
 qeDisjunct : (some (not (>= y 2)))
+qeDisjunct! : (not (>= y 2))
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new
@@ -122,6 +123,7 @@ qeDisjunct : (some (not (>= y 2)))
   println! "q          : {q}"
   println! "qe         : {← s.qe q}"
   println! "qeDisjunct : {← s.qeDisjunct q}"
+  println! "qeDisjunct! : {← s.qeDisjunct! q}"
 
 
 
