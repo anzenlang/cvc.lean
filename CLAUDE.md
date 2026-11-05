@@ -28,26 +28,34 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   the precompiled cvc5 for the platform — verified on a clean clone. The README still says
   otherwise. lean-cvc5 has no post-update hook.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
-  PRs to `main` only, so a topic branch is **not** covered. Jobs:
-  - `build` first runs `.github/scripts/check_versions.py` — the manual on the root's toolchain,
-    Verso pinned to it, and every package the projects sharing `.lake/packages` have in common at
-    one revision — then `lake build`, saving `.lake` to the cache keyed by commit;
-  - `test` (`lake test`, restoring that cache) and `manual` (`lake run buildManual`, which fails
-    on any example whose output drifts) then run in parallel;
-  - on `main` only, `api-docs` (`lake run buildApiDocs`, then the version check again with the
-    generated project's manifest) runs beside them, and `deploy` waits for `test`, `manual` and
-    `api-docs`, takes the manual and the reference they built as artifacts, renders the README as
-    the site's `index.html` (`.github/scripts/render_readme.sh`, through GitHub's Markdown API) and
-    publishes `api/` and `manual/` with `actions/deploy-pages`. No branch: the repository's Pages
-    source must be "GitHub Actions", and each deployment replaces the whole site.
+  PRs to `main` only, so a topic branch is **not** covered. **One job does everything in sequence**,
+  on one machine, so the manual and the API reference build on the library `lake build` just built,
+  in one Lake directory with nothing to hand over: `.github/scripts/check_versions.py` (the manual
+  on the root's toolchain, Verso pinned to it, every package the projects sharing `.lake/packages`
+  have in common at one revision), Lean, `lake build`, `lake test`, `lake run buildManual` (which
+  fails on any example whose output drifts); then, on `main` only, `lake run buildApiDocs`, the
+  version check again with the generated project's manifest, and the site — `api/`, `manual/`, and
+  the README rendered as `index.html` (`.github/scripts/render_readme.sh`, through GitHub's Markdown
+  API) — uploaded for a second `deploy` job, which publishes it with `actions/deploy-pages`. No
+  branch: the repository's Pages source must be "GitHub Actions", and each deployment replaces the
+  whole site.
 
-  `manual` and `api-docs` keep caches of their own, Verso and doc-gen4 living in the shared
-  packages directory and so absent from `build`'s; they are saved only from `main` and restored
-  everywhere, since each is over a gigabyte and GitHub keeps 10 GB per repository. `api-docs`
-  excludes the generated project's build directory, so the reference is always regenerated
-  (doc-gen4 never drops the page of a removed module). A newer push cancels a superseded run, on
-  `main` too. There is no `lake update` step: CI follows the committed manifest. The manual's
-  `apiRoot` points at upstream's site whatever repository builds it.
+  Separate jobs were tried and dropped: each job is a fresh machine, and a GitHub cache entry is an
+  immutable snapshot that cannot be added to or merged, so parallel jobs sharing `.lake/packages`
+  need one cache per part (library, Verso, doc-gen4, Lean) — a lot of machinery to save the minute
+  the tests take. Running two builds concurrently inside one job would not help either: the runner
+  has four cores, each build uses all of them, and both write to `.lake/packages`.
+
+  Caches: `~/.elan`, keyed on the exact toolchain **with no fallback**, so a Lean bump starts empty
+  and saves an entry holding only the new toolchain (a fallback would restore the old one and
+  accumulate toolchains); and the Lake directories, saved only from `main` (the entry holds the
+  library, Verso and doc-gen4) and restored everywhere, minus the API reference's build directory,
+  since doc-gen4 never drops the page of a removed module. Lean is installed by
+  `.github/scripts/install_lean.sh` rather than `leanprover/lean-action`, which caches no
+  toolchain: it skips what the cache restored and retries the toolchain download, Lean's release
+  server answering the occasional 504 (it failed the first run). A newer push cancels a superseded
+  run, on `main` too. There is no `lake update` step: CI follows the committed manifest. The
+  manual's `apiRoot` points at upstream's site whatever repository builds it.
 - [.github/workflows/lean-release.yml](.github/workflows/lean-release.yml) checks daily for a stable
   Lean release newer than `lean-toolchain` and opens one "Bump to Lean vX" issue per release,
   saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually

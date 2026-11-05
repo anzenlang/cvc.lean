@@ -1,19 +1,24 @@
 name: CI
 
 # Builds and tests the library and builds the manual, on pull requests to `main` and pushes to it.
-# On `main` it also builds the API reference and publishes both on GitHub Pages — after the tests
-# and the manual pass, and reusing the manual built here.
+# On `main` it also builds the API reference and publishes both on GitHub Pages, once everything
+# else has passed.
+#
+# One job does it all, in sequence, on one machine: the manual and the API reference build on the
+# library `lake build` just built, sharing its `.lake/packages`, so a single Lake directory grows
+# step by step with nothing to hand over between jobs.
 #
 # There is no `lake update`: the build follows the committed `lake-manifest.json`, and lean-cvc5
 # fetches its precompiled cvc5 as a build target.
 #
-# Caches. `build` saves the Lake directory per commit and `test` restores it, so that the tests do
-# not rebuild the library. `manual` and `api-docs` keep caches of their own, because the manual and
-# the API reference share the root's packages directory and so need Verso or doc-gen4 in it, which
-# `build`'s does not have. Those two are saved only from `main` — they are large, and GitHub keeps
-# 10 GB per repository — and restored everywhere: a pull request falls back on `main`'s newest. A
-# key that misses always falls back on the newest cache for the same toolchain and manifests, so a
-# first run on a commit rebuilds only what changed.
+# Caches:
+# - `~/.elan`, keyed on the exact toolchain and nothing else, so that a Lean bump starts from an
+#   empty directory and saves an entry holding only the new toolchain; the old entry is never
+#   restored again and GitHub drops it after a week unused;
+# - the Lake directories, saved only from `main` — the entry holds the library, Verso and doc-gen4,
+#   and GitHub keeps 10 GB per repository — and restored everywhere: a pull request starts from
+#   `main`'s newest and rebuilds only what changed. The API reference's build directory is left
+#   out, since doc-gen4 never drops the page of a module that no longer exists.
 
 on:
   push:
@@ -33,167 +38,99 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      # whether this run publishes: a push to `main`, or a manual run on it
+      PUBLISH: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Check that the projects agree on versions
         run: python3 .github/scripts/check_versions.py lake-manifest.json CvcManual/lake-manifest.json
-      - name: Cache the Lake directory
-        uses: actions/cache@v6
-        with:
-          path: .lake
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
-          restore-keys: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-      - name: Setup Lean
-        uses: leanprover/lean-action@v1
-        with:
-          auto-config: false
-          use-github-cache: false
-      - name: Build
-        run: lake build
 
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Restore the Lake directory
+      - name: Restore Lean
+        id: restore-lean
         uses: actions/cache/restore@v6
         with:
-          path: .lake
-          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
-          restore-keys: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-      - name: Setup Lean
-        uses: leanprover/lean-action@v1
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'CvcManual/lean-toolchain') }}
+      - name: Install Lean
+        run: .github/scripts/install_lean.sh
+      - name: Save Lean
+        if: steps.restore-lean.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
         with:
-          auto-config: false
-          use-github-cache: false
-      - name: Test
-        run: lake test
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'CvcManual/lean-toolchain') }}
 
-  # the manual compiles its examples and checks their output, so a change breaking one fails here
-  manual:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
       - name: Restore the Lake directories
         uses: actions/cache/restore@v6
         with:
           path: |
             .lake
+            !.lake/docbuild/.lake/build
             CvcManual/.lake
-          key: manual-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-${{ github.sha }}
-          restore-keys: manual-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-
-      - name: Setup Lean
-        uses: leanprover/lean-action@v1
-        with:
-          auto-config: false
-          use-github-cache: false
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-
+
+      - name: Build
+        run: lake build
+      - name: Test
+        run: lake test
+      # the manual compiles its examples and checks their output, so breaking one fails here
       - name: Build the manual
         run: lake run buildManual
-      - name: Save the Lake directories
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            .lake
-            CvcManual/.lake
-          key: manual-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-${{ github.sha }}
-      - name: Hand the manual over to the deployment
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: manual
-          path: CvcManual/_out/html-multi
-          retention-days: 1
 
-  api-docs:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      # The project is generated under `.lake`, so that one path covers it — except its build
-      # directory: doc-gen4 never drops the pages of a module that no longer exists, so the reference
-      # is regenerated from scratch rather than published with stale pages in it.
-      - name: Restore the Lake directory
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            .lake
-            !.lake/docbuild/.lake/build
-          key: docs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
-          restore-keys: docs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
-      - name: Setup Lean
-        uses: leanprover/lean-action@v1
-        with:
-          auto-config: false
-          use-github-cache: false
       - name: Build the API reference
+        if: env.PUBLISH == 'true'
         run: lake run buildApiDocs
       # the generated project's manifest only exists now
-      - name: Check that the projects agree on versions
+      - name: Check that the API reference agrees on versions
+        if: env.PUBLISH == 'true'
         run: >-
           python3 .github/scripts/check_versions.py
           lake-manifest.json CvcManual/lake-manifest.json .lake/docbuild/lake-manifest.json
-      - name: Save the Lake directory
+      - name: Save the Lake directories
+        if: env.PUBLISH == 'true'
         uses: actions/cache/save@v6
         with:
           path: |
             .lake
             !.lake/docbuild/.lake/build
-          key: docs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
-      - name: Hand the reference over to the deployment
-        uses: actions/upload-artifact@v7
-        with:
-          name: api-docs
-          path: .lake/docbuild/.lake/build/doc
-          retention-days: 1
+            CvcManual/.lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'CvcManual/lean-toolchain', 'CvcManual/lake-manifest.json') }}-${{ github.sha }}
 
-  # Publishes `api/` and `manual/`, with the README as the site's front page. There is no branch:
-  # the site is uploaded as an artifact and deployed by GitHub Pages, whose source must be set to
-  # "GitHub Actions", and each deployment replaces the whole site.
+      # the site: `api/`, `manual/`, and the README as the front page
+      - name: Assemble the site
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir _site
+          cp -r .lake/docbuild/.lake/build/doc _site/api
+          cp -r CvcManual/_out/html-multi _site/manual
+          .github/scripts/render_readme.sh README.md _site/index.html
+      - name: Upload the site
+        if: env.PUBLISH == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  # There is no branch: the site is deployed by GitHub Pages from the artifact `build` uploaded,
+  # the repository's Pages source being "GitHub Actions", and each deployment replaces the whole
+  # site.
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [test, manual, api-docs]
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Fetch the manual
-        uses: actions/download-artifact@v8
-        with:
-          name: manual
-          path: _site/manual
-      - name: Fetch the API reference
-        uses: actions/download-artifact@v8
-        with:
-          name: api-docs
-          path: _site/api
-      - name: Render the README as the front page
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: .github/scripts/render_readme.sh README.md _site/index.html
-      - name: Upload the site
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: _site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
