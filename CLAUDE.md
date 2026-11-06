@@ -65,6 +65,12 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   server answering the occasional 504 (it failed the first run). A newer push cancels a superseded
   run, on `main` too. There is no `lake update` step: CI follows the committed manifest. The
   manual's `apiRoot` points at upstream's site whatever repository builds it.
+- **Windows is not covered.** A trial workflow, in lean-cvc5's own Windows environment (MSYS2's
+  CLANG64), built the library and passed every test but `CvcTests.Srt`, whose abstract sorts a
+  lean-cvc5 bug breaks there (entry 11 of [Cvc5Issues.md](.notes/Cvc5Issues.md)). It was dropped
+  rather than merged failing; the workflow and what it found are entry 1 of
+  [CvcLeanIssues.md](.notes/CvcLeanIssues.md), a draft issue. The glibc shim is linked on Linux
+  only, so a Windows build compiles no C of its own.
 - [.github/workflows/lean-release.yml](.github/workflows/lean-release.yml) checks daily for a stable
   Lean release newer than `lean-toolchain` and opens one "Bump to Lean vX" issue per release,
   saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually
@@ -2106,11 +2112,11 @@ load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` 
 - **Never reference a markdown file from Lean source.** Not from a docstring, not from a `/-! … -/`
   module doc, not from an ordinary comment — and never as a markdown link, which does not even
   render in generated documentation. `CLAUDE.md` and the notes under `.notes/` (`MISSING.md`,
-  `TODO.md`, `Cvc5Issues.md`, `LeanIssues.md`) are notes *about* the project; the source is the
-  project, it is what users read, and it must stand on its own. Say the fact instead of pointing at
-  where it is written down: "cvc5 answers a segfault here, which is a cvc5 bug" rather than "see
-  `Cvc5Issues.md`". Cross-referencing another *Lean* declaration or module is fine, spelled as a
-  name (`Cvc.Untyped.Theory.Sep`), not as a link.
+  `TODO.md`, `Cvc5Issues.md`, `LeanIssues.md`, `CvcLeanIssues.md`) are notes *about* the project;
+  the source is the project, it is what users read, and it must stand on its own. Say the fact
+  instead of pointing at where it is written down: "cvc5 answers a segfault here, which is a cvc5
+  bug" rather than "see `Cvc5Issues.md`". Cross-referencing another *Lean* declaration or module is
+  fine, spelled as a name (`Cvc.Untyped.Theory.Sep`), not as a link.
 
 ## Conventions
 
@@ -2285,6 +2291,10 @@ wrapper has to work around belongs there, with the workaround pointing back at i
 a standalone Lake reproduction, and the action to take upstream. Its first entry is the "not
 unfolded because their definition is not exposed" note every typed sort error carries — pending a
 post on the Lean Zulip. Rewriting the phantom types as structures to avoid it is ruled out.
+
+[CvcLeanIssues.md](.notes/CvcLeanIssues.md) is about this library again, from the outside: drafts
+of issues to open on cvc.lean's own repository, each written to be pasted as is. Windows CI is the
+first.
 
 Term construction and the solver are done — every theory is covered, and the solver is at parity
 with lean-cvc5. What follows is everything that is *not* term construction or solver driving:
