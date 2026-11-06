@@ -168,8 +168,11 @@ def uninterpreted (symbol : String) : Env Srt := do
 def finiteFieldOfString (size : String) (base : UInt32 := 10) : Env Srt :=
   lift% mkFiniteFieldSortOfString size base
 
-/-- An uninterpreted sort constructor, which an `arity` of parameters instantiate into a sort. -/
-def uninterpretedConstructor (arity : Nat) (symbol : String := "") : Env Srt := do
+/-- An uninterpreted sort constructor, which `arity` parameters instantiate into a sort.
+
+The name must not be taken by another sort declared in this scope.
+-/
+def uninterpretedConstructor (arity : Nat) (symbol : String) : Env Srt := do
   Srt.checkFreshSortSymbol symbol
   let u ← (lift% mkUninterpretedSortConstructorSort arity symbol)
   registerSort symbol u

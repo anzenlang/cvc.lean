@@ -298,10 +298,10 @@ namespace Symbols.Sig
 namespace Idents variable [Symbols S] [Ω]
 
 /-- Declares some identifiers as sygus-variables in `solver`. -/
-def declareSygusIn (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
-  S.mapM idents fun {α} _ _ symbol => return ⟨← solver.declareSygusVar symbol (← Srt.of α)⟩
+def declareSygusIn (solver : Solver) (idents : S.Idents) : Env S.Terms :=
+  S.mapM idents fun {α} _ _ symbol => do solver.declareSygusVar symbol (← Srt.of α)
 
-/-- Declares some identifiers as sygus-variables in `solver`. -/
+/-- Declares some identifiers as sygus-variables in `solver`, named for step `k`. -/
 def declareSygusAtIn (k : Nat) (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
   S.mapM idents fun {α} _ _ symbol =>
     return ⟨← solver.declareSygusVar (Symbols.Sig.mkSymbolIdentAt k symbol) (← Srt.of α)⟩

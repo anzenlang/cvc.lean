@@ -186,10 +186,10 @@ namespace Symbols.Sig variable [Ω] [Symbols S]
 namespace Idents
 
 @[inherit_doc Untyped.Symbols.Sig.Idents.declareSygusIn]
-def declareSygusIn (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
-  S.mapM idents fun {α} _ _ symbol => return ⟨← solver.declareSygusVar α symbol⟩
+def declareSygusIn (solver : Solver) (idents : S.Idents) : Env S.Terms :=
+  S.mapM idents fun {α} _ _ symbol => solver.declareSygusVar α symbol
 
-@[inherit_doc Untyped.Symbols.Sig.Idents.declareSygusIn]
+@[inherit_doc Untyped.Symbols.Sig.Idents.declareSygusAtIn]
 def declareSygusAtIn (k : Nat) (solver : Solver) (idents : S.Idents) : Env (S.TermsAt k) :=
   S.mapM idents fun {α} _ _ symbol =>
     return ⟨← solver.declareSygusVar α (Untyped.Symbols.Sig.mkSymbolIdentAt k symbol)⟩

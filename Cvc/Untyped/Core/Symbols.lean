@@ -156,7 +156,7 @@ abbrev FunAt' := S.FunAt'
 @[inherit_doc Sig.Fun2At]
 abbrev Fun2At (k : Nat) (k' : Nat := k + 1) := S.Fun2At k k'
 @[inherit_doc Sig.Fun2At']
-abbrev Fun2At' := S.Fun2At
+abbrev Fun2At' := S.Fun2At'
 
 namespace Sig
 /-- Identifiers associated with a `Sig`. -/

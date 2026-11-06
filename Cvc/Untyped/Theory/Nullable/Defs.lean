@@ -74,8 +74,8 @@ model's answer.
 
 /-- The element a nullable term denotes, or `none` if it denotes the null value.
 
-Fails if the term is not a nullable value: the readers answer what a *value* denotes, and a term
-of nullable sort need not be one — `nullableVal t` is nullable-sorted and is not.
+Fails unless the term is built by a nullable constructor (see `isNullableValue`): a declared
+constant of nullable sort, for instance, is not.
 -/
 def getNullableElem? (term : Term) : Env (Option Term) := do
   let some .APPLY_CONSTRUCTOR := term.getKind?
@@ -91,10 +91,10 @@ def getNullableElem? (term : Term) : Env (Option Term) := do
     return some elem
   | symbol => throwUser s!"expected a nullable value, got constructor `{symbol}`"
 
-/-- Whether a term is a nullable *value*, which is what the readers below need it to be.
+/-- Whether a term is built by a nullable constructor, `nullable.null` or `nullable.some`.
 
-Nullable-sorted is not enough: `nullableVal t` has the element's sort and `nullableSome t` built on
-a symbol is nullable-sorted without denoting anything.
+That is what `getNullableElem?` needs. Being nullable-sorted is not enough: a declared constant of
+nullable sort is built by neither.
 -/
 def isNullableValue (term : Term) : Env Bool := do
   return (← term.getSort).isNullable && term.getKind? matches some .APPLY_CONSTRUCTOR
