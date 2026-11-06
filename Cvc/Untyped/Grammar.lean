@@ -52,15 +52,14 @@ namespace Untyped
 
 A bound variable, but not interchangeable with one: `mkGrammar` takes the parameters and the
 non-terminals as separate arrays, and nothing but the type stops them being swapped.
-
-A *structure* rather than an alias: a `def` wrapper would need `BVar`, and so `Term`, exposed for
-its conversions to compile across a module boundary, and exposing `Term` would make the two layers
-the same type to every downstream module. One field, so it costs nothing at runtime.
 -/
 structure NT where
   private ofBVar ::
   private bvar : BVar
 deriving BEq, Ord, Hashable
+-- A *structure* rather than an alias: a `def` wrapper would need `BVar`, and so `Term`, exposed for
+-- its conversions to compile across a module boundary, and exposing `Term` would make the two
+-- layers the same type to every downstream module. One field, so it costs nothing at runtime.
 
 /-- An array of non-terminal symbols. -/
 abbrev NTs := Array NT
@@ -428,10 +427,6 @@ def expandGrammar (layer : Layer) (body : Syntax) (withParts : Bool := false)
 
 /-- The pattern `smt.letGrammar! g ← …` binds: `g`, the parameters and the non-terminals, grouped as
 `smt.mkGrammar!` answers them and named as the block declares them.
-
-The declared names are bound without a source position: the `do` element cannot see the rest of
-its block, so it cannot tell which ones are used there, and positioned binders would trip the
-unused-variable linter for every non-terminal that is never extended.
 -/
 def letGrammarPattern (g : Ident) (body : Syntax) : MacroM (TSyntax `term) := do
   let params := quantBinders body[1]
@@ -439,6 +434,9 @@ def letGrammarPattern (g : Ident) (body : Syntax) : MacroM (TSyntax `term) := do
   let quiet (id : Syntax) : Term := ⟨(mkIdent id.getId).raw⟩
   let head ← mkTuple (⟨g.raw⟩ :: params.toList.map (fun (id, _) => quiet id))
   mkTuple (head :: rules.toList.map (fun rule => quiet rule[0]))
+-- The declared names are bound without a source position: the `do` element cannot see the rest of
+-- its block, so it cannot tell which ones are used there, and positioned binders would trip the
+-- unused-variable linter for every non-terminal that is never extended.
 
 end Ext
 

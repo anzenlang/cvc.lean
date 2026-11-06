@@ -13,12 +13,14 @@ meta import all Cvc.Defs
 
 public import Cvc
 public import VersoManual
+public import CvcManual.Decl
 
 public import CvcManual.Env.SafetyErrors
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
 open Verso.Code.External
+open CvcManual
 
 open Cvc
 
@@ -54,7 +56,7 @@ Cvc.Srt [Ω] : Type
 
 {lean}`Ω` is a type class whose only field is itself a type, so an instance costs nothing at runtime: it compiles to a constant. It is deliberately not a {lean}`Prop`, since any two proofs of a proposition are equal, which would make every scope's sorts and terms interchangeable. You cannot build an instance yourself, as the constructor is private.
 
-{docstring Ω}
+{decl Ω}
 
 {lean}`Ω` is tied to cvc.lean's environment monad {lean}`Env`: {lean}`Env α`, or more precisely {lean}`@Env inst α` where {lean}`(inst : Ω)`, corresponds to code that uses a specific term manager to produce a value of type `α`.
 Cvc5's term manager handles term/sort perfect sharing{margin}[Also known as _hash-consing_: building the same term twice produces the same (reference to the same) term, meaning physical (reference) equality is structural equality.].
@@ -65,7 +67,7 @@ Second, as mentioned above, values tied to different managers should never inter
 
 For example, the function building an array-sort makes sure the index and element sorts agree on their manager, and keeps track of the manager associated to the resulting sort by having all of them agree on their {lean}`Ω`.
 
-{docstring Srt.arrayTo}
+{decl Srt.arrayTo}
 
 
 
@@ -82,7 +84,7 @@ Cvc.EnvT [Ω] (m : Type → Type) (α : Type) : Type
 
 Be careful that, in practice, {lean}`EnvT` works on monads that lift {lean}`BaseIO` so that it can call the cvc5 C++ API.{margin}[Also for maintaining its state efficiently as a mutable reference.] {lean}`Env` is simply {lean}`EnvT BaseIO`.
 
-{docstring Env}
+{decl Env}
 
 The only way to run {lean}`Env`-code is through its `run`-like functions. The simplest one is `Env.run` and produces a {lean}`BaseIO (Res α)` where {lean}`Res` is {lean}`Except` specialized to cvc.lean's {lean}`Error` type.
 

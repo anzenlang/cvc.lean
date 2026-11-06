@@ -133,15 +133,15 @@ def mkRecord (srt : Srt) (fields : Array (String × Term)) : Env Term := do
 /-- Builds a record value whose fields may each state their sort, or leave it to their term.
 
 A field that states its sort has that sort checked against its term's, by `Term.mkRecord`; one that
-does not takes its term's own. This is what a record literal expands to, and the reason it is a
-function rather than something the expansion inlines is that a record's sort has to be built before
-any field can be checked against it.
+does not takes its term's own. This is what a record literal expands to.
 -/
 def mkRecordFrom (fields : Array (String × Option Srt × Term)) : Env Term := do
   let mut srts := #[]
   for (name, srt?, value) in fields do
     srts := srts.push (name, ← srt?.getDM value.getSort)
   Term.mkRecord (← Srt.record srts) (fields.map fun (name, _, value) => (name, value))
+-- A function rather than something the expansion inlines, because a record's sort has to be built
+-- before any field can be checked against it.
 
 /-- Checks a term against a stated sort, and answers it unchanged.
 
@@ -195,17 +195,15 @@ structure Fields [Ω] (names : List String) where
   private mk ::
   private values : Vector Term names.length
 
-/-- `name` is one of `names`, and where it sits.
-
-Carrying the *position* rather than a projection is what keeps `Fields` in `Type`: a spine binding
-one type variable per field would land in `Type 1`, which nothing in `Env` can answer.
-
-The position is a `Fin`, which is safe here in a way it would not be for a hand-written one:
-resolution produces it, so there is no numeral for `Fin`'s modular `OfNat` to reduce.
--/
+/-- `name` is one of `names`, and where it sits. -/
 class FieldAt (names : List String) (name : String) where
   /-- Where the field sits in `names`. -/
   idx : Fin names.length
+-- Carrying the *position* rather than a projection is what keeps `Fields` in `Type`: a spine
+-- binding one type variable per field would land in `Type 1`, which nothing in `Env` can answer.
+--
+-- The position is a `Fin`, which is safe here in a way it would not be for a hand-written one:
+-- resolution produces it, so there is no numeral for `Fin`'s modular `OfNat` to reduce.
 
 instance (priority := high) : FieldAt (name :: rest) name := ⟨0⟩
 

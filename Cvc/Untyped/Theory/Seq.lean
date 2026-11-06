@@ -51,16 +51,14 @@ def getSeqValue [TermToValue α] (term : Term) : Env (Array α) := do
 @[inherit_doc getSeqValue]
 def getSeqValueOf (α : Type) [TermToValue α] : (term : Term) → Env (Array α) := getSeqValue
 
-/-- The sequence term denoting an array of values.
-
-`mkEmptySeq` takes the *element* sort rather than the sequence's own, and an empty sequence cannot
-be concatenated onto, so the empty case is separate rather than the fold's initial value.
--/
+/-- The sequence term denoting an array of values. -/
 def mkSeqValue [ToTyp α] [ValueToTerm α] (elems : Array α) : Env Term := do
   let units ← elems.mapM fun elem => do mkValue elem >>= seqUnit
   if let some fst := units[0]? then
     (units.drop 1).foldlM (init := fst) seqConcat
   else Srt.of α >>= mkEmptySeq
+-- `mkEmptySeq` takes the *element* sort rather than the sequence's own, and an empty sequence
+-- cannot be concatenated onto, so the empty case is separate rather than the fold's initial value.
 
 instance [ToTyp α] [ValueToTerm α] : ValueToTerm (Array α) := ⟨mkSeqValue⟩
 instance [TermToValue α] : TermToValue (Array α) := ⟨getSeqValue⟩

@@ -58,14 +58,13 @@ namespace Cvc.Typed public section variable [Ω]
 
 A bound variable, but not interchangeable with one: `mkGrammar` takes the parameters and the
 non-terminals separately, and only the type keeps them apart.
-
-A *structure* rather than an alias, for the same reason as the sort-erased one: a `def` wrapper
-would need `Term` exposed, and that would make the two layers the same type downstream. One field,
-so it costs nothing at runtime.
 -/
 structure NT (α : Type) where
   private ofUntyped ::
   private untyped : Untyped.NT
+-- A *structure* rather than an alias, for the same reason as the sort-erased one: a `def` wrapper
+-- would need `Term` exposed, and that would make the two layers the same type downstream. One
+-- field, so it costs nothing at runtime.
 
 /-- Non-terminal symbols of assorted sorts. -/
 abbrev NTs := List ((α : Type) × NT α)

@@ -125,13 +125,11 @@ spine assembles the result index as it collects positions.
 Positions count from zero over `α ++ [β]`, exactly as `tupleProject`'s indices do.
 -/
 
-/-- The component a position-zero column has: the head of `α`, or `β` when `α` is empty.
-
-Folding the two cases into one class is what lets a position be written as a numeral. They have
-different types, so a macro expanding `col%2` cannot know which terminal to emit; the instances
-pick by the shape of `α`, and they do not overlap, so resolution is deterministic.
--/
+/-- The component a position-zero column has: the head of `α`, or `β` when `α` is empty. -/
 class ColHead (α : List Type) (β : Type) (γ : outParam Type)
+-- Folding the two cases into one class is what lets a position be written as a numeral. They have
+-- different types, so a macro expanding `col%2` cannot know which terminal to emit; the instances
+-- pick by the shape of `α`, and they do not overlap, so resolution is deterministic.
 
 instance : ColHead [] β β := ⟨⟩
 instance : ColHead (γ :: αs) β γ := ⟨⟩

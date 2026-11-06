@@ -33,13 +33,11 @@ open cvc5 renaming Term → T
 gen_untyped% from Cvc.Spec.Float
 gen_untyped_view% from Cvc.Spec.Float
 
-/-- A rounding-mode value.
-
-Hand-written rather than specified: the conversion of the Lean enumeration into cvc5's is private,
-so no `tm` entry can name it.
--/
+/-- A rounding-mode value. -/
 def mkRoundingMode (rm : Cvc.Float.RoundingMode) : Env Term :=
   runUnsafe fun tm => tm.mkRoundingMode rm.toUnsafe
+-- Hand-written rather than specified: the conversion of the Lean enumeration into cvc5's is
+-- private, so no `tm` entry can name it.
 
 
 

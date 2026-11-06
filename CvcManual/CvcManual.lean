@@ -12,6 +12,7 @@ import CvcManual.Env
 import CvcManual.Sorts
 import CvcManual.Terms
 import CvcManual.Solver
+import CvcManual.Proofs
 
 open Verso.Genre Manual
 open Verso.Genre.Manual.InlineLean
@@ -42,6 +43,8 @@ _Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on 
 {include 1 CvcManual.Terms}
 
 {include 1 CvcManual.Solver}
+
+{include 1 CvcManual.Proofs}
 
 
 # Index

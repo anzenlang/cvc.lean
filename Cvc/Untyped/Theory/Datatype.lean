@@ -490,19 +490,10 @@ def patArgs (args : Array Syntax) : MacroM (Array (Ident × Option (TSyntax `ter
     | k => Macro.throwErrorAt arg s!"unsupported pattern variable (kind `{k}`)"
 
 
-/-- Expands one alternative of a `match` into a term building that case.
+/-- Expands one alternative of a sort-erased `match` into a term building that case.
 
-The variables a pattern binds are spliced as binders *as the writer wrote them*, never through
-`mkIdent`, or hygiene would hide them from the body. Everything the expansion binds for its own
-sake is macro-scoped instead, so the two cannot collide.
-
-Each variable is bound twice: once to the bound variable itself, which the case needs, and once —
-under the writer's name — to the term it converts to, which is what the body may mention. That
-saves the coercion having to fire at every use.
-
-This is the sort-erased arm: a bound variable is made at the field's declared sort and the pattern
-is applied by hand. The typed one, beside the typed constructors, lets `Datatype.Ctor.case` build
-the pattern and check both the arity and the sorts.
+The body sees each variable the pattern binds, under the name the writer gave it, as a term. A
+variable is made at its field's declared sort, so a sort ascription is refused.
 -/
 def expandMatchAltU (layer : Layer) (scrutId : Ident) (alt : Syntax)
 : MacroM (TSyntax `term) := do
@@ -559,6 +550,17 @@ def expandMatchAltU (layer : Layer) (scrutId : Ident) (alt : Syntax)
     acc ← `(($ctorId).checkArity $(quote pats.size) >>= fun _ => $acc)
     `($(layer.op `ctorOf) $scrutId $(quote ctor.getId.toString) >>= fun $ctorId => $acc)
   | k => Macro.throwErrorAt alt s!"unsupported match alternative (kind `{k}`)"
+-- The variables a pattern binds are spliced as binders *as the writer wrote them*, never through
+-- `mkIdent`, or hygiene would hide them from the body. Everything the expansion binds for its own
+-- sake is macro-scoped instead, so the two cannot collide.
+--
+-- Each variable is bound twice: once to the bound variable itself, which the case needs, and once —
+-- under the writer's name — to the term it converts to, which is what the body may mention. That
+-- saves the coercion having to fire at every use.
+--
+-- This is the sort-erased arm, where the pattern is applied by hand. The typed one, beside the
+-- typed constructors, lets `Datatype.Ctor.case` build the pattern and check both the arity and the
+-- sorts.
 
 @[inherit_doc Cvc.Ext.expandSmt]
 macro_rules

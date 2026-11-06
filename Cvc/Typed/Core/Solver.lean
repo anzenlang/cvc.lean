@@ -36,8 +36,15 @@ namespace Cvc.Typed public section
 /-- A solver instance. -/
 abbrev Solver [Ω] := Cvc.Untyped.Solver
 
-@[inherit_doc Untyped.Solver.Proof]
-abbrev Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
+/-- A proof produced by solver `s` for component `pc`, whose conclusions are formulas, `Term Bool`.
+
+The same cvc5 proof as the sort-erased `Cvc.Untyped.Solver.Proof`, under a type of its own: the
+sort-erased functions do not accept it, and `toUntyped` (or `relax`) and `toTyped` cross for free.
+-/
+def Solver.Proof [Ω] (s : Solver) (pc : Proof.Component) : Type := Untyped.Solver.Proof s pc
+-- A type of its own rather than an abbreviation, unlike `Solver`: an abbreviation unfolds, and
+-- wherever this layer lacked a function, dot notation would then find the sort-erased one and
+-- answer sort-erased terms, silently.
 
 /-- The sort-erased solver it is, for free: the two layers share one solver type. -/
 abbrev Solver.toUntyped [Ω] : Solver → Untyped.Solver := id
@@ -48,37 +55,45 @@ abbrev Solver.relax [Ω] : Solver → Untyped.Solver := Solver.toUntyped
 /-- The typed solver it is, for free: the two layers share one solver type. -/
 abbrev _root_.Cvc.Untyped.Solver.toTyped [Ω] : Untyped.Solver → Solver := id
 
-/-- The sort-erased proof it is, for free: the two layers share one proof type. -/
-abbrev Solver.Proof.toUntyped [Ω] {s : Solver}
+/-- The sort-erased proof it is, for free: a typed proof is a sort-erased one under a type of its
+own. -/
+def Solver.Proof.toUntyped [Ω] {s : Solver}
 : Solver.Proof s pc → Untyped.Solver.Proof s pc := id
 
 @[inherit_doc Solver.Proof.toUntyped]
 abbrev Solver.Proof.relax [Ω] {s : Solver} : Solver.Proof s pc → Untyped.Solver.Proof s pc :=
   Solver.Proof.toUntyped
 
-/-- The typed proof it is, for free: the two layers share one proof type. -/
-abbrev _root_.Cvc.Untyped.Solver.Proof.toTyped [Ω] {s : Untyped.Solver}
+/-- The typed proof it is, for free: there is nothing to check, a proof's conclusions being formulas
+whatever the layer. -/
+def _root_.Cvc.Untyped.Solver.Proof.toTyped [Ω] {s : Untyped.Solver}
 : Untyped.Solver.Proof s pc → Solver.Proof s pc := id
 
-/-- An array of `Solver.Proof`.
+@[inherit_doc Untyped.Solver.Proof.instBEq]
+instance Solver.Proof.instBEq [Ω] {s : Solver} : BEq (s.Proof pc) :=
+  inferInstanceAs (BEq (Untyped.Solver.Proof s pc))
 
-Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proofs`, following
-`Terms`: the element type has to be *this* layer's, or taking an element out of the array — with
-`for`, `map`, `getElem` — unfolds to the sort-erased head and the sort-erased accessors answer.
--/
+@[inherit_doc Untyped.Solver.Proof.instHashable]
+instance Solver.Proof.instHashable [Ω] {s : Solver} : Hashable (s.Proof pc) :=
+  inferInstanceAs (Hashable (Untyped.Solver.Proof s pc))
+
+/-- An array of `Solver.Proof`. -/
 abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (Solver.Proof s pc)
+-- Spelled `Array (Solver.Proof s)` rather than as an alias of `Untyped.Solver.Proofs`, following
+-- `Terms`: the element type has to be *this* layer's, or taking an element out of the array — with
+-- `for`, `map`, `getElem` — unfolds to the sort-erased head and the sort-erased accessors answer.
 
 /-- A grammar generating terms of signature `σ`.
 
 A sort-erased grammar under an index. That one carries the parameters it was declared over and its
 start symbol's sort, so `synthFun` cannot be given different parameters, and `σ` is what they
 describe. Like the sort-erased one it belongs to the scope, not to the solver that built it.
-Declared here rather than beside the builders in `Cvc.Typed.Grammar` because the interpolant and
-abduct queries below take one.
 -/
 structure Grammar [Ω] (σ : Type) where
   private mk ::
   private untyped : Untyped.Grammar
+-- Declared here rather than beside the builders in `Cvc.Typed.Grammar` because the interpolant and
+-- abduct queries below take one.
 
 /-- The sort-erased grammar it wraps, parameters and start sort included.
 
@@ -319,16 +334,19 @@ def% getUnsatAssumptions : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsat
 def% getUnsatCore : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsatCore
 def% getUnsatCoreLemmas : (s : Solver) → s.EnvUnsat (Terms Bool) ← getUnsatCoreLemmas
 
-/-- Written out rather than stated with `def%`, twice over: the component argument has a default,
-which eta-expansion would collapse, and the result has to be spelled at *this* layer's `Proofs`.
+/-- The proof of the unsat answer this block stands on, for component `pc`.
 
-That last point is what makes the re-typing worth anything. `Proofs` is an abbreviation of the
-sort-erased one, so the body is the sort-erased function unchanged — but the type as *written* is
-what dot notation resolves against, so a proof obtained here answers `Term Bool` from `getResult`
-where an inherited one would answer a sort-erased term.
+Needs the solver option `produce-proofs`. The `full` component, the default, is the whole
+refutation, and answers one proof; the others are its parts — preprocessing, the SAT solver's
+reasoning, the theory lemmas — and may answer several, one per lemma for `theoryLemmas`. These are
+this layer's proofs, whose conclusions are `Term Bool`.
 -/
 def getUnsatProof (pc : Proof.Component := Proof.Component.full) : s.EnvUnsat (s.Proofs pc) :=
   U.getUnsatProof s pc
+-- Written out rather than stated with `def%`, twice over: the component argument has a default,
+-- which eta-expansion would collapse, and the result has to be spelled at *this* layer's
+-- `Proofs`, whose elements are this layer's `Solver.Proof`. The body is the sort-erased function
+-- unchanged, a typed proof being a sort-erased one underneath.
 
 def% getUnsatAssumptions! : (s : Solver) → Env (Terms Bool) ← getUnsatAssumptions!
 def% getUnsatCore! : (s : Solver) → Env (Terms Bool) ← getUnsatCore!

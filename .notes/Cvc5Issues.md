@@ -487,8 +487,193 @@ The C23 variants differ from the classic functions only in reading `0b` binary l
 with base 0 or 2, `fscanf`'s `%i`), which the callers have no use for: MiniSat's integer options,
 GMP's `scanf`, and CaDiCaL reading its resident set size from `/proc`.
 
-**What it costs a wrapper.** cvc.lean carries the shim in `c/glibc_compat.c`, with a target in the
+**What it costs a wrapper.** cvc.lean carries the shim in `Cvc/glibc_compat.c`, with a target in the
 root lakefile, both marked temporary, to be removed once this is fixed. It covers executables only.
 Lake keeps a library's `moreLinkObjs` out of the per-module shared libraries its own build loads,
 and lean-cvc5's shared library, the one referencing the symbols, is loaded before cvc.lean's
 anyway. So an old-glibc host is left as it was.
+
+## 9. `getProof()` aborts the process under `proof-mode sat-proof` with unsat cores
+
+**Severity: crash.** Two options, both accepted by `setOption`, then the default `getProof()` takes
+the process down.
+
+```cpp
+s.setOption("produce-unsat-cores", "true");
+s.setOption("proof-mode", "sat-proof");
+Sort bool_ = tm.getBooleanSort();
+Term a = s.declareFun("a", {}, bool_), b = s.declareFun("b", {}, bool_),
+     c = s.declareFun("c", {}, bool_), d = s.declareFun("d", {}, bool_);
+s.assertFormula(tm.mkTerm(Kind::OR, {tm.mkTerm(Kind::AND, {a, b}), tm.mkTerm(Kind::AND, {c, d})}));
+s.assertFormula(tm.mkTerm(Kind::OR, {tm.mkTerm(Kind::NOT, {a}), tm.mkTerm(Kind::NOT, {b})}));
+s.assertFormula(tm.mkTerm(Kind::OR, {tm.mkTerm(Kind::NOT, {c}), tm.mkTerm(Kind::NOT, {d})}));
+std::cout << "check-sat: " << s.checkSat() << std::endl;
+std::cout << "unsat-cores-mode: " << s.getOption("unsat-cores-mode") << std::endl;
+std::vector<Proof> sat = s.getProof(modes::ProofComponent::SAT);
+std::cout << "sat component: " << sat[0].getRule() << " ⊢ " << sat[0].getResult() << std::endl;
+std::cout << "full proof..." << std::endl;
+std::vector<Proof> full = s.getProof();   // inside a try/catch
+std::cout << "still alive" << std::endl;
+```
+
+Output:
+
+```
+check-sat: unsat
+unsat-cores-mode: assumptions
+sat component: ASSUME ⊢ false
+full proof...
+Fatal failure within std::shared_ptr<ProofNode> cvc5::internal::ProofNodeManager::mkScope(…)
+  at src/proof/proof_node_manager.cpp:248
+Unreachable code reached Generated a proof that is not closed by the scope:
+Free assumption: false
+- assumption: (or (not a) (not b))
+- assumption: (or (not c) (not d))
+- assumption: (or (and a b) (and c d))
+Use -t dump-proof-error for details on proof
+[exit 134 — SIGABRT; "still alive" is never reached]
+```
+
+**What happens.** `produce-unsat-cores` selects `unsat-cores-mode assumptions`, in which the SAT
+solver finds its core through assumptions and records no refutation. `proof-mode sat-proof` turns
+`produce-proofs` on regardless, so proofs are built, and the SAT component comes out as a bare
+`ASSUME false`: an open assumption, not a proof of anything. The full proof wraps it in a `SCOPE`
+over the assertions, and the check that the scope leaves nothing open is an `Unreachable` abort
+rather than an exception.
+
+Setting `produce-proofs true` explicitly, before or after the other options, avoids it: cvc5 then
+switches `unsat-cores-mode` to `sat-proof` itself. `proof-mode sat-proof` turns proofs on without
+that switch. On the same problem:
+
+| options | `getProof(SAT)` | `getProof()` |
+|---|---|---|
+| `produce-unsat-cores true`, `proof-mode sat-proof` | `ASSUME ⊢ false` | abort |
+| `unsat-cores-mode assumptions`, `proof-mode sat-proof` | `ASSUME ⊢ false` | abort |
+| the first row, then `produce-proofs true` | `CHAIN_M_RESOLUTION ⊢ false` | a proof |
+| `produce-unsat-cores true`, `unsat-cores-mode sat-proof`, `proof-mode sat-proof` | `CHAIN_M_RESOLUTION ⊢ false` | a proof |
+| `produce-unsat-cores true` alone (`proof-mode` reported as `pp-only`) | exception, below | a proof, refuted by `TRUST` (entry 10) |
+
+The exception in the last row is the right answer, and what `sat-proof` should give as well:
+"Cannot get a proof for this component when SAT solver is not proof producing." Either that, or
+refusing `proof-mode sat-proof` together with assumption-based cores, or switching the cores mode as
+an explicit `produce-proofs` does, would turn the abort into something a caller can handle.
+
+**What it costs a wrapper.** Options pass through `setOption` as strings, so cvc.lean cannot rule
+the combination out, and a library user who sets these two options loses the process. Nothing in the
+library sets them.
+
+## 10. Three documented proof rules that cvc5 never seems to produce
+
+**Severity: documentation, or dead code.** `cvc5_proof_rule.h` documents `SAT_REFUTATION`, `SPLIT`
+and `PAIRWISE_CONG`, and a wrapper decoding proof steps has to handle all three. We could not get
+cvc5 to produce any of them, so a decoder written from the documentation alone cannot be tested.
+Is each of them still produced, and if so, by which problem and options?
+
+The program below prints the rules of the full proof, with how many distinct steps use each, for the
+two problems that should come closest to producing the first and the third:
+
+```cpp
+// every rule in the proof, with its number of distinct steps
+std::map<std::string, int> rules(const Proof& root) {
+  std::map<std::string, int> out;
+  std::vector<Proof> todo{root}, seen;
+  while (!todo.empty()) {
+    Proof p = todo.back(); todo.pop_back();
+    bool dup = false;
+    for (auto& q : seen) if (q == p) { dup = true; break; }
+    if (dup) continue;
+    seen.push_back(p);
+    std::string r = toString(p.getRule());
+    if (p.getRule() == ProofRule::TRUST) {
+      r += "(" + p.getArguments()[0].toString() + ")";
+      std::cout << "  TRUST " << p.getArguments()[0] << ", " << p.getChildren().size()
+                << " premises: ";
+      for (auto& c : p.getChildren()) std::cout << c.getResult() << "; ";
+      std::cout << "⊢ " << p.getResult() << std::endl;
+    }
+    out[r]++;
+    for (auto& c : p.getChildren()) todo.push_back(c);
+  }
+  return out;
+}
+
+void run(const std::string& name, std::vector<std::pair<std::string, std::string>> opts,
+         std::function<void(TermManager&, Solver&)> setup) {
+  TermManager tm;
+  Solver s(tm);
+  for (auto& [k, v] : opts) s.setOption(k, v);
+  setup(tm, s);
+  std::cout << name << ": " << s.checkSat() << "\n ";
+  for (auto& [r, n] : rules(s.getProof()[0])) std::cout << " " << r << "×" << n;
+  std::cout << std::endl;
+}
+
+int main() {
+  // the problem of entry 9
+  auto clauses = [](TermManager& tm, Solver& s) { /* … */ };
+  // SAT_REFUTATION: "SAT Refutation for assumption-based unsat cores"
+  run("proofs", {{"produce-proofs", "true"}}, clauses);
+  run("assumption cores", {{"produce-unsat-cores", "true"}}, clauses);
+  run("sat-external-prove",
+      {{"produce-proofs", "true"}, {"prop-proof-mode", "sat-external-prove"}}, clauses);
+
+  // PAIRWISE_CONG: "used only for congruence of terms whose kind is DISTINCT"
+  auto distinct = [](TermManager& tm, Solver& s) {
+    Sort is = tm.getIntegerSort();
+    Term x = s.declareFun("x", {}, is), y = s.declareFun("y", {}, is),
+         z = s.declareFun("z", {}, is);
+    // (distinct (+ x 0) x y z): rewriting (+ x 0) to x under DISTINCT needs congruence over it
+    s.assertFormula(tm.mkTerm(Kind::DISTINCT,
+        {tm.mkTerm(Kind::ADD, {x, tm.mkInteger(0)}), x, y, z}));
+  };
+  for (auto g : {"macro", "dsl-rewrite", "theory-rewrite"})
+    run(std::string("distinct, ") + g,
+        {{"produce-proofs", "true"}, {"proof-granularity", g}}, distinct);
+  return 0;
+}
+```
+
+Output:
+
+```
+proofs: unsat
+  ASSUME×3 CHAIN_M_RESOLUTION×5 CNF_AND_POS×4 REORDERING×4 SCOPE×2
+assumption cores: unsat
+   TRUST 3, 3 premises: (or (and a b) (and c d)); (or (not a) (not b)); (or (not c) (not d)); ⊢ false
+ ASSUME×3 SCOPE×2 TRUST(3)×1
+sat-external-prove: unsat
+  ASSUME×3 CHAIN_M_RESOLUTION×5 CNF_AND_POS×4 REORDERING×4 SCOPE×2
+distinct, macro: unsat
+  ASSUME×1 EQ_RESOLVE×1 MACRO_SR_EQ_INTRO×1 SCOPE×2
+distinct, dsl-rewrite: unsat
+  ABSORB×1 ARITH_POLY_NORM×1 ASSUME×1 CONG×6 DSL_REWRITE×1 EQ_RESOLVE×1 EVALUATE×1 NARY_CONG×1 REFL×6 SCOPE×2 THEORY_REWRITE×1 TRANS×4
+distinct, theory-rewrite: unsat
+  ASSUME×1 CONG×6 EQ_RESOLVE×1 NARY_CONG×1 REFL×6 SCOPE×2 TRANS×4 TRUST_THEORY_REWRITE×5
+```
+
+- **`SAT_REFUTATION`** is documented as the "SAT Refutation for assumption-based unsat cores", with
+  the core as premises and `false` as conclusion. In exactly that mode — `produce-unsat-cores`,
+  which selects `unsat-cores-mode assumptions` — the refutation is a `TRUST` step of trust id 3
+  instead, with that very shape: the three assertions as premises, `false` as conclusion. Under
+  `proof-mode sat-proof` the step is missing altogether and the process aborts (entry 9). Asking for
+  the `SAT` or `PREPROCESS` component, or checking with assumptions, changes nothing. Should this
+  `TRUST` step be a `SAT_REFUTATION`, or is the rule's documentation out of date?
+  `prop-proof-mode sat-external-prove` is accepted and silently ignored with the default SAT solver,
+  so `SAT_EXTERNAL_PROVE` does not appear either, and `sat-solver cadical` is refused with proofs:
+  "CaDiCaL not supported with proofs or unsat cores".
+- **`PAIRWISE_CONG`** is documented as "used only for congruence of terms whose kind is
+  `DISTINCT`". At every granularity, `DISTINCT` is rewritten into its pairwise disequalities before
+  its arguments are, so the congruence is over the expansion — `CONG` and `NARY_CONG` above —
+  never over the `DISTINCT` itself. The same holds with 3, 4 and 12 arguments, and when a
+  substitution applies under the `DISTINCT`.
+- **`SPLIT`**, `F ∨ ¬F` from nothing, never appeared on any of the problems that need a case split.
+  Arithmetic branch and bound concludes with `ARITH_TRICHOTOMY` instead, with `arith-brab` on or
+  off, and datatypes split with `DT_SPLIT`. A UF and linear arithmetic pigeonhole needing theory
+  combination, the non-linear split on zero, string length splits, quantifier instantiation and
+  counterexample-guided instantiation, sets, arrays, and Boolean structure meant for the circuit
+  propagator did not produce it either.
+
+**What it costs a wrapper.** cvc.lean decodes each of the three into a constructor of its own, from
+the documented layout alone. These are the only decoded rules its tests cannot show decoded on a
+real proof, so a layout change would go unnoticed for them, where for every other rule a test would
+fail.
