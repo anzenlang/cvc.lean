@@ -11,25 +11,26 @@
  * symbols in the whole release, on x86_64 and arm64 alike (`nm -u` over every library: `libcvc5.a`
  * and `libgmp.a` need `__isoc23_strtol`, `libcadical.a` needs `__isoc23_fscanf`).
  *
- * The C23 variants differ from the classic functions only in reading `0b` binary literals (`strtol`
- * with base 0 or 2, `fscanf`'s `%i`), which the callers — MiniSat's integer options, GMP's `scanf`,
- * CaDiCaL reading its resident set size from `/proc` — have no use for.
+ * The C23 variants differ from the C99 ones only in reading `0b` binary literals (`strtol` with
+ * base 0 or 2, `fscanf`'s `%i`), which the callers — MiniSat's integer options, GMP's `scanf`,
+ * CaDiCaL reading its resident set size from `/proc` — have no use for. So they forward to `strtol`
+ * and to `__isoc99_vfscanf`, the symbol glibc's own headers give `vfscanf` in C99 and later.
  *
- * Compiled as C11, without `_GNU_SOURCE`, so that glibc's headers do not redirect the classic calls
- * below to the very functions being defined. On any other platform the file is empty.
+ * The file includes no libc header and declares those two itself: it is compiled with the C
+ * compiler Lean ships, which comes with the compiler's own headers, `stdarg.h` among them, and no
+ * libc's. Without glibc's headers nothing redirects the calls below either, which from glibc 2.38
+ * on would turn them into calls to the very functions they are in. On any other platform the file
+ * is empty.
  */
 #if defined(__linux__)
 
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 
-/* the calls below would otherwise become calls to the functions they are in, looping forever */
-#ifdef __GLIBC_USE
-#if __GLIBC_USE (C2X_STRTOL)
-#error "glibc redirects strtol here: compile this file as C11, without _GNU_SOURCE"
-#endif
-#endif
+/* glibc's name for the type, which this file only passes along by pointer */
+typedef struct _IO_FILE FILE;
+
+long strtol(const char *nptr, char **endptr, int base);
+int __isoc99_vfscanf(FILE *stream, const char *format, va_list args);
 
 long __isoc23_strtol(const char *nptr, char **endptr, int base) {
   return strtol(nptr, endptr, base);
@@ -38,7 +39,7 @@ long __isoc23_strtol(const char *nptr, char **endptr, int base) {
 int __isoc23_fscanf(FILE *stream, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  int result = vfscanf(stream, format, args);
+  int result = __isoc99_vfscanf(stream, format, args);
   va_end(args);
   return result;
 }

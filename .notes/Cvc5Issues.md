@@ -461,14 +461,17 @@ functions recent glibc releases added.
 
 ### Workaround
 
-cvc.lean links this into its library with `moreLinkObjs`, compiled as C11 without `_GNU_SOURCE` so
-that glibc's headers do not redirect the forwarding calls to the functions being defined:
+cvc.lean links this into its library with `moreLinkObjs`, compiled with the C compiler Lean ships
+(Lake's `buildLeanO`) so that a user needs no C compiler of their own:
 
 ```c
 #if defined(__linux__)
 #include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+typedef struct _IO_FILE FILE;
+
+long strtol(const char *nptr, char **endptr, int base);
+int __isoc99_vfscanf(FILE *stream, const char *format, va_list args);
 
 long __isoc23_strtol(const char *nptr, char **endptr, int base) {
   return strtol(nptr, endptr, base);
@@ -477,16 +480,22 @@ long __isoc23_strtol(const char *nptr, char **endptr, int base) {
 int __isoc23_fscanf(FILE *stream, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  int result = vfscanf(stream, format, args);
+  int result = __isoc99_vfscanf(stream, format, args);
   va_end(args);
   return result;
 }
 #endif
 ```
 
-The C23 variants differ from the classic functions only in reading `0b` binary literals (`strtol`
-with base 0 or 2, `fscanf`'s `%i`), which the callers have no use for: MiniSat's integer options,
-GMP's `scanf`, and CaDiCaL reading its resident set size from `/proc`.
+It includes no libc header, declaring what it calls itself, for two reasons. Lean's toolchain
+ships the compiler's own headers, `stdarg.h` among them, but no libc's, so `stdio.h` is not found.
+And glibc's headers from 2.38 on, under `_GNU_SOURCE` or C23, would redirect the forwarding calls
+to the very functions being defined. `__isoc99_vfscanf` is the symbol glibc's headers give
+`vfscanf` in C99 and later.
+
+The C23 variants differ from the C99 ones only in reading `0b` binary literals (`strtol` with base
+0 or 2, `fscanf`'s `%i`), which the callers have no use for: MiniSat's integer options, GMP's
+`scanf`, and CaDiCaL reading its resident set size from `/proc`.
 
 **What it costs a wrapper.** cvc.lean carries the shim in `Cvc/glibc_compat.c`, with a target in the
 root lakefile, both marked temporary, to be removed once this is fixed. It covers executables only.

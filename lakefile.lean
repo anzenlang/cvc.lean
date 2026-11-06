@@ -21,8 +21,9 @@ lean-cvc5's Linux cvc5 libraries were built against glibc 2.38 or later and refe
 variants `__isoc23_strtol` and `__isoc23_fscanf`, which the older glibc Lean links executables
 against does not have: without this shim, no executable using the library links on Linux, the
 manual's included. `Cvc/glibc_compat.c` defines the two, forwarding to the classic functions, and is
-linked into everything that links `Cvc` on Linux; elsewhere it is neither compiled nor linked.
-Remove it once lean-cvc5 ships a cvc5 built against an older glibc.
+linked into everything that links `Cvc` on Linux; elsewhere it is neither compiled nor linked. It is
+compiled with the C compiler Lean ships, so a user needs no C compiler of their own. Remove it once
+lean-cvc5 ships a cvc5 built against an older glibc.
 -/
 
 input_file glibcCompat.c where
@@ -32,8 +33,9 @@ input_file glibcCompat.c where
 target glibcCompat.o pkg : System.FilePath := do
   let srcJob ← glibcCompat.c.fetch
   let oFile := pkg.buildDir / "Cvc" / "glibc_compat.o"
-  -- C11 without `_GNU_SOURCE`: glibc's headers must not redirect the shim's own calls
-  buildO oFile srcJob (traceArgs := #["-std=c11", "-fPIC"]) (compiler := "clang")
+  -- Lean's own compiler, as Lean's C is compiled: a plain `buildO` runs whatever `clang` the
+  -- system's `PATH` has, if any
+  buildLeanO oFile srcJob (traceArgs := #["-std=c11", "-fPIC"])
 
 /-! ## Releases carry the lean-cvc5 build they were made with
 

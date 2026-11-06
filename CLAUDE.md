@@ -31,11 +31,16 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   glibc ≥ 2.38 and references `__isoc23_strtol`/`__isoc23_fscanf`, which the older glibc Lean links
   executables against lacks, so no executable using the library linked on Linux, the manual's
   included. [Cvc/glibc_compat.c](Cvc/glibc_compat.c) defines the two, forwarding to the classic
-  functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere). It
-  covers executables only: a host whose own glibc predates 2.38 presumably still fails to load
-  lean-cvc5's precompiled modules, which the shim cannot reach. Entry 8 of
-  [Cvc5Issues.md](.notes/Cvc5Issues.md) is the issue to file against lean-cvc5. Remove the file
-  and its lakefile target once lean-cvc5 ships a cvc5 built against an older glibc.
+  functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere).
+  **It is compiled with Lean's own clang** (`buildLeanO`), because a plain `buildO` runs whatever
+  `clang` the system `PATH` has — verified: none there, and the build fails — which runner images
+  have and many users' machines do not. Lean ships the compiler's headers but no libc's, so the
+  shim includes only `stdarg.h` and declares `strtol` and `__isoc99_vfscanf` itself, which also
+  keeps glibc ≥ 2.38's headers from redirecting its calls to itself. It covers executables only:
+  a host whose own glibc predates 2.38 presumably still fails to load lean-cvc5's precompiled
+  modules, which the shim cannot reach. Entry 8 of [Cvc5Issues.md](.notes/Cvc5Issues.md) is the
+  issue to file against lean-cvc5. Remove the file and its lakefile target once lean-cvc5 ships a
+  cvc5 built against an older glibc.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
   PRs to `main` only, so a topic branch is **not** covered. **One job does everything in sequence**,
   on one machine, so the manual and the API reference build on the library `lake build` just built,
