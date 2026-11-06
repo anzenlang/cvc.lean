@@ -225,7 +225,7 @@ variable [Ω]
 /-- info: @Term.mkBVarAs : [inst : Ω] → (α : Type) → [ToTyp α] → String → Env (BVar α) -/
 #guard_msgs in #check @Cvc.Typed.Term.mkBVarAs
 
-/-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → optParam Bool false → Env (Term α) -/
+/-- info: @Solver.declareFun : [inst : Ω] → Solver → {α : Type} → [ToTyp α] → String → optParam Bool true → Env (Term α) -/
 #guard_msgs in #check @Cvc.Typed.Solver.declareFun
 
 /-- info: @Solver.defineFun : [inst : Ω] →

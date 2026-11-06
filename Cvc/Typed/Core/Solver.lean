@@ -139,7 +139,7 @@ section variable [Ω] [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 open Cvc renaming Untyped.Solver → U
 
 /-- Declares a function symbol of type `α`. -/
-def declareFunAs (α : Type) (symbol : String) [ToTyp α] (fresh : Bool := false) : Env (Term α) := do
+def declareFunAs (α : Type) (symbol : String) [ToTyp α] (fresh : Bool := true) : Env (Term α) := do
   let srt ← Srt.of α
   let domCod? : Option (Array Srt × Srt) := do
     let dom ← srt.getFunctionDomainSorts?
@@ -149,7 +149,7 @@ def declareFunAs (α : Type) (symbol : String) [ToTyp α] (fresh : Bool := false
   Untyped.Solver.declareFun s symbol dom cod (fresh := fresh)
 
 @[inherit_doc declareFunAs]
-abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := false) : Env (Term α) :=
+abbrev declareFun [ToTyp α] (symbol : String) (fresh : Bool := true) : Env (Term α) :=
   s.declareFunAs α symbol (fresh := fresh)
 
 /-- Defines a function symbol over bound variables `bvs` defined by `body`. -/
