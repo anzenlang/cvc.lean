@@ -76,7 +76,7 @@ def double (x : Term Int) : Env (Term Int) := smt! x + x
 def solve : Env Int := do
   let s ← Solver.new
   s.setOption "produce-models" "true"
-  let x ← s.declareConst Int "x"
+  let x ← s.declareConstAs Int "x"
   s.assert (← smt! ![double x] = 6)
   s.checkSat (ifSat := s.getValue x)
 
