@@ -3,8 +3,9 @@
 Bugs and sharp edges found in cvc5 itself while building this wrapper. Everything here is at the
 **C++ API level** — reproduced against cvc5's own headers and static library, with no Lean and no
 [lean-cvc5](https://github.com/abdoo8080/lean-cvc5) involved, so that each entry is something the
-cvc5 maintainers can act on directly. The exception is entry 8, which concerns the cvc5 build
-lean-cvc5 distributes rather than cvc5's API. It is written as an issue to file against lean-cvc5.
+cvc5 maintainers can act on directly. The exceptions are entries 8 and 11, which concern
+lean-cvc5 rather than cvc5's API — the cvc5 build it distributes, and its C++ glue. Each is written
+as an issue to file against lean-cvc5.
 
 This is not the list of things cvc.lean does not wrap — that is [MISSING.md](MISSING.md) — nor of
 things it has decided not to do, which is [TODO.md](TODO.md).
@@ -677,3 +678,131 @@ distinct, theory-rewrite: unsat
 the documented layout alone. These are the only decoded rules its tests cannot show decoded on a
 real proof, so a layout change would go unnoticed for them, where for every other rule a test would
 fail.
+
+## 11. lean-cvc5's `mkAbstractSort` reads its kind at the wrong width, so it fails on Windows
+
+**Severity: medium, on Windows.** `TermManager.mkAbstractSort` fails there for whichever kind,
+unless the call happens to work. Addressed to [lean-cvc5](https://github.com/abdoo8080/lean-cvc5)
+rather than cvc5, and written to be filed there as is.
+
+**Title:** Windows: `mkAbstractSort` fails with "cannot construct abstract type for kind
+UNDEFINED_SORT_KIND"
+
+### Summary
+
+`termManager_mkAbstractSort` in `ffi/ffi.cpp` takes its kind as a `uint16_t`, but `SortKind` has
+23 constructors, so Lean passes it as a `uint8_t`: the C Lean generates for the `extern` declares
+
+```c
+lean_object* termManager_mkAbstractSort(lean_object*, uint8_t);
+```
+
+against the definition
+
+```cpp
+LEAN_EXPORT lean_obj_res termManager_mkAbstractSort(lean_obj_arg tm,
+                                                    uint16_t kind)
+{
+  CVC5_LEAN_API_TRY_CATCH_ENV_BEGIN;
+  SortKind k = static_cast<SortKind>(static_cast<int32_t>(kind) - 2);
+```
+
+So the function reads a byte the caller never set. On Linux and macOS that byte is zero in
+practice and the call works; on Windows it is not, and cvc5 refuses the kind.
+
+### Reproduction
+
+The `lean-toolchain` and `lakefile.toml` of entry 8, with this `Main.lean`:
+
+```lean
+import cvc5
+
+def main : IO Unit := do
+  let res ← (do
+    let tm ← cvc5.TermManager.new
+    let s ← tm.mkAbstractSort .BITVECTOR_SORT
+    return s.toString : cvc5.Env String).run
+  match res with
+  | .ok s => IO.println s!"ok: {s}"
+  | .error e => IO.println s!"error: {e}"
+```
+
+Run on macOS arm64, as `#eval main`, it prints `ok: ?BITVECTOR_TYPE`. On GitHub Actions'
+`windows-latest` (MSYS2's CLANG64, Lean v4.35.0, lean-cvc5 at that revision through cvc.lean), the
+same call for `BITVECTOR_SORT`, made by cvc.lean's tests, failed with
+
+```
+cannot construct abstract type for kind UNDEFINED_SORT_KIND
+```
+
+while `ABSTRACT_SORT`, earlier in the same run, succeeded. The minimal project above was not run on
+Windows as such.
+
+What cvc5 does with a stray high byte is shown on any platform by the C++ below, slotted into the
+skeleton of "Reproducing": it computes the kind as `termManager_mkAbstractSort` does from the 16
+bits it reads.
+
+```cpp
+static void attempt(TermManager& tm, uint16_t received) {
+  SortKind k = static_cast<SortKind>(static_cast<int32_t>(received) - 2);
+  std::cout << "received " << received << " -> kind " << k << ": ";
+  try {
+    std::cout << tm.mkAbstractSort(k) << std::endl;
+  } catch (const CVC5ApiException& e) {
+    std::cout << "threw: " << e.what() << std::endl;
+  }
+}
+
+int main() {
+  TermManager tm;
+  uint8_t bv = static_cast<uint8_t>(static_cast<int32_t>(SortKind::BITVECTOR_SORT) + 2);
+  attempt(tm, bv);           // the byte Lean passes, high byte clear
+  attempt(tm, 0x0100 | bv);  // the same byte with a stray high byte
+  attempt(tm, 0xab00 | bv);
+  return 0;
+}
+```
+
+```
+received 7 -> kind BITVECTOR_SORT: ?BITVECTOR_TYPE
+received 263 -> kind UNDEFINED_SORT_KIND: threw: cannot construct abstract type for kind UNDEFINED_SORT_KIND
+received 43783 -> kind UNDEFINED_SORT_KIND: threw: cannot construct abstract type for kind UNDEFINED_SORT_KIND
+```
+
+cvc5 prints any value outside `SortKind` as `UNDEFINED_SORT_KIND`, which is the Windows message.
+
+### Cause
+
+A `uint8_t` argument travels in the low byte of a register, and the calling conventions leave the
+rest unspecified, with one exception: Apple's arm64 ABI makes the caller extend it to 32 bits.
+Compilers targeting Linux and macOS x86_64 extend it too, by convention rather than requirement,
+which is why the read has worked there. The Windows x64 convention gives no such guarantee, so the
+high byte `termManager_mkAbstractSort` reads is whatever the register held.
+
+A non-zero high byte makes the kind at least 254, beyond every `SortKind`, so the failure is always
+cvc5 refusing the kind, never another valid kind silently built. When the byte happens to be zero
+the call succeeds, which is why `ABSTRACT_SORT` passed. lean-cvc5's own tests call `mkAbstractSort`
+with `BITVECTOR_SORT` and run on Windows in its CI, so whether they pass there depends on what that
+register holds at that call. Linux arm64 relies on the same convention as Linux x86_64 and has not
+been seen to fail.
+
+Every other exported function taking an enum agrees with Lean on the width: `Kind` (297
+constructors) and `ProofRewriteRule` (527) are `uint16_t` on both sides, and every enum of fewer
+than 256 constructors is read as a `uint8_t`.
+
+### Suggested fix
+
+Declare the parameter `uint8_t kind` in `termManager_mkAbstractSort`.
+
+Unrelated to Windows but next to it: `sortKind_hash` casts its argument without the `- 2` that
+`sortKind_toString` and `termManager_mkAbstractSort` subtract. The hash stays consistent, the shift
+being the same for every value, but it hashes a different `SortKind` from the one meant.
+
+### Workaround
+
+None. cvc5's API has no other way to build an abstract sort, and patching `ffi.cpp` downstream
+would mean carrying a fork of lean-cvc5.
+
+**What it costs a wrapper.** On Windows, cvc.lean's `Srt.any`, `Srt.abstract`, and building the sort
+of an abstract `Typ?` each fail with that error, or work, depending on the call. Its `CvcTests.Srt`
+fails there for that reason, which is what keeps Windows out of cvc.lean's CI.

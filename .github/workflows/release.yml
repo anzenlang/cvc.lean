@@ -25,8 +25,8 @@ name: Release
 # headers either: a user of a release needs none.
 #
 # A failed job leaves the pre-release as it is. Delete it along with its tag and publish it again,
-# or publish the next version. Windows is not built yet: lean-cvc5 builds there under MSYS2, and
-# this library has never been tried on it.
+# or publish the next version. Windows is not built yet: the library builds there under MSYS2, as
+# lean-cvc5 does, but a lean-cvc5 bug breaks its abstract sorts on Windows.
 
 on:
   release:
