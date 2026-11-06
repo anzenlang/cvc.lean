@@ -31,11 +31,16 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   glibc ≥ 2.38 and references `__isoc23_strtol`/`__isoc23_fscanf`, which the older glibc Lean links
   executables against lacks, so no executable using the library linked on Linux, the manual's
   included. [Cvc/glibc_compat.c](Cvc/glibc_compat.c) defines the two, forwarding to the classic
-  functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere). It
-  covers executables only: a host whose own glibc predates 2.38 presumably still fails to load
-  lean-cvc5's precompiled modules, which the shim cannot reach. Entry 8 of
-  [Cvc5Issues.md](.notes/Cvc5Issues.md) is the issue to file against lean-cvc5. Remove the file
-  and its lakefile target once lean-cvc5 ships a cvc5 built against an older glibc.
+  functions, and the root lakefile links it into `Cvc` with `moreLinkObjs` (empty elsewhere).
+  **It is compiled with Lean's own clang** (`buildLeanO`), because a plain `buildO` runs whatever
+  `clang` the system `PATH` has — verified: none there, and the build fails — which runner images
+  have and many users' machines do not. Lean ships the compiler's headers but no libc's, so the
+  shim includes only `stdarg.h` and declares `strtol` and `__isoc99_vfscanf` itself, which also
+  keeps glibc ≥ 2.38's headers from redirecting its calls to itself. It covers executables only:
+  a host whose own glibc predates 2.38 presumably still fails to load lean-cvc5's precompiled
+  modules, which the shim cannot reach. Entry 8 of [Cvc5Issues.md](.notes/Cvc5Issues.md) is the
+  issue to file against lean-cvc5. Remove the file and its lakefile target once lean-cvc5 ships a
+  cvc5 built against an older glibc.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
   PRs to `main` only, so a topic branch is **not** covered. **One job does everything in sequence**,
   on one machine, so the manual and the API reference build on the library `lake build` just built,
@@ -87,9 +92,13 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   macOS it sets `MACOSX_DEPLOYMENT_TARGET=11.0`, the oldest macOS cvc5's static release and Lean
   support, and checks every object of lean-cvc5's build carries it: unpinned, `ffi.o`, Lean's
   compiled modules and lean-cvc5's shared library all record the build machine's version (14 in
-  lean-cvc5's own archive). A `check` job on a fresh machine runs
+  lean-cvc5's own archive). A check job per platform, on a fresh machine, runs
   `.github/scripts/check_release.sh <repository URL> <tag>`, and `publish` turns the pre-release
-  into a release once every check passes. No cache anywhere.
+  into a release once every check passes. No cache anywhere. On Linux the check (`check-linux`)
+  runs in a bare `ubuntu:22.04` container with only `git`, `curl` and CA certificates added, and
+  fails if any C compiler is present: the runner images come with compilers and headers, which
+  hid the shim's need for a system `clang`. macOS has its own job (`check-macos`), since a job
+  container needs a Linux runner — and what an empty `container:` value does is undocumented.
 
 ### Releases carry the lean-cvc5 build they were made with
 

@@ -21,8 +21,9 @@ name: Release
 # version and checks every object of lean-cvc5's build carries it.
 #
 # Nothing is cached, so a bundle holds only what this release's build made, and each check runs on
-# a fresh machine, so it cannot see what the bundle job left behind. The check installs no C++
-# headers either: a user of a release needs none.
+# a fresh machine, so it cannot see what the bundle job left behind. On Linux the check runs in a
+# bare Ubuntu container with only what Lean and Lake need added, and no C compiler: the runner
+# images come with compilers and headers, which would hide a build quietly relying on them.
 #
 # A failed job leaves the pre-release as it is. Delete it along with its tag and publish it again,
 # or publish the next version. Windows is not built yet: the library builds there under MSYS2, as
@@ -47,7 +48,7 @@ jobs:
     name: bundle (${{ matrix.name }})
     strategy:
       fail-fast: false
-      # the same platforms in `check`
+      # the same platforms in `check-linux` and `check-macos`
       matrix:
         include:
           - { name: Linux-x86_64, os: ubuntu-22.04 }
@@ -98,16 +99,48 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$RUNNER_TEMP"/bundle/*.tar.gz --clobber
 
-  check:
+  # `check-linux` and `check-macos` check the platforms `bundle` builds, as a user gets the release
+  check-linux:
     name: check (${{ matrix.name }})
     needs: bundle
     strategy:
       fail-fast: false
-      # the same platforms in `bundle`
       matrix:
         include:
           - { name: Linux-x86_64, os: ubuntu-22.04 }
           - { name: Linux-aarch64, os: ubuntu-22.04-arm }
+    runs-on: ${{ matrix.os }}
+    # a bare system rather than the runner's, which comes with compilers, headers and tools that a
+    # user's machine may not have
+    container: ubuntu:22.04
+    timeout-minutes: 60
+    steps:
+      - name: Install what Lean and Lake need
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git
+          # nothing to compile with but what Lean ships, as on a machine with no C compiler
+          for tool in cc c++ gcc g++ clang; do
+            if command -v "$tool"; then
+              echo "::error::the container has \`$tool\`"
+              exit 1
+            fi
+          done
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install Lean
+        run: .github/scripts/install_lean.sh
+      - name: Build a project requiring the release
+        run: .github/scripts/check_release.sh "https://github.com/$GH_REPO" "$TAG"
+
+  check-macos:
+    name: check (${{ matrix.name }})
+    needs: bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - { name: macOS-aarch64, os: macos-15 }
           - { name: macOS-x86_64, os: macos-15-intel }
     runs-on: ${{ matrix.os }}
@@ -121,7 +154,7 @@ jobs:
         run: .github/scripts/check_release.sh "https://github.com/$GH_REPO" "$TAG"
 
   publish:
-    needs: check
+    needs: [check-linux, check-macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
