@@ -12,4 +12,5 @@ public import Cvc.Typed.Grammar
 public import Cvc.Typed.Proof
 public import Cvc.Typed.Synth
 public import Cvc.Typed.Theory
+public import Cvc.Typed.Extra
 public import Cvc.Typed.View
