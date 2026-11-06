@@ -65,6 +65,15 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   server answering the occasional 504 (it failed the first run). A newer push cancels a superseded
   run, on `main` too. There is no `lake update` step: CI follows the committed manifest. The
   manual's `apiRoot` points at upstream's site whatever repository builds it.
+- [.github/workflows/windows.yml](.github/workflows/windows.yml) builds and tests on Windows, then
+  links a small executable using the library, from a project sharing the repository's packages
+  directory so nothing is rebuilt. Run by hand and on pull requests to `main`, not on pushes, and
+  uncached. Its environment is lean-cvc5's own Windows CI's: MSYS2's CLANG64 (`msys2 {0}` shell,
+  `path-type: inherit`) and `leanprover/lean-action` rather than `install_lean.sh`, untried on
+  Windows. Lake runs `tar` and `curl` by bare name, and Windows looks in `System32` before `PATH`,
+  so a native process should get the system's bsdtar and curl rather than MSYS2's — Lake's source
+  says so of curl, which is why it reads a `CURL` variable. A first step towards Windows releases:
+  the glibc shim is linked on Linux only, so a Windows user needs no `cc`.
 - [.github/workflows/lean-release.yml](.github/workflows/lean-release.yml) checks daily for a stable
   Lean release newer than `lean-toolchain` and opens one "Bump to Lean vX" issue per release,
   saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually

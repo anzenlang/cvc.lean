@@ -1,0 +1,83 @@
+name: Windows
+
+# Builds and tests the library on Windows, which the CI does not cover, and links an executable
+# using it, which is where a platform's linking problems show.
+#
+# Started by hand (Actions, Windows, Run workflow) and on pull requests to `main`, but not on pushes
+# to `main`, so it slows nothing down. Nothing is cached.
+#
+# The environment is the one lean-cvc5's own CI builds it in on Windows: MSYS2's CLANG64, whose
+# clang lean-cvc5 compiles its `ffi.cpp` with when it builds from source, and Lean installed by
+# `leanprover/lean-action`.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          path-type: inherit
+          install: mingw-w64-clang-x86_64-clang
+      - name: Install Lean
+        uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          use-github-cache: false
+      - name: Build
+        run: lake build
+      - name: Test
+        run: lake test
+      - name: Link an executable using the library
+        run: |
+          repo=$(cygpath -m "$PWD")
+          dir=$(mktemp -d)
+          cp lean-toolchain "$dir/"
+          # the repository's packages directory, so that the library is not rebuilt against another
+          # checkout of lean-cvc5
+          cat > "$dir/lakefile.toml" <<EOF
+          name = "check"
+          defaultTargets = ["check"]
+          packagesDir = "$repo/.lake/packages"
+
+          [[require]]
+          name = "cvc"
+          path = "$repo"
+
+          [[lean_exe]]
+          name = "check"
+          root = "Check"
+          EOF
+          cat > "$dir/Check.lean" <<'EOF'
+          import Cvc.Srt
+
+          def main : IO Unit := do
+            IO.println (← Cvc.Env.runIO do return s!"cvc5 answers: {← Cvc.Srt.int}")
+          EOF
+          cd "$dir"
+          lake build
+          answer=$(lake exe check | tr -d '\r')
+          echo "$answer"
+          if [ "$answer" != "cvc5 answers: Int" ]; then
+            echo "::error::the executable answered \`$answer\`"
+            exit 1
+          fi
