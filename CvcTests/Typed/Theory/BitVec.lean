@@ -32,7 +32,7 @@ bvUlt    : (bvult u v)
 bvSle    : (bvsle u v)
 bvConcat : (concat u w)
 bvComp   : (bvcomp u v)
-bvToNat  : (ubv_to_int u)
+ubvToInt : (ubv_to_int u)
 -/
 #guard_msgs in #eval Env.runIO do
   let u ← Cvc.Typed.Term.mkSymbolAs (BitVec 4) "u"
@@ -48,7 +48,7 @@ bvToNat  : (ubv_to_int u)
   println! "bvSle    : {← bvSle u v}"
   println! "bvConcat : {← bvConcat u w}"
   println! "bvComp   : {← bvComp u v}"
-  println! "bvToNat  : {← bvToNat u}"
+  println! "ubvToInt : {← bvUbvToInt u}"
 
 section sizes
 variable [Ω] (u v : Term (BitVec 4)) (w : Term (BitVec 6))
@@ -64,7 +64,7 @@ example : Env (Term Bool) := bvUlt u v
 /-- Reductions land at size one. -/
 example : Env (Term (BitVec 1)) := bvComp u v
 /-- Conversion to integers. -/
-example : Env (Term Int) := bvToNat u
+example : Env (Term Int) := bvUbvToInt u
 
 end sizes
 
@@ -113,7 +113,6 @@ zeroExtend : ((_ zero_extend 4) u)
 signExtend : ((_ sign_extend 4) u)
 rotateLeft : ((_ rotate_left 2) u)
 rotateRight: ((_ rotate_right 2) u)
-bit        : ((_ @bit 3) u)
 intToBv    : ((_ int_to_bv 8) i)
 -/
 #guard_msgs in #eval Env.runIO do
@@ -126,7 +125,6 @@ intToBv    : ((_ int_to_bv 8) i)
   println! "signExtend : {← bvSignExtend 4 u}"
   println! "rotateLeft : {← bvRotateLeft 2 u}"
   println! "rotateRight: {← bvRotateRight 2 u}"
-  println! "bit        : {← bvBit 3 u}"
   println! "intToBv    : {← intToBv 8 i}"
 
 /-! ## Constructors -/
@@ -138,41 +136,6 @@ mkBitVecOfString: #b11111111
 #guard_msgs in #eval Env.runIO do
   println! "mkBitVec        : {← mkBitVec 8 5}"
   println! "mkBitVecOfString: {← mkBitVecOfString 8 "ff" 16}"
-
-/-! ## From booleans
-
-The result's size is the operator's own arity, not a function of its arguments' sorts.
--/
-
-/-- info:
-one bit : (@from_bools a)
-two     : (@from_bools a b)
-three   : (@from_bools a b c)
--/
-#guard_msgs in #eval Env.runIO do
-  let a ← Cvc.Typed.Term.mkSymbolAs Bool "a"
-  let b ← Cvc.Typed.Term.mkSymbolAs Bool "b"
-  let c ← Cvc.Typed.Term.mkSymbolAs Bool "c"
-
-  println! "one bit : {← bvFromBool a}"
-  println! "two     : {← bvFromBools #[a, b]}"
-  println! "three   : {← bvFromBools #[a, b, c]}"
-
-section arity
-open Cvc.Typed (Term)
-variable [Ω] (a b c : Term Bool)
-
-/-- One bit in, a one-bit vector out. -/
-example : Env (Term (BitVec 1)) := bvFromBool a
-
-/-- The n-ary result size is the array's, which reduces for a literal array. -/
-example : Env (Term (BitVec 3)) := bvFromBools #[a, b, c]
-
-/-- …and for any other length. -/
-example : Env (Term (BitVec 2)) := bvFromBools #[a, b]
-
-end arity
-
 
 /-! # The `smt!` DSL, bit-vector notation
 
@@ -211,3 +174,10 @@ example : Env (Term (BitVec 4)) := smt! u &&& v <<< u
 example : Env (Term (BitVec 4)) := smt! ![Cvc.Typed.Term.bvAdd u v]
 
 end indices
+
+/-! A value wider than 64 bits keeps every bit on its way to a term. -/
+
+/-- info: 2^70 + 5 at width 72 : 0x400000000000000005#72 -/
+#guard_msgs in #eval Env.runIO do
+  let t ← Cvc.Typed.Term.mkValue (BitVec.ofNat 72 (2^70 + 5))
+  println! "2^70 + 5 at width 72 : {← Cvc.Typed.Term.getBitVecValue (size := 72) t}"

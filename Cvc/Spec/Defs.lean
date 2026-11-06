@@ -299,8 +299,7 @@ structure OpSpec where
   /-- Name of the n-ary variant, when `<id>N` is not the right one.
 
   The `N` suffix suits an operator whose n-ary form is the same operation at greater arity. It
-  does not suit one where the distinction is singular versus plural: `bvFromBool` takes a bit and
-  `bvFromBools` takes several.
+  does not suit one where the distinction is singular versus plural, a bit against several bits.
   -/
   naryName : Option Name := none
   /-- Surface notation in the `smt!` DSL. -/

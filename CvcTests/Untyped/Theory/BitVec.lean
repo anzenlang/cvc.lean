@@ -39,7 +39,7 @@ bvSge    : (bvsge u v)
 bvConcat : (concat u w)
 bvComp   : (bvcomp u v)
 bvRedor  : (bvredor u)
-bvToNat  : (ubv_to_int u)
+ubvToInt : (ubv_to_int u)
 -/
 #guard_msgs in #eval Env.runIO do
   let u ← Cvc.Untyped.Term.mkSymbolAs (BitVec 4) "u"
@@ -63,7 +63,7 @@ bvToNat  : (ubv_to_int u)
   println! "bvConcat : {← bvConcat u w}"
   println! "bvComp   : {← bvComp u v}"
   println! "bvRedor  : {← bvRedor u}"
-  println! "bvToNat  : {← bvToNat u}"
+  println! "ubvToInt : {← bvUbvToInt u}"
 
 /-! ## Overflow predicates and conversions -/
 
@@ -110,7 +110,6 @@ zeroExtend : ((_ zero_extend 4) u)
 signExtend : ((_ sign_extend 4) u)
 rotateLeft : ((_ rotate_left 2) u)
 rotateRight: ((_ rotate_right 2) u)
-bit        : ((_ @bit 3) u)
 intToBv    : ((_ int_to_bv 8) i)
 -/
 #guard_msgs in #eval Env.runIO do
@@ -123,7 +122,6 @@ intToBv    : ((_ int_to_bv 8) i)
   println! "signExtend : {← bvSignExtend 4 u}"
   println! "rotateLeft : {← bvRotateLeft 2 u}"
   println! "rotateRight: {← bvRotateRight 2 u}"
-  println! "bit        : {← bvBit 3 u}"
   println! "intToBv    : {← intToBv 8 i}"
 
 /-! ## Constructors -/
@@ -135,26 +133,6 @@ mkBitVecOfString: #b11111111
 #guard_msgs in #eval Env.runIO do
   println! "mkBitVec        : {← mkBitVec 8 5}"
   println! "mkBitVecOfString: {← mkBitVecOfString 8 "ff" 16}"
-
-/-! ## From booleans
-
-The result's size is the operator's own arity, not a function of its arguments' sorts.
--/
-
-/-- info:
-one bit : (@from_bools a)
-two     : (@from_bools a b)
-three   : (@from_bools a b c)
--/
-#guard_msgs in #eval Env.runIO do
-  let a ← Cvc.Untyped.Term.mkSymbolAs Bool "a"
-  let b ← Cvc.Untyped.Term.mkSymbolAs Bool "b"
-  let c ← Cvc.Untyped.Term.mkSymbolAs Bool "c"
-
-  println! "one bit : {← bvFromBool a}"
-  println! "two     : {← bvFromBools #[a, b]}"
-  println! "three   : {← bvFromBools #[a, b, c]}"
-
 
 /-! # The `smt!` DSL, bit-vector notation
 
@@ -185,3 +163,10 @@ bv lshr     : (bvlshr u v)
   println! "bv lshr     : {← smt! u >>> v}"
   println! "||| under &&&: {← smt! u ||| v &&& u}"
   println! "&&& under <<<: {← smt! u &&& v <<< u}"
+
+/-! A value wider than 64 bits keeps every bit on its way to a term. -/
+
+/-- info: 2^70 + 5 at width 72 : 0x400000000000000005#72 -/
+#guard_msgs in #eval Env.runIO do
+  let t ← Cvc.Untyped.Term.mkValue (BitVec.ofNat 72 (2^70 + 5))
+  println! "2^70 + 5 at width 72 : {← Cvc.Untyped.Term.getBitVecValue (size := 72) t}"

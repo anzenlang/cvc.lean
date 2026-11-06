@@ -116,9 +116,6 @@ op% bvRedand {n : size} (bv : bitVec n) : bitVec 1 := BITVECTOR_REDAND
 /-- Disjunction of all the bits, as a one-bit bit-vector. -/
 op% bvRedor {n : size} (bv : bitVec n) : bitVec 1 := BITVECTOR_REDOR
 
-/-- Conversion to a non-negative integer. -/
-op% bvToNat {n : size} (bv : bitVec n) : int := BITVECTOR_TO_NAT
-
 
 
 /-! ## Overflow predicates and conversions -/
@@ -184,9 +181,6 @@ op% bvRotateLeft [count] {n : size} (bv : bitVec n) : bitVec n := BITVECTOR_ROTA
 /-- Rotation to the right by the given number of bits. -/
 op% bvRotateRight [count] {n : size} (bv : bitVec n) : bitVec n := BITVECTOR_ROTATE_RIGHT
 
-/-- The bit at the given index, as a `Bool`. -/
-op% bvBit [idx] {n : size} (bv : bitVec n) : bool := BITVECTOR_BIT
-
 /-- Conversion of an integer to a bit-vector of the given size. -/
 op% intToBv [size] (arg : int) : bitVec size := INT_TO_BITVECTOR
 
@@ -201,14 +195,3 @@ op% mkBitVec [size] (value :! UInt64) : bitVec size := CONST_BITVECTOR tm mkBitV
 /-- A bit-vector literal of the given size, read in the given base. -/
 op% mkBitVecOfString [size] (repr :! String) (base :! UInt32) : bitVec size
   := CONST_BITVECTOR tm mkBitVectorOfString
-
-/-! ## From booleans
-
-`BITVECTOR_FROM_BOOLS` builds a bit-vector one bit per argument, so its result's size is its own
-arity rather than a function of its arguments' sorts. `bvFromBool` takes a single bit;
-`bvFromBools` takes several, and its result size is the term array's, which makes that signature
-depend on a runtime value.
--/
-
-/-- The one-bit bit-vector made of the given bit. -/
-op% bvFromBool (bit : bool) : bitVec arity := BITVECTOR_FROM_BOOLS naryAs bvFromBools

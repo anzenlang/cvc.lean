@@ -38,7 +38,7 @@ Arith: 39 operators
   no constructor for mkReal: a value, the `.value` leaf
   no constructor for mkRealOfString: a value, the `.value` leaf
 Bag: 19 operators
-BitVec: 54 operators
+BitVec: 51 operators
   no constructor for mkBitVec: a value, the `.value` leaf
   no constructor for mkBitVecOfString: a value, the `.value` leaf
 Bool: 8 operators

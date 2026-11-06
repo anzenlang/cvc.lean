@@ -535,8 +535,9 @@ op% bvConcat {n m : width} (lft : bitVec n) (rgt : bitVec m) : bitVec (n + m) :=
 - **`SizeExpr` supports `+`, `-`, `*` and `arity`** — `hi - lo + 1` for `EXTRACT`, `n * count` for
   `REPEAT`, `n + extra` for the extensions. Subtraction is `Nat` subtraction. `arity` is the number
   of term arguments: a literal in a fixed-arity signature, the term array's `.size` in an n-ary
-  one, which is what lets `bvFromBools : (terms : Terms Bool) → … → Env (Term (BitVec terms.size))`
-  depend on a runtime value. The identifier `arity` is therefore reserved in a size position.
+  one, so a result sort can depend on a runtime value. The identifier `arity` is therefore
+  reserved in a size position. No entry uses it any more: `BITVECTOR_FROM_BOOLS` did, and is not
+  wrapped, cvc5 forbidding terms of that kind through its API (asserting one aborts the process).
 - **Constructors use a `tm` build.** `op% setEmpty {α} : set α := SET_EMPTY tm mkEmptySet` builds
   through `cvc5.TermManager.mkEmptySet` rather than `mkTerm`. The `kind` is still recorded — it is
   the kind the resulting term *has* — but is not what builds it. Three further pieces go with it:
@@ -547,7 +548,7 @@ op% bvConcat {n m : width} (lft : bitVec n) (rgt : bitVec m) : bitVec (n + m) :=
     `mkOpOfIndices` takes `Nat`;
   - `naryAs <name>` names the n-ary variant, for when `<id>N` is not the right name: the `N`
     suffix suits an operator that is the same operation at greater arity, not one whose
-    distinction is singular versus plural (`bvFromBool` versus `bvFromBools`);
+    distinction is singular versus plural. No entry uses it any more;
   - `tmSortOf <fn> <shape>` names the shape whose sort **cvc5's method** wants, for the methods
     that do not want the sort of the term they build. It does *not* reach the generated signature
     — see the element-sort rule below. `mkEmptySet` wants the set sort but `mkEmptySequence` wants
@@ -580,14 +581,14 @@ op% bvConcat {n m : width} (lft : bitVec n) (rgt : bitVec m) : bitVec (n + m) :=
 
 ### Status
 
-**256 `op%` entries**, 24 of them `tm` constructors, 28 with `smt!` notation, 27 indexed, across
+**253 `op%` entries**, 24 of them `tm` constructors, 28 with `smt!` notation, 27 indexed, across
 thirteen theory modules per layer:
 
 | theory | entries | coverage |
 |---|---|---|
 | bool | 12 | the connectives, plus the sort-generic `equal`, `distinct` and `ite` |
 | arithmetic | 43 | complete: comparisons, division and modulus (total and partial), `pow`/`pow2`/`log2`/`sqrt`/`exp`, the 12 transcendentals, `toReal`/`toInt`/`isInt`, `divisible`, `iand`, `piand` |
-| bit-vectors | 56 | complete |
+| bit-vectors | 53 | complete but for `BITVECTOR_BIT` and `BITVECTOR_FROM_BOOLS`, which cvc5 forbids creating through its API, and the deprecated `BITVECTOR_TO_NAT` (`bvUbvToInt` replaces it) |
 | arrays | 4 | `select`, `store`, `eqRange`, `mkConstArray` |
 | sets | 19 | complete; comprehension is hand-written, see "Quantifiers" |
 | bags | 19 | complete |
@@ -1746,8 +1747,8 @@ argument and the result of a lifted operator are nullable, so `addN'? #[]` is `s
 theory's own constructor (`mkInt` here), which the lift module does not generate. As for plain
 `addN'`, an empty array leaves the index undetermined and has to be ascribed.
 
-Status: **every theory but `Fun`** — 207 liftable entries over eleven theories, one module each per
-layer. Per-theory counts: BitVec 46, Arith 36, Float 26, String 26, Bag 18, Set 17, Seq 14, Regex 9,
+Status: **every theory but `Fun`** — 205 liftable entries over eleven theories, one module each per
+layer. Per-theory counts: BitVec 44, Arith 36, Float 26, String 26, Bag 18, Set 17, Seq 14, Regex 9,
 Bool 8, FiniteField 4, Array 3. `Fun` is deliberately left out.
 
 Only Arith and Bool actually have unit elements, so only they *need* the plain-theory import — but
@@ -2316,7 +2317,7 @@ with lean-cvc5. What follows is everything that is *not* term construction or so
    they can be written: the typed layer gets the sort from the index, while sort-erased `mkSymbol`
    takes a `Srt` and a sort ascription has no index to check against.
 
-   Beyond the fixed forms, **28 of the 256 `op%` entries carry a notation** and the rest are
+   Beyond the fixed forms, **28 of the 253 `op%` entries carry a notation** and the rest are
    reachable only through `![…]`. Adding more runs into the collisions listed under "The `smt!`
    DSL" — division has no notation at all for that reason — so that dispatch has to be settled
    first. Every notated operator whose `nary` is not `.never` already has its bracket form

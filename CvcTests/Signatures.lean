@@ -182,16 +182,6 @@ the typed one computes it from the index. The nullary ones need neither.
 
 
 
--- a result size that is the operator's arity: a literal at fixed arity, the array's size when
--- n-ary, which makes that signature depend on a runtime value
-/-- info: @Typed.Term.bvFromBool : [inst : Ω] → Typed.Term Bool → Env (Typed.Term (BitVec 1)) -/
-#guard_msgs in #check @Cvc.Typed.Term.bvFromBool
-
-/-- info: @Typed.Term.bvFromBools : [inst : Ω] →
-  (terms : Typed.Terms Bool) →
-    autoParam (2 ≤ Array.size terms) Typed.Term.bvFromBools._auto_1 → Env (Typed.Term (BitVec (Array.size terms))) -/
-#guard_msgs in #check @Cvc.Typed.Term.bvFromBools
-
 
 
 /-! ## Index arithmetic and refinement classes hold definitionally -/

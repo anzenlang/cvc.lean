@@ -53,5 +53,8 @@ def getBitVecValue (term : Term) : Env (BitVec size) := do
   else throwUser s!"expected bitvector term of size {size}, got size {size'}: {term}"
 
 instance : SrtLike (BitVec size) where
-  valueToTerm bv := mkBitVec size bv.toNat.toUInt64
+  -- `mkBitVec` takes a `UInt64`, so a wider value goes through its binary digits
+  valueToTerm bv :=
+    if size ≤ 64 then mkBitVec size bv.toNat.toUInt64
+    else mkBitVecOfString size (String.ofList (Nat.toDigits 2 bv.toNat)) 2
   termToValue t := t.getBitVecValue
