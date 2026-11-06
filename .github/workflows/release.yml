@@ -13,7 +13,12 @@ name: Release
 # from source (`--no-cache`), so that its `ffi.o` is compiled against this release's Lean rather
 # than taken from lean-cvc5's archive, which is built with lean-cvc5's own, possibly older, Lean.
 # Its environment is the one lean-cvc5's own CI builds it in: the same runner images, and on Linux
-# the same libc++ headers, which compiling `ffi.cpp` needs.
+# the same libc++ headers, which compiling `ffi.cpp` needs. The exception is Apple silicon, built on
+# `macos-15` where lean-cvc5 names `macos-14`, an image GitHub has retired.
+#
+# On macOS, everything the build compiles or links would require the build machine's macOS version
+# or later, while cvc5's static release and Lean itself support macOS 11. The bundle job pins that
+# version and checks every object of lean-cvc5's build carries it.
 #
 # Nothing is cached, so a bundle holds only what this release's build made, and each check runs on
 # a fresh machine, so it cannot see what the bundle job left behind. The check installs no C++
@@ -47,10 +52,14 @@ jobs:
         include:
           - { name: Linux-x86_64, os: ubuntu-22.04 }
           - { name: Linux-aarch64, os: ubuntu-22.04-arm }
-          - { name: macOS-aarch64, os: macos-14 }
+          - { name: macOS-aarch64, os: macos-15 }
           - { name: macOS-x86_64, os: macos-15-intel }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
+    env:
+      # the oldest macOS cvc5's static release and Lean itself support, which compilers default to
+      # the build machine's instead; only compilers targeting macOS read it
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -61,6 +70,22 @@ jobs:
         run: .github/scripts/install_lean.sh
       - name: Build, lean-cvc5 from source
         run: lake build --no-cache
+      - name: Check the bundle's minimum macOS version
+        if: runner.os == 'macOS'
+        run: |
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            minos=$(otool -l "$file" |
+              awk '/LC_BUILD_VERSION/ { b = 1 } b && /minos/ && !m { m = $2 } END { print m }')
+            echo "$file: macOS $minos"
+            if [ "$minos" != "$MACOSX_DEPLOYMENT_TARGET" ]; then
+              echo "::error::$file requires macOS $minos, not $MACOSX_DEPLOYMENT_TARGET"
+              exit 1
+            fi
+          done < <(find .lake/packages/cvc5/.lake/build -type f \
+            \( -name '*.o' -o -name '*.o.export' -o -name '*.dylib' \) -print0)
+          [ "$found" = 1 ] || { echo "::error::no object found in lean-cvc5's build"; exit 1; }
       # works around tar packing corrupt archives on macOS runners,
       # https://github.com/actions/runner-images/issues/2619
       - name: Purge the disk cache
@@ -83,7 +108,7 @@ jobs:
         include:
           - { name: Linux-x86_64, os: ubuntu-22.04 }
           - { name: Linux-aarch64, os: ubuntu-22.04-arm }
-          - { name: macOS-aarch64, os: macos-14 }
+          - { name: macOS-aarch64, os: macos-15 }
           - { name: macOS-x86_64, os: macos-15-intel }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
