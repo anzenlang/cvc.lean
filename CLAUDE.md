@@ -74,10 +74,14 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   publishing a **pre-release** with a new `v*` tag. Not a draft: a draft's tag does not exist until
   it is published, and its files are not public, so the check could not fetch it as a user does.
   Per platform — lean-cvc5's own CI matrix minus Windows: Linux x86_64 and aarch64 on Ubuntu 22.04,
-  macOS aarch64 and x86_64 — a `bundle` job builds with lean-cvc5 **from source** (`lake build
-  --no-cache`, in lean-cvc5's CI environment, libc++-15 headers on Linux) so that `ffi.o` is
-  compiled against our Lean, then attaches `lean-cvc5-<Lean's target triple>.tar.gz`, packed by
-  `lake run packLeanCvc5Bundle <dir>`. A `check` job on a fresh machine runs
+  macOS aarch64 (on `macos-15`, lean-cvc5's `macos-14` being retired) and x86_64 — a `bundle` job
+  builds with lean-cvc5 **from source** (`lake build --no-cache`, in lean-cvc5's CI environment,
+  libc++-15 headers on Linux) so that `ffi.o` is compiled against our Lean, then attaches
+  `lean-cvc5-<Lean's target triple>.tar.gz`, packed by `lake run packLeanCvc5Bundle <dir>`. On
+  macOS it sets `MACOSX_DEPLOYMENT_TARGET=11.0`, the oldest macOS cvc5's static release and Lean
+  support, and checks every object of lean-cvc5's build carries it: unpinned, `ffi.o`, Lean's
+  compiled modules and lean-cvc5's shared library all record the build machine's version (14 in
+  lean-cvc5's own archive). A `check` job on a fresh machine runs
   `.github/scripts/check_release.sh <repository URL> <tag>`, and `publish` turns the pre-release
   into a release once every check passes. No cache anywhere.
 
