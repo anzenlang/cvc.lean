@@ -73,7 +73,7 @@ def setNonDiff : Kind → Kind
 | k@(.nonDiff ..) => k
 
 def setNonLinear : Kind → Kind
-| .diff => .nonDiff false true
+| .diff => .nonDiff false false
 | .nonDiff _ t => .nonDiff false t
 
 def setTranscendental : Kind → Kind

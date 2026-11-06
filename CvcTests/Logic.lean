@@ -84,6 +84,22 @@ all.qf.ho : HO_QF_ALL
   println! "all.ho.qf : {Cvc.Logic.all.ho.qf.toSmtLib}"
   println! "all.qf.ho : {Cvc.Logic.all.qf.ho.toSmtLib}"
 
+/-! Each arithmetic setter of the builder changes one aspect only: making arithmetic non-linear
+leaves transcendentals out, and adding them keeps the arithmetic linear.
+-/
+
+/-- info:
+nonDiff                  : LIA
+nonLinear                : NIA
+transcendental           : LIAT
+nonLinear.transcendental : NIAT
+-/
+#guard_msgs in #eval do
+  println! "nonDiff                  : {Cvc.Logic.mk.nonDiff.toLogic.toSmtLib}"
+  println! "nonLinear                : {Cvc.Logic.mk.nonLinear.toLogic.toSmtLib}"
+  println! "transcendental           : {Cvc.Logic.mk.transcendental.toLogic.toSmtLib}"
+  println! "nonLinear.transcendental : {Cvc.Logic.mk.nonLinear.transcendental.toLogic.toSmtLib}"
+
 /-! Parsing accepts what cvc5 writes and rejects what it does not.
 
 Trailing input is the case worth pinning: `ALL` and its prefixed forms are matched whole, so
