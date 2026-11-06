@@ -92,9 +92,13 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   macOS it sets `MACOSX_DEPLOYMENT_TARGET=11.0`, the oldest macOS cvc5's static release and Lean
   support, and checks every object of lean-cvc5's build carries it: unpinned, `ffi.o`, Lean's
   compiled modules and lean-cvc5's shared library all record the build machine's version (14 in
-  lean-cvc5's own archive). A `check` job on a fresh machine runs
+  lean-cvc5's own archive). A check job per platform, on a fresh machine, runs
   `.github/scripts/check_release.sh <repository URL> <tag>`, and `publish` turns the pre-release
-  into a release once every check passes. No cache anywhere.
+  into a release once every check passes. No cache anywhere. On Linux the check (`check-linux`)
+  runs in a bare `ubuntu:22.04` container with only `git`, `curl` and CA certificates added, and
+  fails if any C compiler is present: the runner images come with compilers and headers, which
+  hid the shim's need for a system `clang`. macOS has its own job (`check-macos`), since a job
+  container needs a Linux runner — and what an empty `container:` value does is undocumented.
 
 ### Releases carry the lean-cvc5 build they were made with
 
