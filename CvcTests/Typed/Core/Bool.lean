@@ -134,3 +134,13 @@ example : Env (Term Int) := smt! if a then i else j
 example : Env (Term Bool) := smt! =[i, j, i]
 
 end indices
+
+/-! A chain of equalities over one term holds: `equalN'` answers its unit, `true`, rather than the
+term itself, which has the wrong sort.
+-/
+
+/-- info: equalN' [x] : true : Bool -/
+#guard_msgs in #eval Env.runIO do
+  let x ← Cvc.Typed.Term.mkSymbolAs Int "x"
+  let e ← equalN' #[x]
+  println! "equalN' [x] : {e} : {← e.getSort}"

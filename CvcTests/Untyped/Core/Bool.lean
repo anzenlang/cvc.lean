@@ -123,3 +123,16 @@ right-assoc ∧ : (and a (and b a))
   println! "ite      : {← smt! if a then i else j}"
   -- associativity follows the `op%` entry: `∧` is `infixr`
   println! "right-assoc ∧ : {← smt! a ∧ b ∧ a}"
+
+/-! A chain of equalities over one term holds: `equalN'` answers its unit, `true`, unless `on1` says
+otherwise.
+-/
+
+/-- info:
+equalN' [x]        : true
+equalN' [x] (on1)  : false
+-/
+#guard_msgs in #eval Env.runIO do
+  let x ← mkSymbolAs Int "x"
+  println! "equalN' [x]        : {← equalN' #[x]}"
+  println! "equalN' [x] (on1)  : {← equalN' #[x] (on1 := fun _ => mkBool false)}"

@@ -1747,6 +1747,12 @@ argument and the result of a lifted operator are nullable, so `addN'? #[]` is `s
 theory's own constructor (`mkInt` here), which the lift module does not generate. As for plain
 `addN'`, an empty array leaves the index undetermined and has to be ascribed.
 
+On one term, an `N'` variant (plain or lifted) answers the term for an operation and the unit for a
+relation — `equalN' #[t]` is `true`, `t` having the wrong sort (`OpSpec.unitOn1Default`). The typed
+variants pass an arithmetic unit at the operands' sort (`arithUnitAt`: `addN' (#[] : Terms Rat)` is
+`0.0`), the sort-erased ones having no sort to go by. `on0`/`on1` are built with `mkIdent`, so a
+caller can pass them by name; hygienic, they could not be named at all.
+
 Status: **every theory but `Fun`** — 205 liftable entries over eleven theories, one module each per
 layer. Per-theory counts: BitVec 44, Arith 36, Float 26, String 26, Bag 18, Set 17, Seq 14, Regex 9,
 Bool 8, FiniteField 4, Array 3. `Fun` is deliberately left out.

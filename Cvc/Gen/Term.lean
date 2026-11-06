@@ -70,6 +70,10 @@ def untypedTermsId : Ident := mkIdent `Cvc.Untyped.Terms
 def typedTermId : Ident := mkIdent `Cvc.Typed.Term
 /-- `Cvc.Typed.Terms`. -/
 def typedTermsId : Ident := mkIdent `Cvc.Typed.Terms
+/-- `on0`, what an `N'` variant answers for no term; a caller can name it, so it is not hygienic. -/
+def on0Id : Ident := mkIdent `on0
+/-- `on1`, what an `N'` variant answers for one term; a caller can name it, so it is not hygienic. -/
+def on1Id : Ident := mkIdent `on1
 /-- `Cvc.Srt`. -/
 def srtId : Ident := mkIdent `Cvc.Srt
 /-- `Cvc.Srt.of`, which turns a Lean index into the sort it denotes. -/
@@ -194,6 +198,25 @@ def OpSpec.liftNaryDoc (spec : OpSpec) : String :=
 def OpSpec.liftNaryPrimeDoc (spec : OpSpec) : String :=
   s!"N-ary version of `{spec.liftId.getId}` with defaults for zero- and one-element arrays."
 
+/-- The default an `N'` variant answers for a single term, given the unit's term.
+
+The term itself, for an operation whose result has its arguments' sort (`addN' #[t]` is `t`); the
+unit for a relation (`equalN' #[t]` is `true`), whose single term has the wrong sort.
+-/
+def OpSpec.unitOn1Default (spec : OpSpec) (unitTerm : TSyntax `term) : MacroM (TSyntax `term) :=
+  if spec.args.all (·.shape == spec.ret) then `(pure) else `(fun _ => $unitTerm)
+
+/-- An integer unit as a sort-erased term at the sort of `type`, an arithmetic Lean type.
+
+The sort-erased `N'` variants build their unit with `mkInt`, having no sort to go by; the typed ones
+know theirs, and pass the unit at it.
+-/
+def arithUnitAt (type : TSyntax `term) (i : Int) : MacroM (TSyntax `term) :=
+  let n := Syntax.mkNumLit (toString i)
+  `(match ($(mkIdent `Cvc.Typ.of) $type) with
+    | .real => $(mkIdent `Cvc.Untyped.Term.mkReal) $n
+    | _ => $(mkIdent `Cvc.Untyped.Term.mkInt) $n)
+
 /-- Creates a `docComment` node from a docstring. -/
 def mkDocComment (s : String) : TSyntax ``Lean.Parser.Command.docComment :=
   mkNode ``Lean.Parser.Command.docComment #[mkAtom "/--", mkAtom (s ++ " -/")]
@@ -286,15 +309,16 @@ def genUntyped (spec : OpSpec) : MacroM (Array (TSyntax `command)) := do
         let lit := mkIdent (if b then `Bool.true else `Bool.false)
         `($(mkIdent `Cvc.Untyped.Term.mkBool) $lit)
       | .int i => `($(mkIdent `Cvc.Untyped.Term.mkInt) $(Syntax.mkNumLit (toString i)))
+    let on1Default ← spec.unitOn1Default unitTerm
     let naryPrimeDoc := mkDocComment spec.naryPrimeDoc
     cmds := cmds.push <| ← `(
       $naryPrimeDoc:docComment
       def $(spec.naryPrimeId):ident ($termsId : $untypedTermsId)
-        (on0 : $envId $untypedTermId := $unitTerm)
-        (on1 : $untypedTermId → $envId $untypedTermId := pure)
+        ($on0Id : $envId $untypedTermId := $unitTerm)
+        ($on1Id : $untypedTermId → $envId $untypedTermId := $on1Default)
       : $envId $untypedTermId :=
-        if $(termsId).size = 0 then on0
-        else if h : $(termsId).size = 1 then on1 $(termsId)[0]
+        if $(termsId).size = 0 then $on0Id
+        else if h : $(termsId).size = 1 then $on1Id $(termsId)[0]
         else $runUnsafeId fun tm => tm.mkTerm $kind $termsId
     )
 
@@ -352,15 +376,16 @@ def genUntypedNullable (spec : OpSpec) : MacroM (Array (TSyntax `command)) := do
         `($(mkIdent `Cvc.Untyped.Term.mkBool) $lit >>= $someId)
       | .int i =>
         `($(mkIdent `Cvc.Untyped.Term.mkInt) $(Syntax.mkNumLit (toString i)) >>= $someId)
+    let on1Default ← spec.unitOn1Default unitTerm
     let primeDoc := mkDocComment spec.liftNaryPrimeDoc
     cmds := cmds.push <| ← `(
       $primeDoc:docComment
       def $(spec.liftNaryPrimeId):ident ($termsId : $untypedTermsId)
-        (on0 : $envId $untypedTermId := $unitTerm)
-        (on1 : $untypedTermId → $envId $untypedTermId := pure)
+        ($on0Id : $envId $untypedTermId := $unitTerm)
+        ($on1Id : $untypedTermId → $envId $untypedTermId := $on1Default)
       : $envId $untypedTermId :=
-        if $(termsId).size = 0 then on0
-        else if h : $(termsId).size = 1 then on1 $(termsId)[0]
+        if $(termsId).size = 0 then $on0Id
+        else if h : $(termsId).size = 1 then $on1Id $(termsId)[0]
         else $runUnsafeId fun tm => tm.mkNullableLift $kind $termsId
     )
 
@@ -559,13 +584,17 @@ def genTyped (spec : OpSpec) : MacroM (Array (TSyntax `command)) := do
       $(mkIdent (`T ++ spec.naryId.getId)) $termsId $validId
   )
 
-  if spec.nary matches .arrayWithUnit _ then
+  if let .arrayWithUnit unit := spec.nary then
+    let call := mkIdent (`T ++ spec.naryPrimeId.getId)
+    let body ← match unit with
+      | .int i => `($call $termsId ($on0Id := $(← arithUnitAt naryArgType i)))
+      | .bool _ => `($call $termsId)
     let naryPrimeDoc := mkDocComment spec.naryPrimeDoc
     cmds := cmds.push <| ← `(
       $naryPrimeDoc:docComment
       def $(spec.naryPrimeId):ident $[ $binders ]* ($termsId : $typedTermsId $naryArgType)
       : $envId ($typedTermId $naryRetType) :=
-        $(mkIdent (`T ++ spec.naryPrimeId.getId)) $termsId
+        $body
     )
 
   return cmds
@@ -651,13 +680,20 @@ def genTypedNullable (spec : OpSpec) : MacroM (Array (TSyntax `command)) := do
       $(mkIdent (`T ++ spec.liftNaryId.getId)) $termsId $validId
   )
 
-  if spec.nary matches .arrayWithUnit _ then
+  if let .arrayWithUnit unit := spec.nary then
+    let call := mkIdent (`T ++ spec.liftNaryPrimeId.getId)
+    let body ← match unit with
+      | .int i =>
+        let elemType ← firstArg.shape.render naryArity
+        let someId := mkIdent `Cvc.Untyped.Term.nullableSome
+        `($call $termsId ($on0Id := $(← arithUnitAt elemType i) >>= $someId))
+      | .bool _ => `($call $termsId)
     let primeDoc := mkDocComment spec.liftNaryPrimeDoc
     cmds := cmds.push <| ← `(
       $primeDoc:docComment
       def $(spec.liftNaryPrimeId):ident $[ $binders ]* ($termsId : $typedTermsId $naryArgType)
       : $envId ($typedTermId $naryRetType) :=
-        $(mkIdent (`T ++ spec.liftNaryPrimeId.getId)) $termsId
+        $body
     )
 
   return cmds

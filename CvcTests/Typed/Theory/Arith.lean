@@ -232,3 +232,18 @@ example : Env (Term Rat) := smt! - r
 example : Env (Term Rat) := smt! 1.5 + 2.5
 
 end indices
+
+/-! The unit of `addN'` and `mulN'` on an empty array is built at the operands' sort. -/
+
+/-- info:
+addN' [] (Int) : 0 : Int
+addN' [] (Rat) : 0.0 : Real
+mulN' [] (Rat) : 1.0 : Real
+-/
+#guard_msgs in #eval Env.runIO do
+  let zi ← addN' (#[] : Cvc.Typed.Terms Int)
+  let zr ← addN' (#[] : Cvc.Typed.Terms Rat)
+  let or ← mulN' (#[] : Cvc.Typed.Terms Rat)
+  println! "addN' [] (Int) : {zi} : {← zi.getSort}"
+  println! "addN' [] (Rat) : {zr} : {← zr.getSort}"
+  println! "mulN' [] (Rat) : {or} : {← or.getSort}"

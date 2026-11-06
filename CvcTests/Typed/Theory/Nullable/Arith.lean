@@ -148,3 +148,10 @@ mulN'? []   : (some 1)
     println! "addN'? [x]  : {← s.getValue single}"
     println! "addN'? [x,x]: {← s.getValue many}"
     println! "mulN'? []   : {← s.getValue unit}")
+
+/-! The lifted unit is built at the operands' sort too. -/
+
+/-- info: addN'? [] (Rat) : (nullable.some 0.0) : (Nullable Real) -/
+#guard_msgs in #eval Env.runIO do
+  let z ← addN'? (#[] : Cvc.Typed.Terms (Option Rat))
+  println! "addN'? [] (Rat) : {z} : {← z.getSort}"
