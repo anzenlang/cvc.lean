@@ -36,9 +36,115 @@ target glibcCompat.o pkg : System.FilePath := do
   -- C11 without `_GNU_SOURCE`: glibc's headers must not redirect the shim's own calls
   buildO oFile srcJob (traceArgs := #["-std=c11", "-fPIC"]) (compiler := compiler)
 
+/-! ## Releases carry the lean-cvc5 build they were made with
+
+lean-cvc5 fetches files from two releases of its own when it is built: its build archive, which
+Lake falls back from by building it from source, and cvc5's static libraries, without which it
+cannot build at all. A release of this library attaches, for each platform it supports, a bundle of
+both — cvc5's static libraries and lean-cvc5's build directory — so that depending on a release
+keeps working whatever becomes of those files.
+
+`leanCvc5Bundle` restores the bundle when this package is a git dependency checked out at a release
+tag, before Lake processes lean-cvc5. lean-cvc5 then fetches nothing: Lake skips a dependency's
+build archive when its build directory exists, and lean-cvc5 skips downloading cvc5 when the trace
+the bundle carries says the download was done. If the bundle cannot be fetched, lean-cvc5 fetches
+its own files as it always does. `lake run packLeanCvc5Bundle <dir>` packs the bundle; the release
+workflow runs it on each platform and attaches the result.
+-/
+
+/-- The file name of the lean-cvc5 bundle for the platform Lake runs on. -/
+def leanCvc5BundleName : String :=
+  s!"lean-cvc5-{System.Platform.target}.tar.gz"
+
+/-- The directory under `dir` holding cvc5's static release, `cvc5-<os>-<arch>-static`. -/
+def cvc5StaticDir? (dir : System.FilePath) : IO (Option String) := do
+  return (← dir.readDir).findSome? fun entry =>
+    let name := entry.fileName
+    if name.startsWith "cvc5-" && name.endsWith "-static" then some name else none
+
+/-- Runs `cmd args` in `cwd`, failing with its error output if it fails. -/
+def runOrFail (cmd : String) (args : Array String) (cwd : Option System.FilePath := none) :
+    IO Unit := do
+  let out ← IO.Process.output { cmd, args, cwd }
+  unless out.exitCode == 0 do
+    throw <| .userError s!"`{cmd}` exited with code {out.exitCode}: {out.stderr.trimAscii.toString}"
+
+/-- Downloads the bundle at `url` and moves its contents into `leanCvc5`, lean-cvc5's directory.
+
+`staging` is a scratch directory. Nothing is moved unless the whole bundle was fetched and unpacked.
+-/
+def restoreLeanCvc5 (url : String) (staging leanCvc5 : System.FilePath) : IO Unit := do
+  if ← staging.pathExists then IO.FS.removeDirAll staging
+  IO.FS.createDirAll staging
+  let archive := staging / leanCvc5BundleName
+  runOrFail "curl" #["-sSfL", "--retry", "3", "-o", archive.toString, url]
+  runOrFail "tar" #["-xzf", archive.toString, "-C", staging.toString]
+  let some cvc5Dir ← cvc5StaticDir? staging
+    | throw <| .userError "the bundle holds no cvc5 release"
+  unless ← (staging / ".lake" / "build").pathExists do
+    throw <| .userError "the bundle holds no build directory"
+  if ← (leanCvc5 / cvc5Dir).pathExists then IO.FS.removeDirAll (leanCvc5 / cvc5Dir)
+  IO.FS.rename (staging / cvc5Dir) (leanCvc5 / cvc5Dir)
+  IO.FS.createDirAll (leanCvc5 / ".lake")
+  IO.FS.rename (staging / ".lake" / "build") (leanCvc5 / ".lake" / "build")
+-- The build directory goes last: its presence is what stops Lake from fetching lean-cvc5's archive,
+-- so a failure before it leaves lean-cvc5 to fetch its own files as usual.
+
+/-- Restores lean-cvc5 from this release's bundle, when this package is a dependency at a release.
+
+Does nothing unless this package is a git dependency checked out at a tag and lean-cvc5 has no build
+directory yet. The bundle is looked up where Lake looks up release archives: on the release of that
+tag, in the repository this package was cloned from. Failing to restore it is only a warning, since
+lean-cvc5 then fetches its own files.
+-/
+target leanCvc5Bundle pkg : Unit := do
+  let some leanCvc5 ← findPackageByName? `cvc5
+    | error "lean-cvc5 is not in the workspace"
+  if pkg.isRoot || (← leanCvc5.buildDir.pathExists) then return pure ()
+  let some repo := pkg.remoteUrl? | return pure ()
+  let some tag ← (GitRepo.mk pkg.dir).findTag? | return pure ()
+  let repo := if repo.endsWith ".git" then (repo.dropEnd 4).copy else repo
+  let url := s!"{repo}/releases/download/{tag}/{leanCvc5BundleName}"
+  let staging := pkg.buildDir / "leanCvc5Bundle"
+  match ← (restoreLeanCvc5 url staging leanCvc5.dir).toBaseIO with
+  | .ok () => logInfo s!"restored lean-cvc5 from {url}"
+  | .error e => logWarning s!"could not restore lean-cvc5 from {url}, so lean-cvc5 fetches its own \
+      files: {e}"
+  discard <| (IO.FS.removeDirAll staging).toBaseIO
+  return pure ()
+-- It does its work while Lake computes the build's jobs rather than in a job of its own, and every
+-- module of `Cvc` needs it: Lake finishes a library's `needs` before processing the imports of any
+-- of its modules, so lean-cvc5 is restored before anything looks at it.
+-- Failures are caught rather than logged as errors, since an error in the log fails the build.
+
+/-- Packs this platform's lean-cvc5 bundle into the directory given as argument.
+
+lean-cvc5 must have been built, by `lake build` for instance. The bundle holds cvc5's static release
+— its executable and Java bindings left out, nothing linking them — lean-cvc5's build directory, and
+lean-cvc5's licence. cvc5's release carries its own licences, GMP's LGPL among them.
+-/
+script packLeanCvc5Bundle (args) do
+  let [dir] := args
+    | throw <| .userError "expected one argument, the directory to pack the bundle into"
+  let some leanCvc5 ← findPackageByName? `cvc5
+    | throw <| .userError "lean-cvc5 is not in the workspace"
+  unless ← leanCvc5.buildDir.pathExists do
+    throw <| .userError "lean-cvc5 has not been built: run `lake build` first"
+  let some cvc5Dir ← cvc5StaticDir? leanCvc5.dir
+    | throw <| .userError "lean-cvc5 holds no cvc5 release"
+  IO.FS.createDirAll dir
+  let archive ← IO.FS.realPath dir <&> (· / leanCvc5BundleName)
+  runOrFail "tar" (cwd := leanCvc5.dir) #[
+    "-czf", archive.toString, "--exclude", s!"{cvc5Dir}/bin", "--exclude", "*cvc5jni*",
+    "LICENSE", cvc5Dir, ".lake/build"
+  ]
+  IO.println archive
+  return 0
+
 @[default_target]
 lean_lib Cvc where
   moreLinkObjs := #[glibcCompat.o]
+  needs := #[leanCvc5Bundle]
 
 lean_lib cvcTests {
   globs := #[Glob.submodules `CvcTests, Glob.submodules `CvcExamples]

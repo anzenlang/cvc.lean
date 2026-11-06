@@ -70,6 +70,54 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually
   and with a delay, so an automated bump would nearly always fail. Dependabot
   ([.github/dependabot.yml](.github/dependabot.yml)) keeps the actions' versions current.
+- [.github/workflows/release.yml](.github/workflows/release.yml) finishes a release, started by
+  publishing a **pre-release** with a new `v*` tag. Not a draft: a draft's tag does not exist until
+  it is published, and its files are not public, so the check could not fetch it as a user does.
+  Per platform — lean-cvc5's own CI matrix minus Windows: Linux x86_64 and aarch64 on Ubuntu 22.04,
+  macOS aarch64 and x86_64 — a `bundle` job builds with lean-cvc5 **from source** (`lake build
+  --no-cache`, in lean-cvc5's CI environment, libc++-15 headers on Linux) so that `ffi.o` is
+  compiled against our Lean, then attaches `lean-cvc5-<Lean's target triple>.tar.gz`, packed by
+  `lake run packLeanCvc5Bundle <dir>`. A `check` job on a fresh machine runs
+  `.github/scripts/check_release.sh <repository URL> <tag>`, and `publish` turns the pre-release
+  into a release once every check passes. No cache anywhere.
+
+### Releases carry the lean-cvc5 build they were made with
+
+lean-cvc5 fetches two release files of its own when built: its build archive (`preferReleaseBuild`,
+fetched from `abdoo8080/lean-cvc5`'s release of the commit's tag; Lake builds from source without
+it, which needs C++ standard headers Lean's sysroot does not ship) and cvc5's static release (from
+`abdoo8080/cvc5`, URL hard-coded in its lakefile, no fallback — the build stops without it). Both
+have disappeared before. Forking lean-cvc5 is ruled out, so instead each release attaches a bundle
+per platform — cvc5's static release (minus its executable and Java bindings), lean-cvc5's
+`.lake/build`, lean-cvc5's `LICENSE` — and the target `leanCvc5Bundle`, in `lean_lib Cvc`'s
+`needs`, restores it into lean-cvc5's directory. Three facts make lean-cvc5 then fetch nothing,
+each read in Lake's source and confirmed by an offline experiment (a fresh project, HTTP(S) sent to
+a dead proxy, building only with the bundle):
+
+- **Lake finishes a library's `needs` before processing any of its modules' imports**
+  (`Module.recFetchPreSetup`, citing lean4#13598), so the restore precedes everything lean-cvc5;
+- **Lake skips a dependency's build archive when its build directory exists**
+  (`Package.maybeFetchBuildCache`: "do not automatically clobber prebuilt artifacts");
+- **lean-cvc5's `cvc5Enums` is up to date when its trace is**, and that trace depends only on the
+  URL string; it lives in the build directory, and the enum files it generates are committed.
+
+Everything of lean-cvc5 is then *replayed*, its shared library included, at a path other than the
+one it was built at. With `-v`, the replayed logs show the build machine's `curl` commands — which
+is how `check_release.sh` tells a real download (naming the check's directory) from a replay.
+
+The restore runs only when this package is a non-root git dependency, checked out at a tag, and
+lean-cvc5 has no build directory. The bundle is looked up as Lake looks up release archives:
+`<remote URL>/releases/download/<tag>/<bundle>`, so a fork's releases serve its own bundles. It
+stages and unpacks everything before moving anything, the build directory last; any failure is a
+**warning** and lean-cvc5 fetches its own files as before. Failures are caught as `BaseIO` results,
+never logged as errors: an error in the log fails the build even when caught. What it cannot cover:
+the lean-cvc5 repository itself (Lake still clones the pinned commit), a user on another Lean
+version (traces mismatch; the fallback applies), and a user module importing `cvc5` directly before
+any `Cvc` module.
+
+Licences: cvc5's static release carries `COPYING` and `licenses/` (GMP is LGPL v3), and the bundle
+keeps them; lean-cvc5's own build archives carry no licence file at all, though they hold GMP
+statically linked.
 
 ## Lean 4 module system
 
