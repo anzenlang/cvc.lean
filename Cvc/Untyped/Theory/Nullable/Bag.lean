@@ -21,10 +21,9 @@ public import Cvc.Spec.Bag
 /-! # Bags over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
-The bag *term* becomes nullable, not its elements — `Option (Bag α)`, not `Bag (Option α)`. The
-element type is untouched, so the `Ord` binders are the plain operators'.
+The bag *term* becomes nullable, not its elements: `(Nullable (Bag T))`, not `(Bag (Nullable T))`.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

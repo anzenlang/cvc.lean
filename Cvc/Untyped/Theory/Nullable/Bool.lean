@@ -21,7 +21,7 @@ public import Cvc.Spec.Bool
 /-! # Boolean and sort-generic over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 **`equal?` is not `Option`'s equality.** The lift is strict, so `equal?` of two `none`s is `none`,
 not `some true`. The same goes for `distinct?` and for `ite?`, which is strict in its condition.

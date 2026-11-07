@@ -33,10 +33,7 @@ open cvc5 renaming Term → T
 gen_untyped% from Cvc.Spec.Bool
 gen_untyped_view% from Cvc.Spec.Bool
 
-/-- A symbol of the sort `α` describes.
-
-`mkSymbol` takes the sort itself; this names it by the Lean type denoting it.
--/
+/-- `mkSymbol` at the sort the Lean type `α` denotes. -/
 def mkSymbolAs (α : Type) [ToTyp α] (name : String) : Env Term := do
   mkSymbol (← Srt.of α) name
 
@@ -58,12 +55,12 @@ instance : SrtLike Bool where
 
 
 
-/-! ## The DSL's literals for this theory
+/-! ## `smt!` forms
 
-Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
-theories they imported: without this module, `smt!` does not accept them at all. The expander's own
-machinery lives in `Cvc.Ext`, never in `Cvc`.
+`if c then t else e`, and `true` and `false`. Without this module `smt!` accepts none of them.
 -/
+-- Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
+-- theories they imported. The expander's own machinery lives in `Cvc.Ext`, never in `Cvc`.
 
 public meta section
 
@@ -78,10 +75,9 @@ syntax (name := smtIte)
 
 namespace Ext open Cvc.Ext
 
-/-! `true` and `false` parse as *identifiers* in this category, so they are not a rule of their own
-— this alternative claims those two names and declines every other identifier, which then falls
-through to whatever else handles one.
--/
+-- `true` and `false` parse as *identifiers* in this category, so they are not a rule of their own:
+-- this alternative claims those two names and declines every other identifier, which then falls
+-- through to whatever else handles one.
 
 @[inherit_doc Cvc.Ext.expandSmt]
 macro_rules

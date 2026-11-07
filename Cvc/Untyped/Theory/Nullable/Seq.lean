@@ -21,9 +21,10 @@ public import Cvc.Spec.Seq
 /-! # Sequences over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
-The sequence *term* becomes nullable, not its elements — `Option (Array α)`, not `Array (Option α)`.
+The sequence *term* becomes nullable, not its elements: `(Nullable (Seq T))`, not
+`(Seq (Nullable T))`.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

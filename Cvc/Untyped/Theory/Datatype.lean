@@ -37,16 +37,12 @@ sorts that print identically, and cvc5 rejects any term mixing them:
 Subexpressions must have the same type: Type 1: Pair, Type 2: Pair
 ```
 
-So a datatype sort cannot be *rebuilt*, only kept — which is exactly what `Typ` would have to do,
-mapping a Lean type to a description `Typ.toSrt` reconstructs on demand. `Typ.datatype` therefore
-carries the datatype's **name** and nothing else, and `toSrt` looks the sort up in the scope's
-registry, which `Srt.datatype`, `Srt.datatypes` and `Solver.declareDatatype` all write to. A second
-declaration under a name already taken is rejected, so the name identifies one sort.
+So `Srt.datatype`, `Srt.datatypes` and `Solver.declareDatatype` record each datatype's name in the
+scope, and refuse a name already taken; `Srt.ofName` finds the sort again by its name.
 
-A **record** sort is the other way round, and is the exception worth knowing here: cvc5 builds the
-same record sort from the same fields, so it is structural and `Typ.record` rebuilds it rather than
-looking it up. Records are still datatypes underneath, which is why `Cvc.Untyped.Theory.Record`
-reaches for everything below.
+A **record** sort is the exception: cvc5 builds the same record sort from the same fields, so it is
+not declared. Records are still datatypes underneath, and `Cvc.Untyped.Theory.Record` builds on
+what is here.
 
 Recursion goes through `addSelectorSelf` for a datatype referring to itself, and
 `addSelectorUnresolved` with `Srt.datatypes` for a mutually recursive group.
@@ -288,22 +284,17 @@ abbrev Datatype.Selector.applyUpdate (sel : Datatype.Selector) (dt : Term) (newV
 /-! ## Matching
 
 A match term picks a body by the constructor its scrutinee was built with. Each case pairs a
-*pattern* with the body to use when it applies, and `mkMatch` collects them.
+*pattern* with the body to use when it applies, and `mkMatch` collects them. A case binds its
+constructor's fields to bound variables (`Term.mkBVar`).
 
-Nothing here needs a quantifier: a case binds its constructor's fields to plain bound variables,
-which `Term.mkBVar` already produces. `matchBindCase` builds the variable list cvc5 wants, so that
-term never has to be spelled.
-
-Two conditions are cvc5's to check, since both are properties of the datatype's declaration rather
-than of any term: the cases must cover every constructor unless one of them is a catch-all, and all
-of the bodies must have the same sort.
+cvc5 checks that the cases cover every constructor, unless one of them is a catch-all, and that all
+of the bodies have the same sort.
 
 Cases are tried in order, so a catch-all placed before another case shadows it — the same reading
 Lean's own `match` has. cvc5 accepts a catch-all in any position, including as the only case.
 
-The three lookups below exist for the `smt! match … with` notation, whose expansion has a
-constructor's *name* and the number of variables written after it and nothing else. They are
-ordinary functions, so hand-written matches can use them too.
+`ctorOf`, `checkArity` and `mkBVarAt` find a constructor by name and bind its fields, which is
+what `smt! match` expands to; hand-written matches can use them too.
 -/
 
 namespace Untyped.Term
@@ -319,11 +310,7 @@ end Untyped.Term
 
 namespace Datatype.Ctor variable (c : Datatype.Ctor)
 
-/-- Fails unless the constructor takes exactly `count` fields.
-
-A match binds one variable per field, so this is what reports a pattern of the wrong width, naming
-the constructor rather than leaving an out-of-range index to explain itself.
--/
+/-- Fails unless the constructor takes exactly `count` fields, naming the constructor. -/
 def checkArity (count : Nat) : Env Unit := do
   if c.countSelectors != count then
     throwUser s!"constructor `{← c.getName}` takes {c.countSelectors} field(s), bound {count}"
@@ -377,10 +364,9 @@ Written by hand, and generic over every datatype: which constructors and fields 
 fact about its declaration, so they come back by name. Records, tuples and nullables are datatypes
 to cvc5 too, so this covers them, a record's fields and a tuple's components being selectors like
 any other — a record's constructor answers the name cvc5 gives it, `__cvc5_record_…`.
-
-Named apart from every specified operator, an array's `select` among them: an aggregate's
-abbreviations share one namespace across every theory.
 -/
+-- The constructors are named apart from every specified operator, an array's `select` among them:
+-- an aggregate's abbreviations share one namespace across every theory.
 
 /-- A datatype operation, taken apart one level, sort-erased. -/
 protected inductive Untyped.View.Datatype where
@@ -412,30 +398,30 @@ public meta section
 
 open Lean
 
-/-! ### Matching
+/-! ### `smt! match`
 
 `match … with | ctor x y => … | _ => …` over a datatype, binding each constructor's fields
 without the writer having to make bound variables.
 
-`match` and `with` are Lean keywords already, so unlike an identifier-shaped atom of a new rule
-these reserve nothing. Neither new category needs `behavior := symbol` for the same reason
-`smtTerm` does not: every atom here is a symbol rather than an identifier, so nothing would be
-reserved either way, and a rule leading with `ident` is what symbol behavior indexes worst.
-
-The alternatives get categories of their own rather than an inline `many` group, since the expander
-navigates nodes by index and nesting them would make that unreadable.
-
-The catch-all is spelled `_` and nothing else. A bare identifier is always a constructor name: a
-nullary constructor and a variable standing for the scrutinee are the same syntax, and cvc5 reads a
-lone variable pattern as the catch-all, so naming the two apart is what keeps `| nil => …` meaning
-the constructor. Nothing is lost — the body of a catch-all can mention the scrutinee directly.
+The catch-all is spelled `_` and nothing else: a bare identifier is always a constructor name, so
+`| nil => …` means the constructor. The body of a catch-all can mention the scrutinee directly.
 -/
+-- `match` and `with` are Lean keywords already, so unlike an identifier-shaped atom of a new rule
+-- these reserve nothing. Neither new category needs `behavior := symbol` for the same reason
+-- `smtTerm` does not: every atom here is a symbol rather than an identifier, so nothing would be
+-- reserved either way, and a rule leading with `ident` is what symbol behavior indexes worst.
+--
+-- The alternatives get categories of their own rather than an inline `many` group, since the
+-- expander navigates nodes by index and nesting them would make that unreadable.
+--
+-- A bare identifier cannot be a variable pattern: a nullary constructor and a variable standing for
+-- the scrutinee are the same syntax, and cvc5 reads a lone variable pattern as the catch-all.
 
 /-- One variable bound by a pattern, optionally at a stated sort. -/
 declare_syntax_cat smtPatArg
 /-- A variable whose sort is inferred. -/
 syntax (name := smtPatArg) ident : smtPatArg
-/-- A variable at a stated sort, `(x : Lst)`. -/
+/-- A variable at a stated sort, `(x : Lst)`; typed layer only, refused sort-erased. -/
 syntax (name := smtPatArgOf) "(" ident " : " term ")" : smtPatArg
 
 /-- One alternative of a match. -/
@@ -450,9 +436,8 @@ syntax (name := smtMatch)
   withPosition("match " smtTerm " with" (ppLine colGe smtMatchAlt)+)
 : smtTerm
 
-/-! The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
-with the API a user opens.
--/
+-- The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
+-- with the API a user opens.
 namespace Ext
 
 /-- The name a pattern variable binds. -/

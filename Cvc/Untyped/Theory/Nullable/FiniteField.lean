@@ -21,7 +21,7 @@ public import Cvc.Spec.FiniteField
 /-! # Finite fields over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 The field's size is an index on the sort, not an operator index, so every operator here lifts.
 -/

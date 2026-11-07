@@ -21,11 +21,10 @@ public import Cvc.Spec.Float
 /-! # Floating point over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
-A rounding-mode argument becomes nullable along with the rest: `fpAdd?` takes a
-`Term (Option Float.RoundingMode)`, since `nullable.lift` makes every argument of the lifted
-operator nullable and none of them optional.
+A rounding-mode argument becomes nullable along with the rest: `fpAdd?` takes a rounding mode of
+sort `(Nullable RoundingMode)`, as every argument of a lifted operator is nullable.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

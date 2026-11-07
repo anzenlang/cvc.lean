@@ -25,3 +25,8 @@ public import Cvc.Untyped.Theory.Set
 public import Cvc.Untyped.Theory.String
 public import Cvc.Untyped.Theory.Table
 public import Cvc.Untyped.Theory.Tuple
+
+/-! # Every sort-erased theory
+
+Importing a single theory module instead compiles, and adds to `smt!`, that theory alone.
+-/

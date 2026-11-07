@@ -28,11 +28,11 @@ public import Cvc.Untyped.Core.Symbols
 Where `checkSat` asks whether constraints *can* be satisfied, `checkSynth` asks for a function that
 satisfies them for every input. The shape of that function is what a `Grammar` restricts.
 
-The pieces fit together in one order: declare the universally quantified variables with
-`declareSygusVar`, declare the functions to synthesize with `synthFun`, constrain them with
-`addSygusConstraint`, then `checkSynth` and read each function back with `getSynthSolution`.
-`findSynth` is the other entry point — it enumerates terms of interest rather than solving a
-conjecture.
+The pieces fit together in one order: set the `sygus` option (`s.setOption "sygus" "true"`),
+declare the universally quantified variables with `declareSygusVar`, declare the functions to
+synthesize with `synthFun`, constrain them with `addSygusConstraint`, then `checkSynth` and read
+each function back with `getSynthSolution`. `findSynth` is the other entry point — it enumerates
+terms of interest rather than solving a conjecture.
 -/
 namespace Cvc.Untyped public section variable [Ω]
 
@@ -40,16 +40,13 @@ namespace Cvc.Untyped public section variable [Ω]
 
 /-! ## Synthesis-mode monadic environments
 
-A synthesis check splits the world in three, as a check-sat does, and the queries that make sense
-differ in each: a solution can be read only where one was found. The `env_gen%` mechanism is the
-same, and so are both of its guarantees — the lift from `EnvT` is private to this module, so only
-`checkSynth` below can enter these, and each is indexed by the solver that answered, so a solution
-cannot be read off a solver other than the one whose check found it.
-
-They are separate from the sat monads on purpose. `EnvUnknown` gates a *timeout core*, which has
-nothing to do with a synthesis check giving up, so reusing it would let one be asked for where it
-does not exist.
+A synthesis check splits the world in three, as a check-sat does: a solution can be read only
+where one was found. As for the sat monads, only `checkSynth` enters these, and each is indexed by
+the solver that answered, so a solution cannot be read off another solver.
 -/
+-- The `env_gen%` lift is private to this module. These are separate from the sat monads on
+-- purpose: `EnvUnknown` gates a *timeout core*, which has nothing to do with a synthesis check
+-- giving up, so reusing it would let one be asked for where it does not exist.
 namespace Solver variable [Ω] [Monad m]
 
 /-- Code running where the solver last found a synthesis solution. -/
@@ -146,7 +143,7 @@ def synthFun (symbol : String) (boundVars : BVars) (srt : Srt)
 def addSygusConstraint (t : Term) : Env Unit :=
   runUnsafe' do s.toUnsafe.addSygusConstraint t
 
-@[inherit_doc addSygusConstraint]
+/-- The constraints added so far. -/
 def getSygusConstraints : Env Terms :=
   runUnsafe' do s.toUnsafe.getSygusConstraints
 
@@ -154,7 +151,7 @@ def getSygusConstraints : Env Terms :=
 def addSygusAssume (t : Term) : Env Unit :=
   runUnsafe' do s.toUnsafe.addSygusAssume t
 
-@[inherit_doc addSygusAssume]
+/-- The assumptions added so far. -/
 def getSygusAssumptions : Env Terms :=
   runUnsafe' do s.toUnsafe.getSygusAssumptions
 
@@ -167,8 +164,7 @@ def addSygusInvConstraint (inv pre trans post : Term) : Env Unit :=
 
 /-! ### Rejecting an unexpected answer
 
-What a synthesis branch falls back on when the caller did not expect that answer. The analogue of
-dumping the assertions is dumping the sygus constraints.
+What a synthesis branch falls back on when the caller did not expect that answer.
 -/
 
 section unexpected
@@ -203,11 +199,7 @@ end unexpected
 
 
 
-/-! ### Checking a synthesis conjecture
-
-`checkSynth` is the only way into the synthesis-mode monads: it runs the branch matching the answer
-the solver actually gave, and a branch the caller did not supply rejects that answer.
--/
+/-! ### Checking a synthesis conjecture -/
 
 /-- Tries to solve the synthesis conjecture, as a raw result. -/
 def checkSynthResult : Env SynthResult :=
@@ -217,7 +209,10 @@ def checkSynthResult : Env SynthResult :=
 def checkSynthNextResult : Env SynthResult :=
   SynthResult.ofUnsafe <$> runUnsafe' s.toUnsafe.checkSynthNext
 
-@[inherit_doc checkSynthResult]
+/-- Tries to solve the synthesis conjecture, and runs the branch matching the answer.
+
+A branch left out fails if its answer comes; `getSynthSolution` is available in `ifSolved`.
+-/
 def checkSynth
   (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
   (ifUnsolvable : s.EnvUnsolvableT m α := s.unexpectedUnsolvable)
@@ -228,10 +223,9 @@ def checkSynth
   | some false => ifUnsolvable.toEnv
   | none => ifUnknown.toEnv
 
-/-- Tries to find *another* solution to the synthesis conjecture.
+/-- Tries to find *another* solution to the synthesis conjecture, with `checkSynth`'s branches.
 
-Only where one was already found, which is what `EnvSolved` records; the answer re-splits the
-world, so this takes the same three branches `checkSynth` does.
+Only possible where a solution was already found.
 -/
 def checkSynthNext
   (ifSolved : s.EnvSolvedT m α := s.unexpectedSolved)
@@ -243,7 +237,7 @@ def checkSynthNext
   | some false => ifUnsolvable.toEnv
   | none => ifUnknown.toEnv
 
-@[inherit_doc checkSynthResult]
+/-- `checkSynth` whose branches all default to answering `none`. -/
 def checkSynth? {α : Type} (s : Solver)
   (ifSolved : s.EnvSolvedT m (Option α) := return none)
   (ifUnsolvable : s.EnvUnsolvableT m (Option α) := return none)
@@ -255,7 +249,7 @@ def checkSynth? {α : Type} (s : Solver)
 
 /-! ### Where a solution was found -/
 
-/-- The solution found for a synthesized function. -/
+/-- The solution found for `fn`, a function `synthFun` declared. -/
 def getSynthSolution (fn : Term) : s.EnvSolved Term :=
   runUnsafe' do s.toUnsafe.getSynthSolution fn
 
@@ -265,13 +259,14 @@ def getSynthSolutions (fns : Terms) : s.EnvSolved Terms :=
 
 /-- Enumerates a term of interest, rather than solving a conjecture, `none` if cvc5 finds none.
 
-A `grammar` restricts what may be enumerated. cvc5 answers the null term when the search fails,
-which is `none` here, so that no null term reaches a caller.
+A `grammar` restricts what may be enumerated; without one, the last `synthFun`'s grammar is used,
+and cvc5 refuses if it had none.
 -/
 def findSynth (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none)
 : Env (Option Term) := runUnsafe' do
   let t ← s.toUnsafe.findSynth target.toUnsafe (grammar.map (·.raw))
   return if t.isNull then none else some t
+-- cvc5 answers the null term when the search fails, which is `none` here.
 
 /-- `findSynth`, failing rather than answering `none`. -/
 def findSynth! (target : Cvc.Synth.FindTarget) (grammar : Option Grammar := none) : Env Term :=

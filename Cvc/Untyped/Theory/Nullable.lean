@@ -19,3 +19,5 @@ public import Cvc.Untyped.Theory.Nullable.Regex
 public import Cvc.Untyped.Theory.Nullable.Seq
 public import Cvc.Untyped.Theory.Nullable.Set
 public import Cvc.Untyped.Theory.Nullable.String
+
+/-! # Nullable values, and every theory's operators lifted over them, sort-erased -/

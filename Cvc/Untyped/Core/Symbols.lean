@@ -47,24 +47,23 @@ names a symbol `count__@__k`, and `FunAt`, `Fun2At` and their primed forms are t
 one step or two. `Cvc.Untyped.Extra.Sys` builds transition systems and bounded model checking
 on top.
 
-Worked examples, including the hand-written path for what `structure.symbols` cannot express, are
-in `CvcTests.Untyped.Symbols`.
+What `structure.symbols` cannot express, such as a field holding an array of symbols, takes a
+hand-written `Symbols` instance.
 -/
 namespace Cvc.Untyped public section
 
 namespace Symbols
 
-/-- Signature of the symbol wrapper. -/
+/-- What a symbol structure's fields are wrapped in: `String` for identifiers, `Term` for terms. -/
 abbrev Wrap : Type 1 := (α : Type) → [ToTyp α] → [TermToValue α] → Type
 
-/-- Signature of a user-provided type representing some symbols. -/
+/-- A symbol structure, parameterized by the `Wrap` its fields are wrapped in. -/
 abbrev Sig : Type 1 := Wrap → Type
 
-/-- A `Wrap` value at some depth `k : Nat`. -/
+/-- A field at step `k`, unwrapped with `get`. -/
 protected structure At (k : Nat) (W : Symbols.Wrap) (α : Type) [ToTyp α] [TermToValue α] where
-/-- Private constructor. -/
 private mk' ::
-  /-- Accessor. -/
+  /-- The field. -/
   get : W α
 
 namespace At
@@ -76,43 +75,42 @@ end At
 
 namespace Sig variable [Ω] (S : Sig)
 
-/-- Some `String` identifiers over a `Sig` -/
+/-- The symbols' identifiers. -/
 abbrev Idents : Type := S (fun _α => String)
-/-- `Term` specialization for a `Sig`. -/
+/-- The symbols, as terms. -/
 abbrev Terms : Type := S (𝕂 Term)
-/-- `Term` at `k` specialization for a `Sig`. -/
+/-- The symbols at step `k`, as terms. -/
 abbrev TermsAt (k : Nat) : Type := S (Symbols.At k (𝕂 Term))
-/-- `BVar` specialization for a `Sig`. -/
+/-- The symbols, as bound variables. -/
 abbrev BVars : Type := S (𝕂 BVar)
-/-- Lean-value specialization for a `Sig`. -/
+/-- The symbols' values in a model, as Lean values. -/
 abbrev Values : Type := S (fun α => α)
-/-- `Term`-value specialization for a `Sig`. -/
+/-- The symbols' values in a model, as terms. -/
 abbrev ValueTerms : Type := S (𝕂 Term)
-/-- Lean-value at `k` specialization for a `Sig`. -/
+/-- The values of the symbols at step `k` in a model, as Lean values. -/
 abbrev ValuesAt (k : Nat) : Type := S (Symbols.At k fun α => α)
-/-- `Term`-value specialization for a `Sig`. -/
+/-- The values of the symbols at step `k` in a model, as terms. -/
 abbrev ValueTermsAt (k : Nat) : Type := S (Symbols.At k (𝕂 Term))
 /-- Function from `Term`-symbols to a `Term`. -/
 abbrev Fun : Type := S.Terms → Env Term
 /-- Function from `Term`-symbols at `k` to a `Term`. -/
 abbrev FunAt (k : Nat) : Type := S.TermsAt k → Env Term
-@[inherit_doc FunAt]
+/-- `FunAt` at every step. -/
 abbrev FunAt' : Type := {k : Nat} → S.FunAt k
 /-- Function over some `Term`-symbols at `k` and some at `k'` (default `k + 1`). -/
 abbrev Fun2At (k : Nat) (k' : Nat := k + 1) : Type := S.TermsAt k → S.TermsAt k' → Env Term
-@[inherit_doc Fun2At]
+/-- `Fun2At` at every pair of steps. -/
 abbrev Fun2At' : Type := {k k' : Nat} → S.Fun2At k k'
 
 end Sig
 
 end Symbols
 
-/-- Symbols specification.
-
-Instantiate this class on your own types to benefit from the `Symbols` framework.
--/
+/-- What makes `S` a symbol structure; `structure.symbols` generates the instance. -/
 class Symbols (S : Symbols.Sig) where
+  /-- What `idents` builds the identifiers from, `Unit` by default. -/
   InitData : Type := Unit
+  /-- The symbols' identifiers. -/
   idents : InitData → S.Idents
   /-- Monadic map over the symbols. -/
   mapM [Ω] {W W' : Symbols.Wrap} [Monad m]
@@ -193,26 +191,26 @@ def Values.foldM [Ω] [Monad m] (values : S.Values) (init : σ)
 : m σ :=
   inst.foldM (W := fun α => α) values init fun {α} _ _ acc x => f (α := α) acc x
 
-/-- The identifier for symbol `symbol` at depth `k`. -/
+/-- The identifier for symbol `symbol` at step `k`, `symbol__@__k`. -/
 protected def mkSymbolIdentAt (k : Nat) (symbol : String) : String :=
   s!"{symbol}__@__{k}"
 
 namespace Idents variable [Ω]
 
-/-- Declares some symbols. -/
+/-- Makes each symbol a fresh constant of the scope, declared in no solver. -/
 def declare (idents : S.Idents) : Env S.Terms :=
   S.mapM idents fun {α} _ _ symbol => do Term.mkSymbol (← Srt.of α) symbol
 
-/-- Declares some symbols in a solver. -/
+/-- Declares each symbol in `solver`. -/
 def declareIn (idents : S.Idents) (solver : Solver) : Env S.Terms :=
   S.mapM idents fun {α} _ _ symbol => Srt.of α >>= solver.declareFun symbol #[]
 
-/-- Declares some symbols a depth `k`. -/
+/-- `declare` at step `k`, naming each symbol for the step. -/
 def declareAt (idents : S.Idents) (k : Nat) : Env (S.TermsAt k) :=
   S.mapM idents fun {α} _ _ ident =>
     return ⟨← Term.mkSymbol (← Srt.of α) (Sig.mkSymbolIdentAt k ident)⟩
 
-/-- Declares some symbols at depth `k` in a solver. -/
+/-- `declareIn` at step `k`, naming each symbol for the step. -/
 def declareAtIn (k : Nat) (s : Solver) (idents : S.Idents)
   (fresh : Bool := false)
 : Env (S.TermsAt k) :=
@@ -231,20 +229,19 @@ namespace Terms
 def toBVars (terms : S.Terms) : Env S.BVars :=
   S.mapM terms fun {α} _ _ term => do term.getSymbol >>= BVar.mk (← Srt.of α)
 
-/-- The Lean-values of some `Term`-symbols in a satisfiable instance. -/
+/-- The symbols' values in the model, as Lean values. -/
 def getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values :=
   S.mapM terms fun term => do
     let valueTerm ← solver.getValue term
     valueTerm.extractValue
 
-/-- The `Term`-values of some `Term`-symbols in a satisfiable instance. -/
+/-- The symbols' values in the model, as terms. -/
 def getValueTerms (terms : S.Terms) (solver : Solver) : solver.EnvSat S.ValueTerms :=
   S.mapM terms fun term => solver.getValue term
 
 /-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
 
-Needs no per-`Sig` code: `mapM` is what makes it generic, so a user's symbol structure gets this
-by instancing `Symbols` and nothing else.
+Answers `none` where unsat, and fails where the solver gives up.
 -/
 def findCex (terms : S.Terms) (solver : Solver)
   (assuming : Option Untyped.Terms := none)
@@ -255,11 +252,11 @@ end Terms
 
 namespace TermsAt
 
-/-- The Lean-values of some `Term`-symbols at depth `k`. -/
+/-- The Lean values of the symbols at step `k` in the model. -/
 def getValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValuesAt k) :=
   S.mapM terms fun {α} _ _ term => return ⟨← solver.getValueAs α term⟩
 
-/-- The `Term`-values of some `Term`-symbols at depth `k`. -/
+/-- The values of the symbols at step `k` in the model, as terms. -/
 def getValueTerms (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValueTermsAt k) :=
   S.mapM terms fun term => return ⟨← solver.getValue term⟩
 
@@ -287,16 +284,22 @@ end Solver
 
 
 
-/-! ## The `symbols structure` command
+/-! ## The `structure.symbols` command
 
-Declared `scoped`, so `open Cvc.Untyped` selects the sort-erased spelling exactly as it selects
-`smt!`. What it generates is described in `Cvc.Ext.elabSymbols`.
+`scoped`: `open Cvc.Untyped` selects the sort-erased spelling, as it selects `smt!`.
 -/
 
 open Lean Elab Command in
 meta section
 
-/-- Declares a symbols structure and everything a `Symbols` instance needs. -/
+/-- Declares a symbol structure and its `Symbols` instance, from plain Lean field types.
+
+```lean
+structure.symbols MySymbols where
+  isOn : Bool
+  count : Int
+```
+-/
 scoped syntax (name := symbolsStructure) atomic((docComment)? "structure.symbols ") ident
   " where" withPosition((ppLine colGe Lean.Parser.Command.structSimpleBinder)+) : command
 

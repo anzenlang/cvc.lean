@@ -50,7 +50,7 @@ def Term.indexAt? (t : Term) (i : Nat) : Option Nat := do
   let op ← T.getOp? t.toUnsafe
   if h : i < op.getNumIndices then (T.getIntegerValue? (op.get ⟨i, h⟩)).map Int.toNat else none
 
-/-- The views a traversal hands its functions, and how to build one. -/
+/-- The views a traversal hands its functions, and how to build one; `def.term_view` declares it. -/
 class TermView (V : outParam Type) where
   /-- Takes a term apart one level. -/
   viewOf : Term → V

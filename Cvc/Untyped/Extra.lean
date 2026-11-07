@@ -8,3 +8,5 @@ Authors: Adrien Champion
 module
 
 public import Cvc.Untyped.Extra.Sys
+
+/-! # Sort-erased tools built on the solver: transition systems and bounded model checking -/

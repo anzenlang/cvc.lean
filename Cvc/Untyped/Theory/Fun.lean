@@ -21,17 +21,12 @@ public import Cvc.Spec.Fun
 
 /-! # Function-application constructors, sort-erased
 
-`applyN` takes an array and `apply`/`apply2`/`apply3` are the fixed-arity spellings over it, so any
-arity is reachable. All four build `APPLY_UF`, whose first child is the function itself.
+`applyN` takes an array and `apply` to `apply4` are the fixed-arity spellings over it, so any
+arity is reachable. All of them build `APPLY_UF`, whose first child is the function itself.
 
 **They flatten.** Applying a term that is *already* an `APPLY_UF` appends to its children rather
-than nesting, so `apply2 (← apply f i) b` and `applyN f #[i, b]` build the same `(f i b)`. That
-matters beyond tidiness: a nested application would have a partially applied — and therefore
-function-sorted — term inside it, and cvc5 admits function-sorted terms only under a higher-order
-logic. Flattening is what keeps ordinary uninterpreted functions out of `HO_`.
-
-This is why these are hand-written rather than generated: a generated constructor applies its kind
-blindly, and cannot look at the term it is applying.
+than nesting, so `apply2 (← apply f i) b` and `applyN f #[i, b]` build the same `(f i b)`. A nested
+application would hold a function-sorted term, which cvc5 admits only under a higher-order logic.
 
 **A partial application is legal.** cvc5 accepts fewer arguments than the function's arity and
 gives the result the *remaining* function sort: applying `(-> Int Bool Int)` to one `Int` yields a
@@ -41,6 +36,8 @@ least two children, the function and one argument.
 `applyHo` is the different one: it is `HO_APPLY`, consumes exactly one argument whatever the
 arity, and needs a higher-order logic.
 -/
+-- `applyN` and its spellings are hand-written rather than generated because a generated
+-- constructor applies its kind blindly, and cannot look at the term it is applying.
 namespace Cvc.Untyped.Term public section
 
 variable [Ω]
@@ -80,13 +77,12 @@ def apply4 (f fst snd thd frth : Term) : Env Term := applyN f #[fst, snd, thd, f
 
 /-! ## The view of an application
 
-Written by hand, as application is: `Cvc.Spec.Fun` specifies only `applyHo`, whose view is the
-generated `View.Fun`.
+`View.Apply` takes an `APPLY_UF` apart; `applyHo` has the generated `View.Fun`.
 -/
 
 /-- An uninterpreted function's application, taken apart one level, sort-erased. -/
 protected inductive _root_.Cvc.Untyped.View.Apply where
-  /-- `f a₁ … aₙ`, fully applied. -/
+  /-- `f a₁ … aₙ`, possibly a partial application. -/
   | apply (f : Term) (args : Args)
 
 /-- Takes a term apart one level, if it is an uninterpreted function's application. -/

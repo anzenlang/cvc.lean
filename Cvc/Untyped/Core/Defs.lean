@@ -16,20 +16,14 @@ import all Cvc.Basic.Env
 
 /-! # The sort-erased term type
 
-A term carries no sort on the Lean side: it is exactly a cvc5 term, so the wrapper is a zero-cost
-`def` and the conversions either way are `id`. `def3%` derives the comparison and printing
-instances from the underlying type.
-
-`Cvc.Untyped.Term` names both this type and the namespace holding the generated
-constructors. Being a *declaration* as well as a namespace is what lets a typed generation site
-write
-
-```lean
-open Cvc renaming Untyped.Term → T
-```
-
-and have the generator's `T.<id>` delegation resolve.
+`Term`, `Terms`, substitution, building a term from a raw `Kind`, and the layer's `smt!`.
 -/
+-- A term is exactly a cvc5 term, so the wrapper is a zero-cost `def` and the conversions either way
+-- are `id`; `def3%` derives the comparison and printing instances from the underlying type.
+--
+-- `Cvc.Untyped.Term` names both this type and the namespace holding the generated constructors.
+-- Being a *declaration* as well as a namespace is what lets a typed generation site write
+-- `open Cvc renaming Untyped.Term → T` and have the generator's `T.<id>` delegation resolve.
 namespace Cvc.Untyped public section variable [Ω]
 
 /-- A sort-erased cvc5 term.
@@ -105,11 +99,10 @@ rebuild one from an existing term.
 def mkOfKind (kind : Kind) (kids : Terms) : Env Term :=
   runUnsafe fun tm => tm.mkTerm kind kids
 
-/-- `t`'s operator applied to `kids` instead of its own kids: the same kind, and for an indexed
-operator the same indices.
+/-- Applies `t`'s operator, indices included, to `kids` instead of its own kids.
 
-A term with no kids — a value, a symbol, a bound variable — is its own rebuild, so it is answered
-as is when `kids` is empty too. cvc5 checks the kids' number and sorts.
+A term with no kids — a value, a symbol, a bound variable — is answered as is when `kids` is empty
+too. cvc5 checks the kids' number and sorts.
 -/
 def replaceKids (t : Term) (kids : Terms) : Env Term := do
   if t.toUnsafe.getNumChildren == 0 && kids.isEmpty then return t
@@ -133,10 +126,10 @@ private example (ts : Terms) : ofUnsafe ts.toUnsafe = ts := rfl
 
 end Terms
 
-/-- Sort-erased `smt!`.
+/-- Builds a sort-erased term, in `Env`, from SMT notation: `smt! x + 1 ≤ y ∧ b`.
 
-`scoped`, so that `open Cvc.Untyped` selects this layer's DSL. It forwards to `smtU!`, which
-expands to fully-qualified `Cvc.Untyped.Term.…` calls; nothing needs to be in scope.
+The forms accepted are those of the theories imported. `open Cvc.Untyped` selects this spelling;
+`smtU!` is the same notation whatever is open.
 -/
 scoped syntax "smt! " ppLine group(colGt smtTerm) : term
 

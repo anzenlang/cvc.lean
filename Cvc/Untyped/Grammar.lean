@@ -27,13 +27,12 @@ public meta import Cvc.Ext
 /-! # SyGuS grammars, sort-erased
 
 A grammar restricts the shape of a term the solver is allowed to produce — the candidates a
-`synth-fun` may return, or the shape of an interpolant or abduct.
+`synthFun` may return, or the shape of an interpolant or abduct.
 
-Two kinds of variable go into one: the **parameters** the synthesized term may mention, and the
-**non-terminals** the rules are written over. cvc5 takes both as plain bound variables, which makes
-them trivial to mix up, so a non-terminal has its own type here. `NT` converts to a term, because a
-non-terminal appears inside its own rules, but not to a `BVar`: handing one to `mkGrammar` as a
-parameter is exactly the mistake worth ruling out.
+Two kinds of variable go into one: the **parameters** (`BVar`) the synthesized term may mention, and
+the **non-terminals** (`NT`) the rules are written over. An `NT` converts to a term, since a
+non-terminal appears inside its own rules, but has no coercion to `BVar`, so it cannot be passed as
+a parameter by mistake.
 
 **A grammar freezes once it is used.** `addRule` and friends answer a *new* `Grammar`, so the type
 reads as though grammars were persistent values, but the object underneath is shared: once a
@@ -48,11 +47,7 @@ namespace Untyped
 
 /-! ## Non-terminal symbols -/
 
-/-- A grammar's non-terminal symbol.
-
-A bound variable, but not interchangeable with one: `mkGrammar` takes the parameters and the
-non-terminals as separate arrays, and nothing but the type stops them being swapped.
--/
+/-- A grammar's non-terminal symbol: a bound variable, kept apart from parameters by its type. -/
 structure NT where
   private ofBVar ::
   private bvar : BVar
@@ -69,10 +64,7 @@ namespace NT
 /-- A non-terminal symbol of the given sort. -/
 def mk (srt : Srt) (name : String) : Env NT := do return ⟨← BVar.mk srt name⟩
 
-/-- Turns itself into a bound variable.
-
-Explicit on purpose: there is no coercion, because a non-terminal is not a parameter.
--/
+/-- Turns itself into a bound variable, explicitly only: a non-terminal is not a parameter. -/
 def toBVar (nt : NT) : BVar := nt.bvar
 
 /-- Turns itself into a term, which is how a non-terminal appears inside its own rules. -/
@@ -92,34 +84,32 @@ end Untyped
 
 /-! ## Grammars
 
-A grammar belongs to the scope, as a term does: cvc5 builds one through a solver, but any solver
-of the same term manager accepts it. The type is declared beside `Solver`, whose interpolant and
-abduct queries take one; what is here builds one.
+A grammar is built through a solver, but any solver of the scope accepts it.
 -/
 
 namespace Untyped.Solver open Untyped variable (s : Solver)
 
 /-- A grammar over the given parameters, starting at `start`.
 
-`boundVars` are the parameters of the `synth-fun` this grammar will constrain, and must be the very
+`boundVars` are the parameters of the `synthFun` this grammar will constrain, and must be the very
 same variables that function is declared with. `others` are the further non-terminals the rules may
-mention: every one has to be declared here, since a rule over an undeclared symbol is rejected.
-
-The start symbol is a separate argument rather than the head of one array, because cvc5 takes the
-*first* non-terminal as the start symbol and then drops whatever is unreachable from it — silently.
-Handing it `#[cnd, start]` instead of `#[start, cnd]` yields a grammar containing neither `start`
-nor its rules, with no error. Naming the start symbol makes that unrepresentable, and makes the
-array's non-emptiness structural rather than a side condition.
+mention: every one has to be declared here. A non-terminal unreachable from `start` is left out of
+the grammar.
 -/
 def mkGrammar (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env Grammar := do
   let raw : cvc5.Grammar ← runUnsafe' do
     s.toUnsafe.mkGrammar (boundVars.map BVar.toTerm) (#[start.toTerm] ++ others.map NT.toTerm)
   return ⟨raw, boundVars, ← start.toTerm.getSort⟩
+-- The start symbol is a separate argument rather than the head of one array because cvc5 takes the
+-- *first* non-terminal as the start symbol and silently drops whatever is unreachable from it:
+-- `#[cnd, start]` instead of `#[start, cnd]` yields a grammar containing neither `start` nor its
+-- rules. Naming the start symbol rules that out, and makes the array's non-emptiness structural.
 
 end Untyped.Solver
 
 namespace Untyped.Grammar open Untyped variable (g : Grammar)
 
+/-- `Solver.mkGrammar`, without a solver at hand. -/
 def mk (boundVars : BVars) (start : NT) (others : NTs := #[]) : Env Grammar := do
   -- need to create a solver although it will never be used
   -- waiting for upstream to provide a solver-free constructor
@@ -183,16 +173,14 @@ smt.grammar! s (x y : Int) where
   cnd   : Bool := start ≤ start
 ```
 
-- `s` is a solver to build the grammar with — any solver of the scope will do, a grammar belonging
-  to the scope rather than to a solver; the binders after it are the grammar's parameters.
+- `s` is any solver of the scope; the binders after it are the grammar's parameters.
 - Each line declares a non-terminal and its sort, then its alternatives separated by `|`. The first
   line's is the start symbol.
 - Inside the alternatives a non-terminal or parameter stands for its term, so rules mention one
   another and themselves freely. Every non-terminal is made before any rule is added.
 - `?const` and `?var` are cvc5's "any constant" and "any parameter" of the non-terminal's sort.
 
-A sort is written as a Lean type or a `Srt` sort-erased, and as a Lean type typed — the typed
-`smt.grammar!` being an ordinary `Grammar` whose index is the parameters folded over the start sort.
+A sort is written as a Lean type (`Int`) or a `Srt` value (`int`).
 
 ### Extending a grammar afterwards
 
@@ -212,8 +200,8 @@ so nothing can be added to it later. Two forms with the same body answer them to
   let g ← g.addRule start (← smt! if cnd then start else start)
   ```
 
-  A parameter is bound as a `BVar` and a non-terminal as an `NT`, both converting to terms. The
-  names are bound without a source position, so one never used afterwards draws no warning.
+  A parameter is bound as a `BVar` and a non-terminal as an `NT`, both converting to terms. A name
+  never used afterwards draws no unused-variable warning.
 
 In these two forms a non-terminal may be declared without alternatives, `nt : sort` alone, for its
 rules to be added afterwards — rules computed from data, say, which a block cannot spell:
@@ -273,19 +261,25 @@ syntax (name := mkGrammarT) "mkGrammarT! " smtGrammarBody : term
 
 namespace Untyped
 
-/-- Sort-erased `smt.grammar!`. -/
+/-- A sort-erased SyGuS grammar, written as one BNF-style block whose alternatives are `smt!` terms.
+
+```lean
+smt.grammar! s (x y : Int) where
+  start : Int := x | y | start + start
+```
+-/
 scoped syntax "smt.grammar! " smtGrammarBody : term
 
 macro_rules
   | `(smt.grammar! $body) => `(grammarU! $body)
 
-/-- Sort-erased `smt.mkGrammar!`: the grammar together with its parameters and non-terminals. -/
+/-- `smt.grammar!`, also answering its parameters and non-terminals, to extend it afterwards. -/
 scoped syntax "smt.mkGrammar! " smtGrammarBody : term
 
 macro_rules
   | `(smt.mkGrammar! $body) => `(mkGrammarU! $body)
 
-/-- Sort-erased `smt.letGrammar!`: binds the grammar, its parameters and its non-terminals. -/
+/-- `smt.grammar!` as a `do` element, binding the grammar, its parameters and its non-terminals. -/
 scoped syntax "smt.letGrammar! " ident " ← " smtGrammarBody : doElem
 
 end Untyped
@@ -425,8 +419,9 @@ def expandGrammar (layer : Layer) (body : Syntax) (withParts : Bool := false)
   let resultTy ← mkProd (headTy :: ntTys)
   `((do $[$items]* pure $result : $env ($resultTy)))
 
-/-- The pattern `smt.letGrammar! g ← …` binds: `g`, the parameters and the non-terminals, grouped as
-`smt.mkGrammar!` answers them and named as the block declares them.
+/-- The pattern `smt.letGrammar! g ← …` binds: `g`, the parameters and the non-terminals.
+
+They are grouped as `smt.mkGrammar!` answers them, and named as the block declares them.
 -/
 def letGrammarPattern (g : Ident) (body : Syntax) : MacroM (TSyntax `term) := do
   let params := quantBinders body[1]

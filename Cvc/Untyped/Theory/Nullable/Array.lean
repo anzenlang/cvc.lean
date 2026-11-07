@@ -21,11 +21,11 @@ public import Cvc.Spec.Array
 /-! # Arrays over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 `select?` and `store?` take and answer nullable terms: it is the array *term* that becomes
 nullable, not its indices or elements. An array whose elements are themselves nullable is a
-different thing, written `TotalMap α (Option β)`.
+different thing, of sort `(Array I (Nullable E))`.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

@@ -20,9 +20,8 @@ public import Cvc.Untyped.Theory.Tuple
 /-! # Tables, sort-erased
 
 A table is a **bag of tuples** — `(Bag (Tuple T₁ … Tⱼ))` — and not a sort of its own: there is no
-`TABLE_SORT`. These are relational-database tables, so a row can repeat, which is the whole
-difference from the relations in `Relation.lean`. The two families are otherwise operator for
-operator the same.
+`TABLE_SORT`. These are relational-database tables, so a row can repeat, unlike in the relations
+of `Cvc.Untyped.Theory.Relation`, which have every operator here and more.
 
 **cvc5 marks every kind here experimental**, "may be changed or removed in future versions".
 
@@ -47,14 +46,15 @@ def tableProject (columns : Array Nat) (table : Term) : Env Term :=
 
 /-- Equi-join: the product of the two tables, keeping the pairings whose given columns agree.
 
-Each pair is a column of `lft` and one of `rgt` that must be equal. cvc5 takes them interleaved in
-one index list, which is what pairing them here rules a mistake out of — the list cannot come out
-of odd length. The result's sort is the product's, since the columns only filter.
+Each pair is a column of `lft` and one of `rgt` that must be equal. The result's sort is the
+product's, since the columns only filter.
 -/
 def tableJoin (columns : Array (Nat × Nat)) (lft rgt : Term) : Env Term :=
   runUnsafe fun tm => do
     let flat := columns.flatMap fun (l, r) => #[l, r]
     tm.mkTermOfOp (← tm.mkOpOfIndices .TABLE_JOIN flat) #[lft, rgt]
+-- cvc5 takes the pairs interleaved in one index list; taking pairs here means that list cannot come
+-- out of odd length.
 
 /-- Partitions the table, putting rows that agree on the given columns in the same part.
 

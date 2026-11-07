@@ -23,10 +23,11 @@ Two classes relate a Lean type to the terms that denote its values, in the two d
 `ValueToTerm α` builds a constant term from an `α`, `TermToValue α` reads an `α` back out of one.
 `SrtLike` bundles them with `ToTyp`, which is what a type needs to be usable as a sort at all.
 
-Only the *readers* live here — they need nothing but the term. A writer needs its theory's
-constructor, so each instance is registered in the theory module that can build it, and a consumer
-that imports one theory does not compile the others.
+The classes live here; each sort's instances are declared in that sort's theory module, beside
+its constructors (`TermToValue Int` in `Cvc.Untyped.Theory.Arith`, for instance).
 -/
+-- Instances sit in their theory so that a consumer importing one theory does not compile the
+-- others.
 namespace Cvc.Untyped public section variable [Ω]
 
 open cvc5 renaming Term → T
@@ -35,7 +36,10 @@ open cvc5 renaming Term → T
 
 /-! ## The classes -/
 
-/-- Reads the value a constant term denotes, as a Lean `α`. -/
+/-- Reads the value a constant term denotes, as a Lean `α`.
+
+A set or a sequence merely built from constructors is not a value; one a model answers is.
+-/
 class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
   termToValue : [Ω] → Term → Env α
@@ -72,12 +76,8 @@ def extractValueAs (α : Type) [A : TermToValue α] : Term → Env α := extract
 
 /-! ## Reading a term's own structure
 
-These say what a term *is*, as opposed to what value it denotes, and they hold whatever its sort.
-Reconstructing a container value goes through them: an SMT bag or array is a spine of applications,
-so reading one back means walking its kind and children.
-
-The readers that *are* tied to a sort — `getIntValue`, `getBitVecValue`, and the rest — live in
-their own theory, beside the constructor that builds what they read.
+These say what a term *is*, as opposed to what value it denotes, whatever its sort. The readers tied
+to a sort — `getIntValue`, `getBitVecValue`, and the rest — are in that sort's theory module.
 -/
 
 /-- The sort of a term. -/
@@ -85,10 +85,10 @@ def getSort (term : Term) : Env Srt := do
   let srt ← T.getSort term.toUnsafe |>.mapError Error.ofUnsafe
   return by unfold Srt ; exact srt
 
-/-- The sort of a term, outside `Env`: cvc5's accessor is pure, and fails only on the null term,
-which this library never hands out. -/
+/-- The sort of a term, outside `Env`; never `none` in practice. -/
 def getSort? (term : Term) : Option Srt :=
   (T.getSort? term.toUnsafe).map fun srt => by unfold Srt ; exact srt
+-- cvc5's accessor is pure and fails only on the null term, which this library never hands out.
 
 @[inherit_doc T.getId]
 def getId (term : Term) : Res Nat := T.getId term.toUnsafe |>.mapError Error.ofUnsafe

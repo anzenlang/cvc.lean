@@ -35,11 +35,7 @@ gen_untyped_view% from Cvc.Spec.BitVec
 def isBitVecValue (term : Term) : Bool := T.isBitVectorValue term.toUnsafe
 
 
-/-- The bit-vector a constant term denotes, failing unless it has the expected size.
-
-cvc5 reports the value as its base-2 representation, so the size comes out of the string's length
-and has to be checked against the one asked for.
--/
+/-- The bit-vector a constant term denotes, failing unless it has the expected size. -/
 def getBitVecValue (term : Term) : Env (BitVec size) := do
   let binRepr ← T.getBitVectorValue term.toUnsafe 2 |>.mapError Error.ofUnsafe
   let empty : (size : Nat) × BitVec size := ⟨0, BitVec.zero 0⟩
@@ -51,6 +47,7 @@ def getBitVecValue (term : Term) : Env (BitVec size) := do
   if h : size' = size
   then return h ▸ bv
   else throwUser s!"expected bitvector term of size {size}, got size {size'}: {term}"
+-- cvc5 reports the value in base 2, so the size comes out of the string's length.
 
 instance : SrtLike (BitVec size) where
   -- `mkBitVec` takes a `UInt64`, so a wider value goes through its binary digits

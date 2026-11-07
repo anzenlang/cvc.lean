@@ -21,10 +21,7 @@ public import Cvc.Spec.Arith
 /-! # Arithmetic over nullables, sort-erased
 
 One lifted constructor per liftable arithmetic operator, `<id>?`. Each answers `none` unless every
-argument is `some`, which is `nullable.lift`'s semantics and not a choice made here.
-
-This module is separate from `Untyped/Term/Arith.lean` so that a user who wants `Option Int` pays
-for arithmetic alone, and one who does not pays nothing.
+argument is `some`.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

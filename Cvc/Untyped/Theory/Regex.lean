@@ -36,11 +36,11 @@ gen_untyped_view% from Cvc.Spec.Regex
 
 /-! ## Values
 
-A regular expression reads back only as a term for now: cvc5 exposes no accessor for the language
-a constant regex denotes, and nothing reconstructs one from a `Cvc.Regex`.
+A regular expression converts neither way between a term and a `Cvc.Regex`: cvc5 exposes no
+accessor for the language a constant regex denotes. Both conversions of `SrtLike Regex` fail.
 -/
 
-/-- The regular expression a term denotes. -/
+/-- Not implemented: always fails, cvc5 exposing no accessor for a regex's language. -/
 def getRegexValue (term : Term) : Env Regex :=
   throwTodo s!"regex value extraction from a constant term: {term}"
 
@@ -68,7 +68,7 @@ regex! ("ab" | "cd"){2,3} ∖ "abab"
 | form | meaning |
 |---|---|
 | `"abc"`, `'a'` | the literal string, the literal character |
-| `x`, `![e]` | a regex term in scope, any Lean term of the layer's regex type |
+| `x`, `![e]` | a regex term in scope, any Lean term of type `Env Term` |
 | `.`, `∅` | any single character, the empty language (`.*` is every string) |
 | `['a'-'z' '_']`, `[^ …]` | a character class: ranges and characters; its complement in `.` |
 | `r*`, `r+`, `r?`, `r{n}`, `r{n,m}` | star, plus, option, exactly `n`, between `n` and `m` |
@@ -104,7 +104,7 @@ syntax:max (name := smtRegexStr) str : smtRegex
 syntax:max (name := smtRegexChar) char : smtRegex
 /-- A regex term in scope. -/
 syntax:max (name := smtRegexIdent) ident : smtRegex
-/-- Any Lean term of the layer's regex type. -/
+/-- Any Lean term building a regex: `Env Term`, `Env (Term Regex)` typed. -/
 syntax:max (name := smtRegexEscape) "![" term "]" : smtRegex
 /-- Grouping. -/
 syntax:max (name := smtRegexParen) "(" smtRegex ")" : smtRegex
@@ -148,7 +148,7 @@ syntax (name := regexT) "regexT! " smtRegex : term
 
 namespace Untyped
 
-/-- Sort-erased `regex!`. -/
+/-- A sort-erased regex term, in `Env`, in the usual notation: `regex! ['a'-'z']+ ("." | "_")?`. -/
 scoped syntax "regex! " smtRegex : term
 
 macro_rules

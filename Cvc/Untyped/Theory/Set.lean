@@ -72,9 +72,9 @@ instance [TermToValue α] : TermToValue (Cvc.Set α) := ⟨getSetValue⟩
 
 /-! ## Comprehension
 
-`{ elem | bvs. pred }`: a set built by binding variables, so it is written here by hand rather than
-generated, as quantifiers are. cvc5 supports it only under `sets-exp`, and its reasoning about one
-is incomplete: even a membership in a finite comprehension can come back `unknown`.
+`{ elem | bvs. pred }`, a set built by binding variables. cvc5 supports it only under `sets-exp`,
+and its reasoning about one is incomplete: even a membership in a finite comprehension can come back
+`unknown`.
 -/
 
 /-- The set of the values `elem` takes, over the bindings of `bvs` that satisfy `pred`. -/

@@ -21,14 +21,12 @@ take two optional functions: `pre`, called on reaching a node, before its kids, 
 on leaving it, after them. Each answers what to do next — descend, skip the kids, stop, and for a
 walk replace the node — along with the new state.
 
-**`fold` runs in any monad.** Taking a term apart is pure, and the only failure, an ill-formed term,
-is one cvc5 never builds. **`walk` needs `Env`**, to rebuild what it replaced under: building a term
-goes through the term manager.
-
-The machinery is written once, here, and shared with the typed layer: the zipper carries a payload
-per node, which the typed layer uses for each node's sort, and `foldWith`/`walkWith` take how a
-node is presented to the user's functions.
+**`fold` runs in any monad**, taking a term apart being pure. **`walk` needs a monad `Env` lifts
+into**, to rebuild what it replaced under.
 -/
+-- The machinery is written once, here, and shared with the typed layer: the zipper carries a
+-- payload per node, which the typed layer uses for each node's sort, and `foldWith`/`walkWith` take
+-- how a node is presented to the user's functions.
 
 namespace Cvc
 
@@ -41,11 +39,11 @@ private inductive FoldTask (N : Type) where
   | enter (t : Term)
   | leave (n : N)
 
-/-- Folds over a term's nodes, presented as `present` builds them: what `Term.fold` and its typed
-counterpart are built on.
+/-- Folds over a term's nodes, presented as `present` builds them.
 
-Depth-first: each node is entered — `pre` — then, unless that answered `skip`, its kids are folded
-over left to right, and then it is left — `post`.
+What `Term.fold` and its typed counterpart are built on. Depth-first: each node is entered —
+`pre` — then, unless that answered `skip`, its kids are folded over left to right, and then it is
+left — `post`.
 -/
 def foldWith [Monad m] (present : Term → m N) (t : Term) (init : σ)
   (pre : N → σ → m (FoldPre σ)) (post : N → σ → m (FoldPost σ))
@@ -171,16 +169,14 @@ partial def root (z : ZipperOf P) : Env Term := do
   | some z => z.root
   | none => return z.term
 
-/-- Replaces the focus, unchecked: the caller guarantees the replacement has the focus's sort, which
-is what keeps every ancestor well-sorted. -/
+/-- Replaces the focus, unchecked: the replacement must have the focus's sort. -/
 def replaceUnchecked (z : ZipperOf P) (t : Term) : ZipperOf P := ⟨t, z.payload, true, z.path⟩
 
-/-- Walks a term's nodes through a zipper, presented as the functions see fit: what `Term.walk` and
-its typed counterpart are built on.
+/-- Walks a term's nodes through a zipper, presented as the functions see fit.
 
-Depth-first: `pre` on reaching a node, then — unless it skipped, replaced or stopped — its kids,
-then `post` on leaving it. A replacement is unchecked; a `stop` keeps every replacement made.
-Answers the rebuilt term and the final state.
+What `Term.walk` and its typed counterpart are built on. Depth-first: `pre` on reaching a node,
+then — unless it skipped, replaced or stopped — its kids, then `post` on leaving it. A replacement
+is unchecked; a `stop` keeps every replacement made. Answers the rebuilt term and the final state.
 -/
 def walkWith [Monad m] [MonadLiftT Env m] (pay : Term → m P) (z₀ : ZipperOf P) (init : σ)
   (pre : ZipperOf P → σ → m (WalkPre σ Term)) (post : ZipperOf P → σ → m (WalkPost σ Term))
@@ -246,8 +242,7 @@ def left (z : Zipper) : Option Zipper := Id.run (z.leftWith fun _ => return ())
 
 end ZipperOf
 
-/-- Fails unless a replacement has the sort of what it replaces: the check that keeps every ancestor
-well-sorted. -/
+/-- Fails unless a replacement has the sort of what it replaces. -/
 def checkSameSort (old new : Term) : Env Unit := do
   let (oldSrt, newSrt) := (← old.getSort, ← new.getSort)
   unless oldSrt == newSrt do
@@ -265,7 +260,7 @@ on the node — so it sees the node's context too — and its view, and answerin
 A replacement must have the sort of the node it replaces, which is checked. `post` sees a node
 rebuilt with its replaced kids. Answers the rebuilt term with the final state, `stop` included.
 
-Runs in any monad `Env` lifts into: rebuilding a term goes through the term manager.
+Runs in any monad `Env` lifts into, since rebuilding a term needs `Env`.
 -/
 def Term.walk [Monad m] [MonadLiftT Env m] [TermView V] (t : Term) (init : σ)
   (pre : Zipper → V → σ → m (WalkPre σ Term) := fun _ _ s => return .descend s)

@@ -14,3 +14,13 @@ public import Cvc.Untyped.Synth
 public import Cvc.Untyped.Theory
 public import Cvc.Untyped.Extra
 public import Cvc.Untyped.View
+
+/-! # The sort-erased layer
+
+A `Cvc.Untyped.Term` carries no Lean-side sort: terms of every sort share one type, and a sort
+mistake, such as `and` applied to an integer, is reported by cvc5 at run time. `Cvc.Typed` is the
+same API over terms indexed by the Lean type their sort denotes, where such mistakes do not compile;
+`Term.typeCheck` moves a term from this layer to that one, and `toUntyped` moves it back.
+
+`open Cvc.Untyped` selects this layer's notations: `smt!`, `smt.grammar!` and `regex!`.
+-/

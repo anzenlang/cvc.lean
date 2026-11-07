@@ -21,7 +21,7 @@ public import Cvc.Spec.Regex
 /-! # Regular expressions over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 The regex *term* becomes nullable. Note the string-matching operators live in the string theory,
 so `strInRe?` is generated there.

@@ -21,7 +21,7 @@ public import Cvc.Spec.BitVec
 /-! # Bit-vectors over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 Only the non-indexed operators lift. An indexed one — `bvExtract`, `bvRepeat` and the rest — is
 applied through an `Op` carrying its indices, and `mkNullableLift` takes a `Kind`, so there is no

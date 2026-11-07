@@ -21,7 +21,7 @@ public import Cvc.Spec.String
 /-! # Strings over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
 The indexed operators do not lift, for the reason bit-vectors' do not: an `Op` cannot be handed to
 `mkNullableLift`.

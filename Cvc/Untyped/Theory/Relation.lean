@@ -23,8 +23,8 @@ A relation is a **set of tuples** — `(Set (Tuple T₁ … Tⱼ))` — and not 
 no `RELATION_SORT`. So a relation term is built with the set and tuple constructors, and the
 operators here are what treat one as a relation.
 
-Tables are the same operators over *bags*, in `Table.lean`. Duplicates being significant is the
-only difference between the two families, which are otherwise operator for operator identical.
+Tables, in `Cvc.Untyped.Theory.Table`, are bags of tuples, where duplicates are significant; they
+have the product, projection, join, grouping and aggregation, but none of the other operators.
 
 **cvc5 marks every kind here experimental**, "may be changed or removed in future versions".
 
@@ -102,17 +102,17 @@ def relGroup (indices : Array Nat) (rel : Term) : Env Term :=
   runUnsafe fun tm => do
     tm.mkTermOfOp (← tm.mkOpOfIndices .RELATION_GROUP indices) #[rel]
 
-/-- Equi-join: the product of the two relations, keeping the pairings that agree on the given
-component pairs.
+/-- Equi-join: the product of the two relations, keeping the pairings agreeing on the given pairs.
 
-Each pair is a component of `lft` and one of `rgt` that must be equal. cvc5 takes them interleaved
-in one index list, which is what pairing them here rules a mistake out of — the list cannot come
-out of odd length. The result's sort is the product's, since the indices only filter.
+Each pair is a component of `lft` and one of `rgt` that must be equal. The result's sort is the
+product's, since the indices only filter.
 -/
 def relTableJoin (indices : Array (Nat × Nat)) (lft rgt : Term) : Env Term :=
   runUnsafe fun tm => do
     let flat := indices.flatMap fun (l, r) => #[l, r]
     tm.mkTermOfOp (← tm.mkOpOfIndices .RELATION_TABLE_JOIN flat) #[lft, rgt]
+-- cvc5 takes the pairs interleaved in one index list; taking pairs here means that list cannot come
+-- out of odd length.
 
 /-- Folds each group of tuples that agree on the given components.
 

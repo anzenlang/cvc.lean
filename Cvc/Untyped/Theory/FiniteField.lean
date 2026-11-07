@@ -33,13 +33,11 @@ gen_untyped% from Cvc.Spec.FiniteField
 gen_untyped_view% from Cvc.Spec.FiniteField
 
 
-/-- An element of the finite field a sort describes.
-
-Not generated: cvc5 takes the value *before* the sort, against the argument order every other
-constructor uses.
--/
+/-- An element of the finite field a sort describes. -/
 def mkFiniteFieldElem (value : Int) (srt : Srt) : Env Term :=
   runUnsafe fun tm => tm.mkFiniteFieldElem value srt.toUnsafe
+-- Not generated: cvc5 takes the value *before* the sort, against the argument order every other
+-- constructor uses.
 
 
 

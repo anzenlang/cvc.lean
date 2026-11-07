@@ -16,6 +16,12 @@ import all Cvc.Untyped.Core.Defs
 
 
 
+/-! # Bound variables and lambdas, sort-erased
+
+A bound variable (`BVar`) stands for a binder's variable — a lambda's, a quantifier's, a defined
+function's parameter — and is a `Term` only through `toTerm`.
+-/
+
 namespace Cvc.Untyped public section variable [Ω]
 
 
@@ -27,7 +33,7 @@ deriving BEq, Ord, Hashable
 /-- An array of bound variables. -/
 abbrev BVars := Array BVar
 
-/-- A term as the bound variable it is. Unchecked: for a view, which has read the term's kind. -/
+/-- A term as a bound variable, unchecked: for a term whose kind is known to be `VARIABLE`. -/
 def Term.asBVar (t : Term) : BVar := t
 
 namespace BVar
@@ -39,13 +45,13 @@ lambda or witness. Each call produces a fresh variable even for the same name an
 -/
 def mk (srt : Srt) (name : String) : Env BVar := runUnsafe fun tm => tm.mkVar srt.toUnsafe name
 
-/-- Same as `mk` but from a lean type instead of an `Srt`. -/
+/-- `mk` at the sort the Lean type `α` denotes. -/
 def mkAs (α : Type) [ToTyp α] (name : String) : Env BVar := do mk (← Srt.of α) name
 
 /-- Turns itself into a term. -/
 def toTerm : (bv : BVar) → Term := id
 
-/-- Creates a lambda from a bound variables and a body. -/
+/-- Creates a lambda from a bound variable and a body. -/
 def lambda (bv : BVar) (body : Term) : Env Term := runUnsafe fun tm => do
   let bvs ← tm.mkTerm .VARIABLE_LIST #[bv]
   tm.mkTerm .LAMBDA #[bvs, body]
@@ -125,8 +131,7 @@ instance [B : Binder ψ] : Binder (Term → ψ) where
       return (#[bv] ++ bvs, body)
     | [], _ => throwUnreachable "`bindAll` checks there is a binder per argument"
 
-/-- Applies `body` to fresh variables made from `binders`, failing unless there is one per argument.
--/
+/-- Applies `body` to fresh variables made from `binders`, one per argument, or fails. -/
 def Binder.bindAll [B : Binder φ] (binders : List (String × Srt)) (body : φ)
 : Env (BVars × Term) := do
   if binders.length != B.arity then
@@ -157,10 +162,11 @@ end Cvc.Untyped
 
 /-! ## `smt! fun`
 
-The syntax is declared in `Cvc.Ext`, beside the other forms that mention no theory; this is the
-sort-erased expansion, through `Term.lambdaH`. A binder's sort is a Lean type (`Int`) or a `Srt`
-value (`int`), as wherever the sort-erased DSL takes a sort.
+`smt! fun (x y : s) => body` is `Term.lambdaH`. A binder's sort is a Lean type (`Int`) or a `Srt`
+value (`int`).
 -/
+-- The syntax is declared in `Cvc.Ext`, beside the other forms that mention no theory; this is the
+-- sort-erased expansion.
 
 namespace Cvc.Ext
 

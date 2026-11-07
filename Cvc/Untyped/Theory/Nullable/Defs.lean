@@ -23,12 +23,9 @@ public import Cvc.Untyped.Core.Bool
 /-! # Nullable constructors, sort-erased
 
 cvc5's `Nullable` is the `Option` sort: a value is either `nullable.null` or `nullable.some v`.
-It is a **structural** sort constructor, so `Srt.nullable` rebuilds the same sort every time and
-`Typ.nullable` needs no registry — unlike a declared datatype.
+Unlike a declared datatype, `Srt.nullable` gives the same sort every time for the same element sort.
 
-It *is* a datatype underneath, one monomorphised per element sort, which is why a value comes back
-from a model as an `APPLY_CONSTRUCTOR` term rather than through a reader of its own. That is what
-`getNullableValue` walks.
+It is a datatype underneath, so a nullable value is an `APPLY_CONSTRUCTOR` term.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 
@@ -38,14 +35,12 @@ open cvc5 renaming Term → T
 
 /-! ## Constructors -/
 
-/-- The null value at `Option elm`.
-
-Takes the *element* sort, as every constructor of a polymorphic sort does. cvc5's own method wants
-the nullable sort, which is built here.
--/
+/-- The null value of the nullable sort over the element sort `elm`. -/
 def mkNull (elm : Srt) : Env Term := do
   let srt ← Srt.nullable elm
   runUnsafe fun tm => tm.mkNullableNull srt
+-- Takes the *element* sort, as every constructor of a polymorphic sort does; cvc5's own method
+-- wants the nullable sort, which is built here.
 
 @[inherit_doc cvc5.TermManager.mkNullableSome]
 def nullableSome (elem : Term) : Env Term :=

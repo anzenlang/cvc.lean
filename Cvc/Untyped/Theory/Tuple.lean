@@ -22,13 +22,9 @@ public import Cvc.Untyped.Theory.Datatype
 
 /-! # Tuples, sort-erased
 
-A tuple is an SMT datatype with one constructor, so cvc5 builds one with a term-manager method
-rather than a kind, and its components come back out of a *value* rather than off an arbitrary
-term.
-
-`tupleProject` is the one operator, and it answers a **tuple**: projecting a single index gives a
-one-component tuple, not that component. Reading a component off a symbolic tuple needs the
-datatype selector, which this layer does not wrap yet.
+`mkTuple` builds a tuple, `tupleSelect` (with `fst` and `snd`) reads one component, and
+`tupleProject` answers a **tuple** of the components selected: projecting a single index gives a
+one-component tuple, not that component.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 
@@ -52,11 +48,8 @@ def tupleProject (indices : Array Nat) (tuple : Term) : Env Term :=
 
 /-- The component at the given index, at that component's own sort.
 
-This is what `tupleProject` is not: projecting is a tuple-to-tuple operation, so `tupleProject #[1]`
-on a `(Tuple Int Bool String)` answers `(Tuple Bool)` where this answers `Bool`.
-
-There is no kind for it. A tuple sort *is* a datatype — one constructor, one selector per component
-— so selection is the datatype selector, and cvc5 prints the result as `((_ tuple.select i) t)`.
+Unlike `tupleProject #[1]`, which answers `(Tuple Bool)` on a `(Tuple Int Bool String)`, this
+answers `Bool`.
 -/
 def tupleSelect (idx : Nat) (tuple : Term) : Env Term := do
   let srt ← tuple.getSort
@@ -72,10 +65,14 @@ def tupleSelect (idx : Nat) (tuple : Term) : Env Term := do
         s!"sort `{srt}` has {ctor.countSelectors} component(s), so there is none at index {idx}"
   else
     throwInternal s!"tuple sort `{srt}` has no constructor"
+-- There is no kind for it. A tuple sort *is* a datatype — one constructor, one selector per
+-- component — so selection is the datatype selector, and cvc5 prints the result as
+-- `((_ tuple.select i) t)`.
 
-
+/-- A tuple's first component. -/
 abbrev fst (t : Term) : Env Term := t.tupleSelect 0
 
+/-- A tuple's second component. -/
 abbrev snd (t : Term) : Env Term := t.tupleSelect 1
 
 

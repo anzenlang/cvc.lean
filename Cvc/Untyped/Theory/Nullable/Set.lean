@@ -21,10 +21,9 @@ public import Cvc.Spec.Set
 /-! # Sets over nullables, sort-erased
 
 One lifted constructor per liftable operator, `<id>?`, each answering `none` unless every argument
-is `some`. That strictness is `nullable.lift`'s semantics and not a choice made here.
+is `some`.
 
-The set *term* becomes nullable, not its elements — `Option (Set α)`, not `Set (Option α)`. The
-element type is untouched, so the `Ord` binders are the plain operators'.
+The set *term* becomes nullable, not its elements: `(Nullable (Set T))`, not `(Set (Nullable T))`.
 -/
 namespace Cvc.Untyped.Term public section variable [Ω]
 

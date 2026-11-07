@@ -139,12 +139,12 @@ instance : SrtLike Rat where
 
 
 
-/-! ## The DSL's literals for this theory
+/-! ## `smt!` literals
 
-Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
-theories they imported: without this module, `smt!` does not accept them at all. The expander's own
-machinery lives in `Cvc.Ext`, never in `Cvc`.
+Integer and real literals in `smt!`. Without this module `smt!` accepts neither.
 -/
+-- Declared here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
+-- theories they imported. The expander's own machinery lives in `Cvc.Ext`, never in `Cvc`.
 
 public meta section
 

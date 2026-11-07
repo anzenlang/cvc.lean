@@ -14,3 +14,8 @@ public import Cvc.Untyped.Core.Bool
 public import Cvc.Untyped.Core.BVar
 public import Cvc.Untyped.Core.Solver
 public import Cvc.Untyped.Core.Symbols
+
+/-! # What every sort-erased theory needs
+
+Terms and values, the Boolean connectives, bound variables, the solver and symbol structures.
+-/

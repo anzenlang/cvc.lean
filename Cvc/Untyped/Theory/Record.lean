@@ -20,32 +20,20 @@ public meta import Cvc.Ext
 
 /-! # Records, sort-erased
 
-A record is a datatype, and cvc5 says so: `Srt.record` mono-morphises its fields into a datatype of
-one constructor and one selector per field, named `__cvc5_record_a_Int_b_Bool` for
-`{a : Int, b : Bool}`. So everything here goes through `Datatype`, and a record value is an
-ordinary `APPLY_CONSTRUCTOR` term.
-
-What this module adds over reaching for the datatype directly is the three facts a record
-guarantees, and the error messages that follow from them:
-
-- there is exactly **one** constructor, so `Srt.recordCtor` discharges the index rather than
-  leaving the caller an impossible branch to write;
-- the constructor's name is cvc5's, not the user's, so it is never the way in — everything here is
-  keyed on **field names**, which are;
-- a field's sort is known from the sort, so `Term.mkRecord` checks its arguments itself. cvc5 would
-  otherwise report a swapped pair as `[internal] bad type for constructor argument`, naming the
-  mono-morphised sort rather than the field that is wrong.
+A record is a datatype underneath: `Srt.record` builds a datatype of one constructor and one
+selector per field, named by cvc5 (`__cvc5_record_a_Int_b_Bool` for `{a : Int, b : Bool}`), and a
+record value is an ordinary `APPLY_CONSTRUCTOR` term. Everything here is keyed on **field names**
+instead, and checks field sorts itself, so that an error names the field that is wrong.
 
 **Field order is part of the sort**, so `Term.mkRecord` takes its fields *by name* and puts them in
-the sort's order. Writing them in the wrong order is then not an error at all, which is the point:
-the one way to get a record's fields confused is the one way that cannot happen here.
+the sort's order.
 
-`Fields` is the Lean-side record of terms: field names in its *type*, one term per field. That is
-what makes reading a field total — `fs.get "a"` answers a `Term`, never an `Option Term`, because a
-name that is not there has no `FieldAt` instance and does not compile. Sort-erased the index is the
-names alone: a term carries no Lean type here, so putting types in it would buy nothing and would
-have to be written out at every construction.
+`Fields` is the Lean-side record of terms: field names in its *type*, one term per field, so
+`fs.get "a"` answers a `Term`, and a name that is not there does not compile.
 -/
+-- cvc5 would report a swapped pair as `[internal] bad type for constructor argument`, naming the
+-- mono-morphised sort rather than the field. Sort-erased, the `Fields` index is the names alone: a
+-- term carries no Lean type here, so putting types in it would buy nothing.
 namespace Cvc public section variable [Ω]
 
 open Untyped (Term Terms)
@@ -145,9 +133,7 @@ def mkRecordFrom (fields : Array (String × Option Srt × Term)) : Env Term := d
 
 /-- Checks a term against a stated sort, and answers it unchanged.
 
-What a record literal's or update's optional sort annotation expands to, where the sort is not what
-builds the record — in an update the record already has one. The message matches the typed layer's,
-which checks the same thing against the index instead.
+What a record update's optional sort annotation expands to.
 -/
 def checkFieldSrt (field : String) (expected : Srt) (term : Term) : Env Term := do
   let actual ← term.getSort
@@ -256,11 +242,7 @@ end Untyped
 
 namespace Untyped.Term
 
-/-- Builds a record value from a `Fields`.
-
-The names still have to agree with the sort, which is a runtime fact about the sort rather than
-anything the index can say, so this is `Term.mkRecord` with the pairs handed to it.
--/
+/-- Builds a record value from a `Fields`, whose names must be the sort's fields. -/
 def mkRecordOf (srt : Srt) (fields : Fields names) : Env Term :=
   Term.mkRecord srt fields.pairs
 
@@ -288,14 +270,11 @@ syntax with one difference that has to be stated loudly: **the order of the fiel
 sort**. `{a : … , b : …}` and `{b : … , a : …}` denote *different* record sorts, whose terms cvc5
 refuses to mix, where Lean's structure instances are order-insensitive.
 
-A field's sort may be **stated or left out**, per field, in either layer. Left out it is inferred:
-sort-erased from the field term's own sort, typed from the index its term carries. Stated it is
-*checked* against that same thing before the record is built, so an annotation can only confirm
-what is there, never change it. In both layers the sort is written as a Lean type (`Int`) or as a
-`Srt` value (`int`).
+A field's sort may be **stated or left out**, per field. Left out, it is the field term's own sort;
+stated, it is *checked* against that sort, so an annotation can only confirm, never change it. The
+sort is written as a Lean type (`Int`) or as a `Srt` value (`int`).
 
-There is **no syntax for the empty record**: `Srt.record` refuses one, the empty record denoting
-what the empty tuple already denotes.
+There is **no syntax for the empty record**, which `Srt.record` refuses.
 -/
 
 /-- One field of a record literal: its name, its term, and optionally its sort. -/
@@ -316,31 +295,28 @@ overwriting.
 -/
 syntax:max (name := smtWith) "{" smtTerm " with " smtRecField,+ "}" : smtTerm
 
-/-- A field read off a term that is not an identifier, `(f x).a`.
-
-An *identifier* head cannot come here: `r.a` is one token to the lexer, so it arrives as an
-identifier and is taken apart by `smtProjU%`/`smtProjT%` instead. `smt! r .a`, with a space, is
-neither and does not parse.
--/
+/-- A field read off a term, `(f x).a`; `r.a` on an identifier `r` works too. -/
 syntax:max (name := smtProj) smtTerm:max noWs "." noWs ident : smtTerm
+-- An *identifier* head cannot come here: `r.a` is one token to the lexer, so it arrives as an
+-- identifier and is taken apart by `smtProjU%`/`smtProjT%` instead. `smt! r .a`, with a space, is
+-- neither and does not parse.
 
 /-- A field read off whatever is to the left, `f x |>.a`.
 
 Lean's `pipeProj`, at Lean's precedence — **minimum**, so it takes everything to its left:
-`a + b |>.c` is `(a + b).c`, not `a + (b.c)`. That reading is nearly always a mistake here, an
-arithmetic term having no fields, but it is a loud one and matching the language is worth more than
-optimising for it.
+`a + b |>.c` is `(a + b).c`, not `a + (b.c)`.
 -/
 syntax:min (name := smtPipeProj) smtTerm " |>." noWs ident : smtTerm
+-- That reading is nearly always a mistake here, an arithmetic term having no fields, but it is a
+-- loud one, and matching the language is worth more than optimising for it.
 
 /-- Resolves a dotted identifier of the sort-erased layer into a head and the fields read off it. -/
 syntax (name := smtProjU) "smtProjU% " ident : term
 
 
 
-/-! The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
-with the API a user opens.
--/
+-- The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
+-- with the API a user opens.
 namespace Ext
 
 /-- A record field's name. -/
@@ -376,22 +352,20 @@ def recFieldTerm (field : Syntax) : Syntax :=
 
 /-! ## Reading fields off an identifier
 
-`r.a` reaches the expander as a *single* identifier token, so whether it names something or reads
-field `a` off `r` is a question about what is in scope. A macro cannot ask it — `MacroM` can resolve
-global names but cannot see the local context — so the identifier leaf expands to a node with the
-elaborator below, and everything else in the DSL stays a macro.
-
-Resolution follows Lean's own order: a **local** head wins first, then the longest prefix that
-resolves as a name. What is left over is read **by type**, as Lean's dot notation does: while the
-value is not a term — a symbol structure, any Lean structure holding terms — the next component is
-a Lean projection, and from the first term on the rest are SMT record fields. So `r.a` reads a field
-off a local `r` even where a constant `r.a` exists, `Foo.bar.a` reads one off the constant `Foo.bar`,
-`vars.x` projects the Lean field `x` of a structure `vars`, and `vars.r.a` projects `r` in Lean and
-then reads the record field `a`.
-
-An identifier carrying macro scopes is never taken apart: it stands for one binding a macro
-introduced, and its components are not a path a user wrote.
+In `smt!`, a dotted identifier resolves in Lean's own order: a **local** head wins first, then the
+longest prefix that resolves as a name. What is left over is read **by type**, as Lean's dot
+notation does: while the value is not a term — a symbol structure, any Lean structure holding terms
+— the next component is a Lean projection, and from the first term on the rest are SMT record
+fields. So `r.a` reads a field off a local `r` even where a constant `r.a` exists, and `vars.r.a`
+projects `r` out of a Lean structure `vars`, then reads the record field `a`.
 -/
+-- `r.a` reaches the expander as a *single* identifier token, so whether it names something or reads
+-- field `a` off `r` is a question about what is in scope. A macro cannot ask it — `MacroM` can
+-- resolve global names but cannot see the local context — so the identifier leaf expands to a node
+-- with the elaborator below, and everything else in the DSL stays a macro.
+--
+-- An identifier carrying macro scopes is never taken apart: it stands for one binding a macro
+-- introduced, and its components are not a path a user wrote.
 
 /-- The head and the fields read off it, following Lean's resolution order. -/
 private def splitProj (id : Ident) : Lean.Elab.TermElabM (Name × List Name) := do
@@ -457,12 +431,9 @@ def elabSmtProj (layer : Layer) (id : Ident) (expected? : Option Lean.Expr)
 
 
 
-/-! ## Expansion
-
-These are the sort-erased half; the typed one lives beside the typed constructors and is tried
-first, declining whatever is not its layer. `Macro.throwUnsupported` is what makes that work: a
-declining alternative falls through to the next.
--/
+-- Expansion, sort-erased. The typed one lives beside the typed constructors and is tried first,
+-- declining whatever is not its layer through `Macro.throwUnsupported`, which falls through to the
+-- next alternative.
 
 @[inherit_doc Cvc.Ext.expandSmt]
 macro_rules

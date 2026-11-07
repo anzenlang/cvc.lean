@@ -27,24 +27,20 @@ public import Cvc.SolverOptions
 
 /-! # The solver, sort-erased
 
-Three things live here:
-
-- `Solver` itself, and the `Result` a check-sat produces;
-- the three monadic environments that record *which answer the solver just gave, and which solver
-  gave it*, so that a query only valid after one answer cannot be written after another, nor
-  addressed to a different solver;
-- every solver function whose signature mentions no term, and which is therefore shared verbatim
-  by both layers rather than re-typed.
-
-A function whose signature does mention a term — asserting a formula, reading a value, an unsat
-core — is not here: those are the ones the typed layer states more precisely.
+`Solver`, the `Result` a check-sat produces, and the functions driving a solver: options,
+assertions, declarations, `checkSat`, and the queries its answer allows.
 -/
+-- The typed layer's `Solver` is an abbreviation of this one: it inherits every function here that
+-- mentions no term, and re-types the others.
 namespace Cvc.Untyped public section
 
 /-- A solver instance. -/
 def Solver [Ω] := cvc5.Solver
 
-/-- A proof produced by some solver. -/
+/-- A proof, indexed by the solver that produced it and the `Proof.Component` it was asked for.
+
+Obtained with `getUnsatProof`, where the answer was unsat.
+-/
 def Solver.Proof [Ω] : (solver : Solver) → (pc : Proof.Component) → Type := 𝕂² cvc5.Proof
 
 /-- An array of `Solver.Proof`. -/
@@ -64,26 +60,23 @@ instance Solver.Proof.instBEq [Ω] {solver : Solver} : BEq (solver.Proof pc) :=
 instance Solver.Proof.instHashable [Ω] {solver : Solver} : Hashable (solver.Proof pc) :=
   inferInstanceAs (Hashable cvc5.Proof)
 
-/-- A SyGuS grammar.
+/-- A SyGuS grammar, restricting the terms a synthesis, interpolation or abduction may answer.
 
-A grammar belongs to the scope, as a term does: cvc5 builds one through a solver
-(`Solver.mkGrammar`), but any solver of the same term manager accepts it. The rule builders live in
-`Cvc.Untyped.Grammar`.
+Built by `Solver.mkGrammar` or `smt.grammar!` (`Cvc.Untyped.Grammar`); any solver of the scope
+accepts it, not only the one that built it.
 -/
 structure Grammar [Ω] where private mk' ::
   private raw : cvc5.Grammar
   /-- The parameters the grammar was built over.
 
-  A `synth-fun` restricted by the grammar must be declared over these very variables, which is
-  what lets a grammar whose parameters were made out of sight, by `smt.grammar!`, be used for one.
+  A `synthFun` restricted by the grammar must be declared over these very variables.
   -/
   boundVars : BVars
-  /-- The sort of the grammar's start symbol.
-
-  cvc5 offers no way to read a grammar's non-terminals back, so the sort is recorded when the
-  grammar is built; it is what lets the grammar be typed after the fact.
-  -/
+  /-- The sort of the grammar's start symbol. -/
   startSrt : Srt
+-- `startSrt` is recorded because cvc5 offers no way to read a grammar's non-terminals back; it is
+-- what lets the grammar be typed after the fact.
+--
 -- Declared here rather than beside its builders because the interpolant and abduct queries below
 -- take one.
 
@@ -97,49 +90,48 @@ instance [Ω] : ToString Grammar := ⟨Grammar.toString⟩
 /-! ## Solver-mode monadic environments
 
 A check-sat splits the world into three, and the queries that make sense differ in each: a model
-exists only when the answer was sat, an unsat core only when it was unsat, a timeout core only
-when it was unknown.
+exists only when the answer was sat, an unsat core only when it was unsat, a timeout core only when
+it was unknown. Each answer therefore gets its own monad — `EnvSat`, `EnvUnsat`, `EnvUnknown` —
+that only `checkSat` enters, and into which no `Env` code, a check-sat in particular, can be lifted.
 
-Each answer therefore gets its own monad, wrapping `EnvT` privately. Since the wrapper is private,
-user code cannot lift arbitrary `EnvT` code — a check-sat in particular — into one of them, so a
-sat-only block cannot smuggle in a query that would invalidate the very answer it stands on.
+Each is also indexed by the solver that answered, `s.EnvSat`, so asking `s₂` for a value inside
+`s₁`'s sat branch does not typecheck.
 
-**Each is also indexed by the solver that answered**, `s.EnvSatT m α` rather than `EnvSatT m α`,
-and that catches the other mistake two solvers in one scope invite: a block standing on one
-solver's answer querying another solver. Every modal query carries the index —
-`getValue : s.EnvSat Term` — and `checkSat`'s branches are typed at the solver it was called on, so
-asking `s₂` for a value inside `s₁`'s sat branch does not typecheck rather than answering about the
-wrong model.
-
-The two mechanisms are separate and both are needed: the private lift is about *when* a query may
-be written, the index about *what* it may be written against.
-
-`env_gen%` comes from `Cvc.Gen.SolverMode`; the private lift it generates is private to *this*
-module, which is what lets `checkSat` below enter these monads and nothing else.
-
-**Every modal query also has an unchecked twin in `Env`**, named with a trailing `!` —
-`getValue!`, `getUnsatCore!` — for code that knows the answer by other means. It gives up both
-guarantees: nothing checks that the solver last answered as the query needs, or that it is the
-solver which answered. cvc5 still refuses some queries made in the wrong state, at run time.
+Every modal query has an unchecked twin in `Env`, named with a trailing `!` (`getValue!`,
+`getUnsatCore!`), for code that knows the answer by other means. Nothing checks that the solver last
+gave the answer the query needs, nor that it is the solver which gave it; cvc5 still refuses some
+queries made in the wrong state.
 -/
+-- Each monad wraps `EnvT` privately, and `env_gen%` (from `Cvc.Gen.SolverMode`) generates a lift
+-- private to *this* module, which is what lets `checkSat` enter these monads and nothing else. The
+-- private lift is about *when* a query may be written, the solver index about *what* against.
 namespace Solver variable [Ω] [Monad m]
 
 
-/-- Sat-specific modal environment. -/
+/-- Code running where `solver` last answered sat: the model queries (`getValue`, …) live here.
+
+Entered only through `checkSat`'s `ifSat` branch.
+-/
 structure EnvSatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvSatT / EnvSat
 
-/-- Unsat-specific modal environment. -/
+/-- Code running where `solver` last answered unsat: unsat cores and proofs live here.
+
+Entered only through `checkSat`'s `ifUnsat` branch.
+-/
 structure EnvUnsatT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
 
 env_gen% EnvUnsatT / EnvUnsat
 
-/-- Unknown-specific modal environment. -/
+/-- Code running where `solver` last answered unknown: timeout cores live here.
+
+Entered only through `checkSat`'s `ifUnknown` branch.
+-/
 structure EnvUnknownT (solver : Solver) (m : Type → Type) (α : Type) where
 private wrap ::
   private toEnv : EnvT m α
@@ -214,7 +206,7 @@ def getVersion : Env String := runUnsafe' do s.toUnsafe.getVersion
 def setOption (option value : String) : Env Unit := runUnsafe' do
   s.toUnsafe.setOption option value
 
-/-- Sets an option in a solver. -/
+/-- Sets an option given as data, its value typed: `s.setOpt .smt_produceModels true`. -/
 def setOpt (opt : Solver.Option) (val : opt.argType) : Env Unit :=
   let (opt, val) := opt.toStrings val
   s.setOption opt val
@@ -248,7 +240,7 @@ def isLogicSet : Env Bool := runUnsafe' do s.toUnsafe.isLogicSet
 /-- The logic as its SMT-LIB name. -/
 def getLogicString : Env String := runUnsafe' do s.toUnsafe.getLogic
 
-@[inherit_doc getLogicString]
+/-- The logic, parsed from its SMT-LIB name. -/
 def getLogic : Env Logic := s.getLogicString >>= liftM ∘ Logic.ofSmtLib
 
 
@@ -268,19 +260,23 @@ def pop (nscopes : UInt32 := 1) : Env Unit := runUnsafe' do s.toUnsafe.pop nscop
 
 /-! ### Declaring sorts -/
 
-@[inherit_doc S.declareSort]
+/-- Declares an uninterpreted sort of the given arity, named `symbol`.
+
+Fails if a sort of that name was already declared in the scope.
+-/
 def declareSrt (symbol : String) (arity : UInt32) (fresh : Bool := false) : Env Srt := do
   Srt.checkFreshSortSymbol symbol
   let srt ← runUnsafe' do s.toUnsafe.declareSort symbol arity fresh
   registerSort symbol srt
   return srt
+-- With `fresh := false` cvc5 would answer the existing sort for an existing name, but a name is
+-- declared at most once per scope here, so `fresh` changes nothing.
 
 
 
 /-! ### Rejecting an unexpected answer
 
-These are what a check-sat branch falls back on when the caller did not expect that answer. They
-mention no term, so both layers share them.
+What a check-sat branch falls back on when the caller did not expect that answer.
 -/
 
 section unexpected
@@ -319,10 +315,7 @@ end unexpected
 
 
 
-/-! ### Assertions
-
-From here on every signature mentions a term, so the typed layer states these more precisely.
--/
+/-! ### Assertions -/
 
 @[inherit_doc S.getAssertions]
 def getAssertions : Env Terms := runUnsafe' do s.toUnsafe.getAssertions
@@ -389,11 +382,11 @@ def defineFunsRec (funs : Terms) (bvs : Array BVars) (bodies : Terms)
 
 /-! ### Quantifier elimination, interpolants and abducts
 
-cvc5 answers the null term when there is no interpolant or abduct to give, and when an enumeration
-is exhausted. The functions that can be answered that way return an `Option`, `none` standing for
-the null term, so that no null term ever reaches a caller. Each has a `!` form answering the term
-itself and failing with a user error where the `Option` one answers `none`.
+Where cvc5 has no interpolant, abduct or disjunct to give, or an enumeration is exhausted, these
+answer `none`. Each has a `!` form answering the term itself and failing there instead.
 -/
+-- cvc5 answers the null term in those cases; `none` stands for it, so that no null term ever
+-- reaches a caller.
 
 /-- `none` for the null term, the term itself otherwise. -/
 private def nonNull? (t : cvc5.Term) : Option Term := if t.isNull then none else some t
@@ -476,26 +469,32 @@ def getNextAbduct! : Env Term :=
 
 
 
-/-! ### Checking satisfiability
-
-`checkSat` is the only way into the mode monads: it runs the branch matching the answer the solver
-actually gave. A branch the caller did not supply rejects that answer.
--/
+/-! ### Checking satisfiability -/
 
 section check_sat variable (assuming : Option Terms := none)
 
-/-- Checks the satisfiability of the constraints asserted so far. -/
+/-- Checks the satisfiability of the assertions, and of `assuming` if given, as a raw result. -/
 def checkSatResult : Env Result := do
   let code := if let some terms := assuming then S.checkSatAssuming s terms else S.checkSat s
   Result.ofUnsafe <$> runUnsafe' code
 
-@[inherit_doc checkSatResult]
+/-- Checks satisfiability: `.inl true` if sat, `.inl false` if unsat, `.inr why` if unknown. -/
 def checkIsSat? : Env Result.Sat? := do (← s.checkSatResult assuming).isSat?
 
-@[inherit_doc checkSatResult]
+/-- Checks satisfiability, failing if the solver gives up. -/
 def checkIsSat : Env Bool := do (← s.checkSatResult assuming).isSat
 
-@[inherit_doc checkSatResult]
+/-- Checks satisfiability, and runs the branch matching the answer.
+
+Each branch runs in the monad of its answer, where the queries that answer allows can be written:
+
+```lean
+s.checkSat (ifSat := do println! "x = {← s.getValue x}") (ifUnsat := do println! "unsat")
+```
+
+A branch left out fails if its answer comes, with `unexpectedSat` and its siblings. `assuming`
+checks under extra formulas, for this check only.
+-/
 def checkSat
   (ifSat : s.EnvSatT m α := s.unexpectedSat)
   (ifUnsat : s.EnvUnsatT m α := s.unexpectedUnsat)
@@ -506,7 +505,10 @@ def checkSat
   | .inl false => ifUnsat.toEnv
   | .inr unkExpl => ifUnknown unkExpl |>.toEnv
 
-@[inherit_doc checkSatResult]
+/-- `checkSat` whose sat and unsat branches default to answering `none`.
+
+A left-out unknown branch still fails.
+-/
 def checkSat? {α : Type} (s : Solver) (assuming : Option Terms := none)
   (ifSat : s.EnvSatT m (Option α) := return none)
   (ifUnsat : s.EnvUnsatT m (Option α) := return none)
@@ -671,8 +673,8 @@ def getRewriteRule? : Option ProofRewriteRule := cvc5.Proof.getRewriteRule? p
 
 /-- Get the proof rewrite rule used by the root step of the proof.
 
-Requires that `getRule` returns `ProofRule.DSL_REWRITE` or `ProofRule.THEORY_REWRITE`; cvc5 fails
-otherwise. Matching on `getRule` is where the hypothesis comes from:
+Takes as a hypothesis that `getRule` is `ProofRule.DSL_REWRITE` or `ProofRule.THEORY_REWRITE`,
+which matching on `getRule` supplies:
 
 ```lean
 match h : p.getRule with
@@ -684,13 +686,19 @@ match h : p.getRule with
 def getRewriteRule : p.getRule = .DSL_REWRITE ∨ p.getRule = .THEORY_REWRITE → ProofRewriteRule :=
   𝕂 cvc5.Proof.getRewriteRule! p
 
-/-- String representation. -/
+/-- String representation, in `Proof.Format.no`. -/
 def toString : Env String := Env.lift5 <| cvc5.Solver.proofToString solver p .NONE
 
-/-- String representation with formatter. -/
+/-- String representation in the given format.
+
+Any format but `.no` needs a `full` proof; the obligation is discharged automatically when the
+format and the component are both literals.
+-/
 def toStringFmt (fmt : Proof.Format := default)
 : (valid : fmt = .no ∨ pc = .full := by grind) → Env String :=
   𝕂 Env.lift5 <| cvc5.Solver.proofToString solver p fmt.toUnsafe
+-- cvc5 takes the process down when printing a non-`full` proof in a real format, hence a type
+-- obligation rather than a runtime check.
 
 end Proof
 

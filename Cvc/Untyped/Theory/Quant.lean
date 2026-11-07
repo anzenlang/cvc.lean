@@ -122,13 +122,10 @@ open Lean
 /-! ## `smt!`
 
 `smt! ∀ (x y : s) (b : t), body` and `smt! ∃ …` are Lean's own quantifier syntax, binders in
-parentheses as `fun` takes them (`smtQuantBinder`, declared in `Cvc.Ext`). What follows the colon
-depends on the layer: here it is a Lean type (`Int`) or a `Srt` value (`int`), as wherever the
-sort-erased DSL takes a sort; typed, it is the Lean type the variable's index is, and only that.
+parentheses as `fun` takes them. A binder's sort is a Lean type (`Int`) or a `Srt` value (`int`).
 
 The body extends as far right as it can, as in Lean, so a quantifier in argument position needs
-parentheses. Expansion goes through `forallH`/`existsH`, binding each variable under the name the
-writer gave it, which is also the name cvc5 prints.
+parentheses. Each variable is named as the writer named it, which is also the name cvc5 prints.
 -/
 
 /-- Universal quantification. -/
@@ -139,7 +136,8 @@ syntax:lead (name := smtExists) "∃ " (ppSpace smtQuantBinder)+ ", " smtTerm : 
 
 namespace Ext
 
-/-! Expansion, sort-erased; the typed one is in `Cvc.Typed.Theory.Quant`. -/
+-- Expansion, through `forallH`/`existsH`, sort-erased; the typed one is in
+-- `Cvc.Typed.Theory.Quant`.
 
 @[inherit_doc Cvc.Ext.expandSmt]
 macro_rules

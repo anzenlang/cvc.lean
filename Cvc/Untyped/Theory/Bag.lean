@@ -49,9 +49,8 @@ def mkBagValue [ValueToTerm α] (bag : Cvc.Bag α) : Env Term := do
 
 /-- The bag of values a constant bag term denotes.
 
-A bag value is a spine of unions over singletons, so this walks the term's kind. cvc5 only ever
-produces `BAG_UNION_DISJOINT` spines in a model, but the other combinators are recognised as
-unsupported rather than reported as a sort mismatch.
+Works on a bag built from `bagEmpty`, `bagMake` and unions as well as on a model's answer; an
+intersection or a difference is refused.
 -/
 partial def getBagValue [TermToValue α] (term : Term) : Env (Cvc.Bag α) := do
   let kind ← term.getKind
@@ -69,6 +68,9 @@ partial def getBagValue [TermToValue α] (term : Term) : Env (Cvc.Bag α) := do
   | .BAG_INTER_MIN | .BAG_DIFFERENCE_SUBTRACT | .BAG_DIFFERENCE_REMOVE =>
     throwTodo s!"bag-value reconstruction for term kind `{kind}`"
   | _ => throwUser s!"expected a constant bag term, got one of kind `{kind}`"
+-- A bag value is a spine of unions over singletons, so this walks the term's kind. cvc5 only ever
+-- produces `BAG_UNION_DISJOINT` spines in a model; the other combinators are recognised as
+-- unsupported rather than reported as a sort mismatch.
 
 instance [ValueToTerm α] : ValueToTerm (Cvc.Bag α) := ⟨mkBagValue⟩
 instance [TermToValue α] : TermToValue (Cvc.Bag α) := ⟨getBagValue⟩

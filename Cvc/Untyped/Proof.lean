@@ -36,8 +36,7 @@ Every traversal visits a step shared by many others once, as `Cvc.Proof` explain
 
 namespace Cvc.Untyped public section variable [Ω]
 
-/-- A step of a sort-erased proof, taken apart: `Cvc.Proof.View` with sort-erased formulas and
-terms. -/
+/-- A step of a sort-erased proof, taken apart: `Cvc.Proof.View` over sort-erased terms. -/
 abbrev Solver.ProofView (s : Solver) (pc : Proof.Component) : Type :=
   Cvc.Proof.View (s.Proof pc) Term Term
 
@@ -225,8 +224,7 @@ def viewWith (premises : Array X) : Cvc.Proof.View X Term Term :=
   decode? p.getRule premises p.getArguments p.getRewriteRule?
   |>.getD (.other p.getRule premises p.getArguments)
 
-/-- The root step of `p`, taken apart: its rule as a constructor, its premises and arguments as
-fields. -/
+/-- The root step of `p`, taken apart: its rule a constructor, its premises and arguments fields. -/
 def view : s.ProofView pc := p.viewWith p.getChildren
 
 
@@ -254,15 +252,17 @@ def fold [Monad m] (init : σ)
 
 `f` is handed each step with its view, the premises of which are the values already computed for
 them. It is called once per distinct step, so a sub-proof shared by many steps is computed once,
-which is what rebuilding a proof elsewhere wants. Ending early is the monad's business.
+which is what rebuilding a proof elsewhere wants. To end early, throw, in `Except` for instance.
 -/
 def foldUp [Monad m] (f : s.Proof pc → Cvc.Proof.View β Term Term → m β) : m β := do
   let premises ← Cvc.Proof.foldUpWith (·.getChildren) (fun q bs => f q (q.viewWith bs))
     p.getChildren
   f p (p.viewWith premises)
 
-/-- `for step in p do …` visits the distinct steps of `p` in the order `fold` enters them, and
-`break` ends the loop. -/
+/-- `for step in p do …` visits the distinct steps of `p` in the order `fold` enters them.
+
+`break` ends the loop.
+-/
 instance [Monad m] : ForIn m (s.Proof pc) (s.Proof pc) where
   forIn p init f :=
     Cvc.Proof.foldWith (·.getChildren) id #[p] init
@@ -292,8 +292,9 @@ def ruleCounts : Array (ProofRule × Nat) := Id.run do
       | none => counts.push (rule, 1)
   return counts
 
-/-- The assumptions `p` leaves open: the formulas of its `ASSUME` steps that no enclosing `SCOPE`
-discharges, in the order they are first reached.
+/-- The assumptions `p` leaves open, in the order they are first reached.
+
+These are the formulas of its `ASSUME` steps that no enclosing `SCOPE` discharges.
 
 A proof cvc5 answers for the `full` component leaves none open, its root scope discharging the
 assertions. Below that scope, they are the assertions the refutation actually uses.
@@ -312,8 +313,10 @@ def freeAssumptions : Terms :=
             all := all.push f
       return all
 
-/-- The distinct steps of `p` that cvc5 does not justify, `TRUST` and `TRUST_THEORY_REWRITE`, in the
-order they are first reached. -/
+/-- The distinct steps of `p` that cvc5 does not justify, in the order they are first reached.
+
+These are its `TRUST` and `TRUST_THEORY_REWRITE` steps.
+-/
 def trusted : s.Proofs pc := Id.run do
   let mut steps := #[]
   for q in p do
@@ -324,8 +327,10 @@ end Solver.Proof
 
 namespace Solver.Proofs variable {s : Solver} (ps : s.Proofs pc)
 
-/-- `Solver.Proof.fold` over several proofs at once, left to right, a step they share being visited
-once in all. -/
+/-- `Solver.Proof.fold` over several proofs at once, left to right.
+
+A step they share is visited once in all.
+-/
 def fold [Monad m] (init : σ)
   (pre : s.Proof pc → s.ProofView pc → σ → m (FoldPre σ) := fun _ _ s => return .descend s)
   (post : s.Proof pc → s.ProofView pc → σ → m (FoldPost σ) := fun _ _ s => return .continue s)
@@ -334,8 +339,10 @@ def fold [Monad m] (init : σ)
   Cvc.Proof.foldWith (·.getChildren) (fun q => (q, q.view)) ps init
     (fun (q, v) s => pre q v s) (fun (q, v) s => post q v s) revisit
 
-/-- `Solver.Proof.foldUp` over several proofs at once, a step they share being computed once in all;
-answers each proof's value, in order. -/
+/-- `Solver.Proof.foldUp` over several proofs at once, answering each proof's value, in order.
+
+A step they share is computed once in all.
+-/
 def foldUp [Monad m] (f : s.Proof pc → Cvc.Proof.View β Term Term → m β) : m (Array β) :=
   Cvc.Proof.foldUpWith (·.getChildren) (fun q bs => f q (q.viewWith bs)) ps
 
