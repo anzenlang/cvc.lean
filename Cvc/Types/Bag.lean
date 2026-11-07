@@ -18,8 +18,8 @@ public import Std.Data.TreeMap.Iterator
 /-! # Bags
 
 The Lean type denoting an SMT bag: a `Std.TreeMap` from elements to their multiplicity, so the
-element type must be ordered. A zero multiplicity is not represented, which is what `alter` keeps
-true.
+element type must be ordered. Multiplicities are positive: the functions below drop an element whose
+multiplicity reaches zero, and subtraction stops there, as SMT's bag difference does.
 
 Converting a bag to a term and back is done by `Cvc.Untyped.Theory.Bag` and
 `Cvc.Typed.Theory.Bag`.
@@ -27,7 +27,10 @@ Converting a bag to a term and back is done by `Cvc.Untyped.Theory.Bag` and
 namespace Cvc public section variable [Ω]
 
 /-- An SMT bag (multiset): each element's multiplicity, absent elements standing for zero. -/
-abbrev Bag (α : Type) [Ord α] := Std.TreeMap α Int
+abbrev Bag (α : Type) [Ord α] := Std.TreeMap α Nat
+-- `Nat` rather than a positive subtype, which would make every count read and written carry a
+-- proof. The functions here never store a zero; printing and building a term ignore one stored
+-- through the map's own API.
 
 namespace Bag variable [Ord α] (bag : Bag α)
 
@@ -35,21 +38,26 @@ namespace Bag variable [Ord α] (bag : Bag α)
 def empty : Bag α := Std.TreeMap.empty
 
 /-- Applies `f` to an element's multiplicity, removing the element when the result is zero. -/
-def alter (key : α) (f : Int → Int) : Bag α :=
+def alter (key : α) (f : Nat → Nat) : Bag α :=
   Std.TreeMap.alter bag key fun val? => match val?.getD 0 |> f with | 0 => none | n => n
 
+/-- Adds one occurrence of an element. -/
 def increment (key : α) := bag.alter key (· + 1)
 
+/-- Removes one occurrence of an element, if any. -/
 def decrement (key : α) := bag.alter key (· - 1)
 
-def add (key : α) (n : Int) := bag.alter key (· + n)
+/-- Adds `n` occurrences of an element. -/
+def add (key : α) (n : Nat) := bag.alter key (· + n)
 
-def sub (key : α) (n : Int) := bag.alter key (· - n)
+/-- Removes `n` occurrences of an element, or all of them if it has fewer. -/
+def sub (key : α) (n : Nat) := bag.alter key (· - n)
 
-def get? (key : α) : Option Int := Std.TreeMap.get? bag key
+/-- An element's multiplicity, `none` if absent. -/
+def get? (key : α) : Option Nat := Std.TreeMap.get? bag key
 
 /-- An element's multiplicity, zero if absent. -/
-def get (key : α) : Int := bag.get? key |>.getD 0
+def get (key : α) : Nat := bag.get? key |>.getD 0
 
 /-- Whether an element's multiplicity is positive. -/
 def contains (key : α) : Bool := 0 < bag.get key
@@ -86,7 +94,7 @@ protected def compare (b1 b2 : Bag α) : Ordering := Id.run do
     b2 := b2'
   if b2.isEmpty then .eq else .lt
 where
-  getNext (it : Std.Iter (α × Int)) : Option (Std.Iter (α × Int) × α × Int) :=
+  getNext (it : Std.Iter (α × Nat)) : Option (Std.Iter (α × Nat) × α × Nat) :=
     match it.step with
     | ⟨.yield it' (key, val), _⟩ => some (it', key, val)
     | ⟨.done, _⟩ => none

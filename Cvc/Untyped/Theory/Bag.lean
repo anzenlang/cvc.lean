@@ -42,9 +42,10 @@ section variable [Ord α] [ToTyp α]
 /-- The bag term denoting a bag of values. -/
 def mkBagValue [ValueToTerm α] (bag : Cvc.Bag α) : Env Term := do
   let empty ← Srt.of α >>= bagEmpty
-  bag.foldlM (init := empty) fun acc elem count => do
+  bag.foldlM (init := empty) fun acc elem (count : Nat) => do
+    if count = 0 then return acc
     let elem ← mkValue elem
-    let count ← mkInt count
+    let count ← mkInt (count : Int)
     bagMake elem count >>= bagUnionMax acc
 
 /-- The bag of values a constant bag term denotes.
@@ -58,7 +59,10 @@ partial def getBagValue [TermToValue α] (term : Term) : Env (Cvc.Bag α) := do
   | .BAG_EMPTY => return Cvc.Bag.empty
   | .BAG_MAKE =>
     let ⟨kids, _⟩ ← term.getSizedKids 2
-    return Cvc.Bag.empty.insert (← extractValue kids[0]) (← extractValue kids[1])
+    let count : Int ← extractValue kids[1]
+    -- a multiplicity that is not positive denotes the empty bag
+    if count ≤ 0 then return Cvc.Bag.empty
+    return Cvc.Bag.empty.insert (← extractValue kids[0]) count.toNat
   | .BAG_UNION_MAX | .BAG_UNION_DISJOINT =>
     let ⟨kids, _⟩ ← term.getSizedKids 2
     let lft : Cvc.Bag α ← getBagValue kids[0]

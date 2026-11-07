@@ -109,3 +109,20 @@ bag nary  : (bag.union_disjoint (bag.union_disjoint s t) s)
 
   println! "bag union : {← smt! s ⊎ t}"
   println! "bag nary  : {← smt! ⊎[s, t, s]}"
+
+/-! A multiplicity is a positive natural: subtracting past zero removes the element, as SMT's bag
+difference does, and a bag value survives the round trip to a term and back.
+-/
+
+/-- info:
+{ 7 ↦ 3 } → { 7 ↦ 3 }
+sub 1     → { 7 ↦ 2 }
+sub 5     → ∅
+-/
+#guard_msgs in #eval Env.runIO do
+  let three : Cvc.Bag Int := Cvc.Bag.empty.add 7 3
+  let back (b : Cvc.Bag Int) : Env (Cvc.Bag Int) := do
+    Cvc.Typed.Term.extractValueAs (Cvc.Bag Int) (← Cvc.Typed.Term.mkValue b)
+  println! "{three} → {← back three}"
+  println! "sub 1     → {← back (three.sub 7 1)}"
+  println! "sub 5     → {← back (three.sub 7 5)}"
