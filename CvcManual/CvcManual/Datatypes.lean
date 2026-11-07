@@ -133,4 +133,4 @@ q := ((_ update x) p (+ (x p) 1))
 p := {x := 4, y := true}
 ```
 
-Tuples are indexed by Lean products instead, `Term (Int × Bool)`, and built with `Term.mkTuple`.
+Tuples are indexed by Lean products instead, `Term (Int × Bool)`, and built with `Term.mkTuple`. Products flatten to the right, so `Int × Bool × String` is one tuple of three components, and a tuple's model value is the Lean product.

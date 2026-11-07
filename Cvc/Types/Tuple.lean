@@ -18,6 +18,8 @@ public import Cvc.Srt
 A Lean product indexes a tuple: `α × β × γ` is one three-component tuple, as products flatten to
 the right, while `(α × β) × γ` has two components, the first a tuple. `OneTuple α` is the
 one-component tuple. Relations and tables use the list-shaped `Tup` of `Cvc.Types.Relation`.
+
+A tuple's value is the Lean product it is indexed by, converted with the same flattening.
 -/
 
 namespace Cvc public section

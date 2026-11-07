@@ -30,6 +30,9 @@ So a tuple's *last* component cannot itself be a tuple: `mkTuple x (.cons y (.la
 a `Term (α × β × γ)`, and `Components.last` refuses a product. Relations and tables use another
 tuple index, `Tup α β` in `Cvc.Typed.Theory.Relation`, which nests freely and reaches any component
 at a typed position.
+
+A tuple's value is its Lean product: `Solver.getValue` on a `Term (Int × Bool)` answers `(1, true)`,
+and `mkValue (1, true)` builds the tuple.
 -/
 namespace Cvc.Typed.Term public section variable [Ω]
 
