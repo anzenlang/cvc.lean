@@ -26,12 +26,10 @@ curry: `α × β × γ` denotes `(Tuple α β γ)`, one tuple of three component
 component is a pair. Left-nesting is what nests, so `(α × β) × γ` is the two-component tuple whose
 first component is a tuple.
 
-That is what shapes the constructor below. A tuple's components are held flat, because the sort is
-flat, and `Components` is the only way to collect them — its two builders keep the array and the
-index in step. A tuple's *last* component is the one case the index cannot describe: a product
-there would flatten into the tuple being built while the component term would not, so `last` asks
-for a proof that its index is not a product. Anywhere else a product component is fine, since it
-nests.
+So a tuple's *last* component cannot itself be a tuple: `mkTuple x (.cons y (.last z))` builds
+a `Term (α × β × γ)`, and `Components.last` refuses a product. Relations and tables use another
+tuple index, `Tup α β` in `Cvc.Typed.Theory.Relation`, which nests freely and reaches any component
+at a typed position.
 -/
 namespace Cvc.Typed.Term public section variable [Ω]
 
@@ -41,11 +39,7 @@ open Cvc renaming Untyped.Term → T
 
 /-! ## Construction -/
 
-/-- The components of a tuple, flat, along with the index they denote.
-
-`last` and `cons` are the only ways to build one, and between them they keep the number of terms
-equal to the number of components the index describes.
--/
+/-- Components of a tuple, built with `last` and `cons`: `.cons y (.last z)` is `y` then `z`. -/
 structure Components (α : Type) where
   private mk ::
   private terms : Untyped.Terms
@@ -112,36 +106,20 @@ def getTupleValue [ToTyp α] [ToTyp β] (term : Term (α × β)) : Res Untyped.T
 
 /-! ## Selection
 
-`fst` and `snd` read a tuple the way Lean's `Prod.fst` and `Prod.snd` read a product, which is what
-makes them work at every arity rather than only on pairs.
-
-Right-flattening is the reason that matters. `Term (α × β)` describes a two-component tuple when
-`β` is flat, but a longer one when `β` is itself a product — and `β` then stands for *all* the
-remaining components. So `snd` cannot be component 1: on `α × β × γ` it has to answer the tuple
-`(Tuple β γ)`, exactly as Lean's `snd` on `α × (β × γ)` answers the pair. That is what it does, and
-it is why the index it claims always matches the sort it builds.
-
-Reading a *single* component out of the middle of a longer tuple is a different operation, and has
-no typed form yet: `Untyped.Term.tupleSelect` followed by `typeCheck` is the way to one.
+`fst` and `snd` read a tuple as Lean's `Prod.fst` and `Prod.snd` read a product: on an
+`α × β × γ`, `snd` answers the tuple `(Tuple β γ)`. A single middle component has no typed accessor
+here: use `Untyped.Term.tupleSelect` then `typeCheck`, or the `Tup` index, whose `tupAt` reaches
+any component.
 -/
 
-/-- The first component, as Lean's `Prod.fst`.
-
-Sound at any arity: whatever else a tuple holds, its first component is what the index's first
-factor describes.
--/
+/-- The first component, as Lean's `Prod.fst`, at any arity. -/
 def fst (t : Term (α × β)) : Env (Term α) := do
   t.erase.tupleSelect 0
 
 /-- Everything but the first component, as Lean's `Prod.snd`.
 
-On a two-component tuple that is the second component. On a longer one `β` describes the whole
-tail, so this answers the tuple of every component past the first — `(Tuple β γ)` for an
-`α × β × γ`, never just `β`.
-
-The tail is rebuilt from its components rather than projected, so the term reads
-`(tuple (tuple.select 1 t) (tuple.select 2 t))`. That is equal to `tupleProject #[1, 2] t`; the
-solver proves it.
+The second component of a pair; on a longer tuple, the tuple of every component past the first —
+`(Tuple β γ)` for an `α × β × γ`, built as `(tuple (tuple.select 1 t) (tuple.select 2 t))`.
 -/
 def snd [B : ToTyp β] (t : Term (α × β)) : Env (Term β) := do
   let t := t.erase
@@ -156,11 +134,9 @@ def snd [B : ToTyp β] (t : Term (α × β)) : Env (Term β) := do
   -- `β` is flat, so the tuple has exactly two components and the tail is the second
   | _ => t.tupleSelect 1
 
-/-- A pair's two components, if the term is a tuple literal.
+/-- A pair literal's two components, `none` if the term is not a literal.
 
-`none` unless the term is a construction, which its kind says. Pairs only: a longer tuple's tail has
-no term of its own, `α × β × γ` being one three-component tuple, so it cannot come back as a
-`Term (β × γ)`. Generic code, and a longer tuple, go through the datatype view instead.
+Pairs only: a longer tuple's tail has no term of its own. The datatype view takes any tuple apart.
 -/
 def pairComponents? [ToTyp β] (t : Term (α × β))
   (_isFlat : (Typ.of β).isFlat := by

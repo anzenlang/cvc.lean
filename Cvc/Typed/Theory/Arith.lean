@@ -21,7 +21,7 @@ public import Cvc.Spec.Arith
 
 
 
-/-! # Generated arithmetic constructors, typed -/
+/-! # Arithmetic, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -33,11 +33,7 @@ gen_typed_view% from Cvc.Spec.Arith
 
 
 
-/-! ## Values
-
-`Nat` goes to a term but not back: the sort is `Int`, so reading one back would have to fail on a
-negative value rather than answer.
--/
+/-! ## Values -/
 
 /-- The sign of an arithmetic value: negative, zero or positive as `-1`, `0`, `1`. -/
 def getSign [ToTyp α] [IsArith α] (term : Term α) : Res Int := T.getSign term
@@ -128,12 +124,13 @@ instance : SrtLike Rat where
 
 
 
-/-! ## The DSL's literals for this theory
+/-! ## `smt!` literals of this theory
 
-Expanded here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
-theories they imported: without this module, `smt!` does not accept them at all. The expander's own
-machinery lives in `Cvc.Ext`, never in `Cvc`.
+An integer literal is a `Term Int` and a decimal one a `Term Rat` (`1.5`, `1.5e-3`): with
+`r : Term Rat`, write `smt! r + 1.0`, since `smt! r + 1` does not typecheck.
 -/
+-- Expanded here rather than in `Cvc.Ext`, so that `smt!` accepts a theory's forms only where that
+-- theory is imported. The expander's own machinery lives in `Cvc.Ext`, never in `Cvc`.
 
 public meta section
 

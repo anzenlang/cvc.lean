@@ -21,7 +21,7 @@ public import Cvc.Spec.Float
 
 
 
-/-! # Generated Float constructors, typed -/
+/-! # Floating point, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -57,8 +57,7 @@ def isFloatNegZero (term : Term (Cvc.Float exp sig)) : Bool := T.isFloatNegZero 
 
 /-- The exponent size, significand size and bit pattern of a constant floating-point term.
 
-The pattern is sort-erased: its own index would be `BitVec (exp + sig)`, which the *values* the
-sizes carry decide, not the term's index.
+The pattern, a bit-vector of `exp + sig` bits, comes back sort-erased.
 -/
 def getFloatComponents (term : Term (Cvc.Float exp sig))
 : Res (Nat × Nat × Untyped.Term) := T.getFloatComponents term

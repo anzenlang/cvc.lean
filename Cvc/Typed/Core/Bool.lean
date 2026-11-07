@@ -22,7 +22,7 @@ public import Cvc.Spec.Bool
 
 
 
-/-! # Generated Boolean and sort-generic constructors, typed -/
+/-! # Booleans and sort-generic operators, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -52,12 +52,12 @@ instance : SrtLike Bool where
 
 
 
-/-! ## The DSL's literals for this theory
+/-! ## `smt!` forms of this theory
 
-Expanded here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
-theories they imported: without this module, `smt!` does not accept them at all. The expander's own
-machinery lives in `Cvc.Ext`, never in `Cvc`.
+`true`, `false` and `if c then t else e`.
 -/
+-- Expanded here rather than in `Cvc.Ext`, so that `smt!` accepts a theory's forms only where that
+-- theory is imported. The expander's own machinery lives in `Cvc.Ext`, never in `Cvc`.
 
 public meta section
 

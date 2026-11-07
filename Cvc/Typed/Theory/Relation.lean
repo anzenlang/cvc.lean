@@ -23,18 +23,16 @@ public import Cvc.Typed.Theory.Arith
 
 /-! # Relations, typed
 
-A relation is indexed by `Rel α β` — a set of tuples whose components are `α ++ [β]`. See
-`Types/Relation.lean` for why the last component is split off; in short, it makes "drop the last
-component" something unification can do, which is what lets `relJoin` be a signature rather than a
-type-level program.
+A relation is a set of tuples, indexed by `Rel α β`: its tuples are `Tup α β`, whose components
+are the list `α` followed by `β`. So `Rel [Int] Bool` relates `Int`s to `Bool`s, and `Rel [] α` is
+a unary relation. A tuple is built with `mkTup (.cons a (.last b))`, and a component is read at a
+typed position, `t.tupAt col%1`.
 
-**The set operators are restated here rather than reached through `Set`**, so working with a
-relation never means leaving the relation world. `relUnion`, `relMember` and the rest are the set
-operators at a relation's index; `relToSet` is there for the two that genuinely leave it, `setMap`
-and `setFold`, whose results are arbitrary sets.
-
-cvc5 marks every relation-specific kind experimental.
+The set operators are restated at a relation's index (`relUnion`, `relMember`, …); `relToSet`
+crosses to `Set`, for `setMap` and `setFold`. cvc5 marks every relation-specific kind experimental.
 -/
+-- The last component is split off so that "drop the last component" is something unification can
+-- do, which is what lets `relJoin` be a signature rather than a type-level program.
 namespace Cvc.Typed.Term public section variable [Ω]
 
 open Cvc renaming Untyped.Term → T
@@ -77,25 +75,14 @@ A component that is itself a tuple stays one: `Tup [α] (Tup [β] γ)` denotes
 def mkTup (components : Tup.Components α β) : Env (Term (Tup α β)) :=
   T.mkTuple components.terms
 
-/-! Reading a tuple back apart. The index is a list, so each of these is a component position that
-unification or `List.length` can compute — no type-level program is needed, unlike the product
-index where a middle component has no accessor at all.
--/
-
-/-- The first component.
-
-`α :: αs` is a constructor pattern, so the position is `0` whatever follows.
--/
+/-- The first component. -/
 def tupFst (tuple : Term (Tup (α :: αs) β)) : Env (Term α) :=
   tuple.erase.tupleSelect 0
 
-/-- The last component.
-
-Its position is the length of `α`, which computes: a `List Type` is an ordinary runtime value, so
-this works at any arity without the index having to be concrete.
--/
+/-- The last component, at any arity. -/
 def tupLast (tuple : Term (Tup α β)) : Env (Term β) :=
   tuple.erase.tupleSelect α.length
+-- The position is `α.length`, which computes: a `List Type` is an ordinary runtime value.
 
 /-- Every component but the first, as a tuple.
 
@@ -114,11 +101,9 @@ The general form of `tupFst`/`tupLast`, and the way to reach a middle component 
 def tupAt (tuple : Term (Tup α β)) (idx : Col α β γ) : Env (Term γ) :=
   tuple.erase.tupleSelect idx.toNat
 
-/-- The tuple of the components at the given positions, in the order given.
+/-- The tuple of the components at the given positions: `t.tupProject cols% [2, 0]`.
 
-A tuple-to-tuple operation, as `tupleSelect` is not: projecting one position gives a one-component
-tuple, where `tupAt` gives the component. The `Cols` spine is what carries the result's index, so
-this is typed where the sort-erased `Untyped.Term.tupleProject` cannot be.
+Projecting one position gives a one-component tuple, where `tupAt` gives the component.
 -/
 def tupProject (cols : Cols α β α' β') (tuple : Term (Tup α β)) : Env (Term (Tup α' β')) :=
   tuple.erase.tupleProject cols.toArray
@@ -219,9 +204,8 @@ def relTableJoin (indices : Array (Nat × Nat)) (lft : Term (Rel α β)) (rgt : 
 
 /-- Projects every tuple onto the given components, in the order given.
 
-Tuple projection lifted to a relation, so it reorders and duplicates as readily as it selects. The
-`Cols` spine carries the result's index — `T.relProject` on an `Array Nat` is the sort-erased form,
-for positions that are only known at run time.
+Positions are written `cols% [2, 0]`, and may reorder and repeat components.
+`Untyped.Term.relProject` takes them as an `Array Nat`, for positions known only at run time.
 -/
 def relProject (cols : Cols α β α' β') (rel : Term (Rel α β)) : Env (Term (Rel α' β')) :=
   T.relProject cols.toArray rel.erase

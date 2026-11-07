@@ -24,11 +24,19 @@ import all Cvc.Typed.Core.Defs
 
 
 
+/-! # Bound variables and lambdas, typed
+
+A `BVar α` is a variable bound by a lambda, a quantifier, a definition, a match case or a grammar;
+`BVar.toTerm` (or a coercion) uses it as a `Term α`. `BVars` lists the parameters of a lambda or a
+definition, whose signature it computes with `BVars.signatureTo`. `Term.lambdaH` writes a lambda's
+body as a Lean function instead, and so does `smt! fun (x : Int) => x + 1`.
+-/
+
 namespace Cvc.Typed public section variable [Ω]
 
 
 
-/-- A bound variable. -/
+/-- A bound variable of the sort `α` describes. -/
 def BVar (α : Type) := Term α
 
 /-- A term as the bound variable it is. Unchecked: for a view, which has read the term's kind. -/
@@ -39,8 +47,9 @@ namespace BVar
 
 /-- A bound variable of the sort `α` describes.
 
-Only meaningful under a binder: the bound variables of a definition's body, or of a quantifier,
-lambda or witness. Each call produces a fresh variable even for the same name and sort.
+Only meaningful under a binder: a definition's parameters, or those of a lambda, quantifier, set
+comprehension, match case or grammar. Each call produces a fresh variable, even for the same name
+and sort.
 -/
 def mk [ToTyp α] (name : String) : Env (BVar α) := do Untyped.Term.mkBVar (← Srt.of α) name
 
@@ -86,7 +95,11 @@ abbrev _root_.Cvc.Untyped.BVar.typeCheckAs := @Untyped.BVar.toTypedAs
 @[inherit_doc Untyped.BVar.toTypedAs]
 abbrev _root_.Cvc.Untyped.BVar.typeCheck := @Untyped.BVar.toTyped
 
-/-- A typed-list of `BVar`s. -/
+/-- A list of bound variables of assorted sorts: a lambda's or a definition's parameters.
+
+Push them in parameter order: `BVars.push y (BVars.push x [])` stands for the parameters `x` then
+`y`, so its signature to `β` is `X → Y → β`.
+-/
 abbrev BVars := List ((α : Type) × ToTyp α × BVar α)
 
 namespace BVars
@@ -94,28 +107,26 @@ namespace BVars
 /-- An empty list of bound variables. -/
 abbrev empty : BVars := []
 
-/-- Pushes a bound variable. -/
+/-- Adds a bound variable after the parameters already in the list. -/
 abbrev push [ToTyp α] (bv : BVar α) (bvs : BVars) : BVars :=
   ⟨α, inferInstance, bv⟩ :: bvs
 
-/-- Signature of the lambda with codomain `β` associated to these bound variables. -/
+/-- The signature of a lambda over these bound variables whose body has sort `β`. -/
 abbrev signatureTo (β : Type) : (bvs : BVars) → Type
   | [] => β
   | ⟨α, _, _⟩ :: bvs => signatureTo (α → β) bvs
 
-/-! A signature is *computed*, so a term indexed by one is inferred at the application rather than
-at the arrow it denotes: `Grammar (BVars.signatureTo Int (BVars.push y (BVars.push x [])))` where
-`Grammar (Int → Int → Int)` is what a reader wants. Being an `abbrev` does not help — reducibility
-governs unification, not printing, and Lean shows a type as inferred rather than in normal form.
-
-The delaborator below closes that gap for every abbrev whose index goes through `signatureTo` —
-`lambda`, `Solver.defineFun`, `synthAnyFun`, a `Grammar`'s own index.
--/
+-- A signature is *computed*, so a term indexed by one is inferred at the application rather than
+-- at the arrow it denotes: `Grammar (BVars.signatureTo Int (BVars.push y (BVars.push x [])))`
+-- where `Grammar (Int → Int → Int)` is what a reader wants. Being an `abbrev` does not help —
+-- reducibility governs unification, not printing, and Lean shows a type as inferred rather than in
+-- normal form. The delaborator below closes that gap for every abbrev whose index goes through
+-- `signatureTo` — `lambda`, `Solver.defineFun`, `synthAnyFun`, a `Grammar`'s own index.
 
 open Lean PrettyPrinter Delaborator SubExpr in
 /-- Shows a signature in the form it computes to, once that form has no metavariables left.
 
-A signature over a variable spine shows as far as it reduces: `push x bvs` as
+A signature over a variable list shows as far as it reduces: `push x bvs` as
 `signatureTo (Int → Int) bvs`, saying that `x` is already accounted for.
 -/
 @[delab app.Cvc.Typed.BVars.signatureTo]
@@ -222,10 +233,9 @@ end Cvc.Typed
 
 /-! ## `smt! fun`
 
-The syntax is declared in `Cvc.Ext`; this is the typed expansion, through `Term.lambdaH`. A
-binder's type is the Lean type of the variable's index, so `smt! fun (x : Int) => x + 1` is a
-`Term (Int → Int)`.
+A binder's type is the variable's index, so `smt! fun (x : Int) => x + 1` is a `Term (Int → Int)`.
 -/
+-- The syntax is declared in `Cvc.Ext`; this is the typed expansion, through `Term.lambdaH`.
 
 namespace Cvc.Ext
 

@@ -22,13 +22,12 @@ public import Cvc.Typed.Core.Defs
 
 /-! # Values, typed
 
-The same two directions as the sort-erased layer, stated at an index: `ValueToTerm α` builds a
-`Term α` from an `α`, `TermToValue α` reads an `α` back out of one. The classes are this layer's
-own — a typed term is opaque to a user who imports only this layer, so a sort-erased instance
-would not apply to it.
+`ValueToTerm α` builds a `Term α` from an `α`, and `TermToValue α` reads an `α` back out of one.
+Instances bridge to and from the sort-erased classes, so a type with conversions in either layer
+works in both.
 
-Reading a term's own structure needs no index and is inherited unchanged, except that the *sort* of
-a term is what its index already describes, so the readers below narrow the terms they accept.
+The readers of a term's own structure — its sort, kind, symbol and children — take a term at any
+index; the readers tied to a sort live in that sort's theory.
 -/
 namespace Cvc.Typed public section variable [Ω]
 
@@ -42,6 +41,9 @@ open Cvc renaming Untyped.Term → T
 class TermToValue (α : Type) where
   /-- Reads the value a constant term denotes. -/
   termToValue : [Ω] → Term α → Env α
+-- This layer's own class rather than the sort-erased one: a typed term is opaque to a user who
+-- imports only this layer, so a sort-erased instance would not apply to it without the bridges
+-- below.
 
 namespace TermToValue
 
@@ -113,18 +115,11 @@ def extractValueAs (α : Type) [TermToValue α] : Term α → Env α := extractV
 
 /-! ## Reading a term's own structure
 
-These hold whatever a term's index, so they take any of them. Sub-terms are sort-erased: nothing
-about a term's index says what its children's indices are.
-
-The readers that *are* tied to an index — `getIntValue`, `getBitVecValue`, and the rest — live in
-their own theory, beside the constructor that builds what they read.
+These take a term at any index. Children come back sort-erased, since a term's index says nothing
+about its children's.
 -/
 
-/-- The sort of a term.
-
-An index describes a sort, so this is `Srt.of α` — reading it off the term is the way to see
-whether the two agree.
--/
+/-- The sort of a term, which is `Srt.of α`. -/
 def getSort (term : Term α) : Env Srt := T.getSort term
 
 @[inherit_doc T.getId]

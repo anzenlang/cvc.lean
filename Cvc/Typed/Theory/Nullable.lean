@@ -19,3 +19,13 @@ public import Cvc.Typed.Theory.Nullable.Regex
 public import Cvc.Typed.Theory.Nullable.Seq
 public import Cvc.Typed.Theory.Nullable.Set
 public import Cvc.Typed.Theory.Nullable.String
+
+
+
+/-! # Nullables, typed
+
+cvc5's `Nullable` sort is Lean's `Option`: `Term.mkNull`, `Term.nullableSome` and the rest build and
+read `Term (Option α)`, and each theory's operators have a lifted form named with a `?`, such as
+`Term.add? : Term (Option α) → Term (Option α) → Env (Term (Option α))`. A lifted operator is
+strict: its result is null as soon as one argument is.
+-/

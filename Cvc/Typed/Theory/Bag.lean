@@ -20,7 +20,7 @@ public import Cvc.Spec.Bag
 
 
 
-/-! # Generated Bag constructors, typed -/
+/-! # Bags, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T

@@ -14,7 +14,8 @@ public import Cvc.Typed.Core.View
 
 /-! # Folding over typed terms, and walking them with a zipper
 
-`Term.fold` visits a term's nodes; `Term.walk` visits them through a zipper and can replace them.
+`Term.fold` visits a term's nodes; `Term.walk` visits them through a zipper — a position in the
+term, which can move and replace what it is on — and can replace them.
 Both hand each node to the user as its view at its sort — through `ViewFamily`, which
 `def.term_view V` instantiates — and both take four optional functions: `pre` and `post` for a node
 whose sort a `Typ` describes, called on reaching it and on leaving it, and `prePlain` and
@@ -24,10 +25,10 @@ variable list, a term of a parametric datatype. Every node is visited, by one pa
 **Both run in a monad `Env` lifts into.** Presenting a node reads its sort, which the library does
 in `Env`, and a walk rebuilds what it replaced under, which goes through the term manager.
 
-The order, the steps and the zipper are the sort-erased ones, `Cvc.Untyped.Traverse`, with each
-node's sort carried as the zipper's payload. What the index adds is in the replacements: a typed
-node's is a term of its sort, so it cannot be ill-sorted, while a plain node's is checked.
+The order and the steps are those of `Cvc.Untyped.Traverse`. A typed node's replacement is a term
+of its sort, so it cannot be ill-sorted, while a plain node's is checked.
 -/
+-- The zipper is the sort-erased one, with each node's sort carried as its payload.
 
 namespace Cvc.Typed public section variable [Ω]
 

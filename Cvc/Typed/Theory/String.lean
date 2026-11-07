@@ -20,7 +20,7 @@ public import Cvc.Spec.String
 
 
 
-/-! # Generated String constructors, typed -/
+/-! # Strings, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -47,12 +47,12 @@ instance : SrtLike String where
 
 
 
-/-! ## The DSL's literals for this theory
+/-! ## `smt!` literals of this theory
 
-Expanded here rather than in `Cvc.Ext` so that the grammar a user gets is the grammar of the
-theories they imported: without this module, `smt!` does not accept them at all. The expander's own
-machinery lives in `Cvc.Ext`, never in `Cvc`.
+A string literal, written as in Lean, is a `Term String`.
 -/
+-- Expanded here rather than in `Cvc.Ext`, so that `smt!` accepts a theory's forms only where that
+-- theory is imported. The expander's own machinery lives in `Cvc.Ext`, never in `Cvc`.
 
 public meta section
 

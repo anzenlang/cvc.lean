@@ -25,3 +25,11 @@ public import Cvc.Typed.Theory.Set
 public import Cvc.Typed.Theory.String
 public import Cvc.Typed.Theory.Table
 public import Cvc.Typed.Theory.Tuple
+
+
+
+/-! # Every theory, typed
+
+The term constructors of every theory, one module each. Importing a single one, such as
+`Cvc.Typed.Theory.Arith`, compiles only that theory, and `smt!` then accepts only its notations.
+-/

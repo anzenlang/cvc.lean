@@ -25,10 +25,11 @@ Each lifted operator has its plain counterpart's signature with an `Option` arou
 and around the result, and nothing else changed. The lift is **strict**: `none` unless every
 argument is `some`.
 
-Only the non-indexed operators lift. An indexed one — `bvExtract`, `bvRepeat` and the rest — is
-applied through an `Op` carrying its indices, and `mkNullableLift` takes a `Kind`, so there is no
-way to express it.
+Only the non-indexed operators lift: `bvExtract`, `bvRepeat` and the other indexed ones have no
+lifted form.
 -/
+-- An indexed operator is applied through an `Op` carrying its indices, and `mkNullableLift` takes a
+-- `Kind`, so there is no way to express its lift.
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T

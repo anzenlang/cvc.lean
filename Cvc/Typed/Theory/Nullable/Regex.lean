@@ -24,8 +24,8 @@ Each lifted operator has its plain counterpart's signature with an `Option` arou
 and around the result, and nothing else changed. The lift is **strict**: `none` unless every
 argument is `some`.
 
-The regex *term* becomes nullable. Note the string-matching operators live in the string theory,
-so `strInRe?` is generated there.
+The regex *term* becomes nullable. The indexed `reLoop` and `reRepeat` have no lifted form, and
+the string-matching operators live in the string theory, so `strInRegex?` is generated there.
 -/
 namespace Cvc.Typed.Term public section
 

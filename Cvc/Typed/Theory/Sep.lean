@@ -24,31 +24,27 @@ public import Cvc.Spec.Sep
 
 /-! # Separation logic, typed
 
-The sort-erased module holds the reasoning; this one states it in types. Read
-`Cvc.Untyped.Theory.Sep` first.
-
-`Heap` is where the layer earns its keep. Sort-erased it carries the two `Srt`s and checks them at
-construction; here it carries the two **Lean types**, so
+A solver's heap is declared once, at the Lean types of its locations and data. The two constructors
+that depend on it hang off the handle `declareSepHeap` answers, so a location or a datum of the
+wrong type does not compile:
 
 ```lean
-def pto (h : s.Heap α β) (loc : Term α) (data : Term β) : Env (Term Bool)
-def nil (h : s.Heap α β) : Env (Term α)
+let h ← s.declareSepHeap Int Int
+s.assert (← h.pto x y)     -- `x y : Term Int`
+let n ← h.nil              -- `n : Term Int`
 ```
 
-make a heap mismatch a *type* error, and `nil` comes out at the location index with nothing to
-ascribe.
-
-**A handle fits here where it did not fit datatypes.** The objection there was that a handle's
-index has no `ToTyp`, so it cannot go where one is required — inside `Set α`, `declareConstAs α`, a
-tuple component. A heap is never a term's sort: `sep.nil` is a term of the *location* sort, which
-is an ordinary Lean type with an ordinary `ToTyp`. So nothing ever asks for `ToTyp (Heap α β)`, and
-the objection does not arise.
-
-`Heap` is a `structure` wrapping the sort-erased handle rather than an abbreviation of it. An
-abbreviation unfolds, and dot notation would then find `Untyped.Solver.Heap.pto` — which takes
-sort-erased terms, and would accept them, a typed term being definitionally its sort-erased one.
-The wrapper is what keeps `h.pto` meaning the typed one. `Proof` needed the same care.
+`sepEmp`, `sepStar` and `sepWand` need no heap. `getValueSepHeap` and `getValueSepNil` describe the
+model's heap as formulas.
 -/
+-- A handle fits here where it did not fit datatypes: a handle's index has no `ToTyp`, so it cannot
+-- go where one is required. But a heap is never a term's sort — `sep.nil` is a term of the
+-- location sort — so nothing ever asks for `ToTyp (Heap α β)`.
+--
+-- `Heap` is a structure wrapping the sort-erased handle rather than an abbreviation of it: an
+-- abbreviation unfolds, and dot notation would then find `Untyped.Solver.Heap.pto`, which would
+-- accept typed terms, a typed term being definitionally its sort-erased one. `Proof` needed the
+-- same care.
 namespace Cvc.Typed public section
 
 namespace Term variable [Ω]
@@ -66,8 +62,7 @@ namespace Solver variable [Ω] open Cvc renaming Untyped.Solver → U
 
 /-- The heap of a solver, at the Lean types of its locations and its data.
 
-Produced by `declareSepHeap`, and the only way to `Heap.pto` or `Heap.nil`. Indexed by its solver,
-as the sort-erased handle is, and by the two types the sort-erased one carries as `Srt`s.
+Produced by `declareSepHeap`, and the only way to `Heap.pto` or `Heap.nil`.
 -/
 structure Heap (solver : Solver) (α β : Type) where private mk ::
   private untyped : U.Heap solver
@@ -136,8 +131,8 @@ end Heap
 
 /-! ## Reading a heap back
 
-Both answer a `Bool`-sorted formula characterizing the model's heap rather than a value, so both
-are `Term Bool` whatever the heap's indices — see the sort-erased module.
+Both answer a formula describing the model's heap rather than a value, so both are `Term Bool`
+whatever the heap's types.
 -/
 
 @[inherit_doc U.getValueSepHeap]

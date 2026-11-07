@@ -21,16 +21,11 @@ public import Cvc.Typed.Theory.Relation
 
 /-! # Tables, typed
 
-A table is indexed by `Tab α β` — a **bag** of tuples whose columns are `α ++ [β]`. It is the
-relation story with duplicates kept, and shares the tuple index and `Components` builder with
-`Relation.lean`.
+A table is a bag of tuples, indexed by `Tab α β`: a relation with duplicates kept. Its rows are
+the `Tup α β` tuples of `Cvc.Typed.Theory.Relation`, built with `mkTup`.
 
-**The bag operators are restated here rather than reached through `Bag`**, so working with a table
-never means leaving the table world. `tableUnionMax`, `tableCount` and the rest are the bag
-operators at a table's index; `tableToBag` is there for the two that genuinely leave it, `bagMap`
-and `bagFold`.
-
-cvc5 marks every table-specific kind experimental.
+The bag operators are restated at a table's index (`tableUnionMax`, `tableCount`, …); `tableToBag`
+crosses to `Bag`, for `bagMap` and `bagFold`. cvc5 marks every table-specific kind experimental.
 -/
 namespace Cvc.Typed.Term public section variable [Ω]
 
@@ -96,8 +91,8 @@ def tableAggregate [Ord γ] (columns : Array Nat) (f : Term (Tup α β → γ �
 
 /-- Projects every row onto the given columns, in the order given.
 
-Typed by its `Cols` spine, as `relProject` is; `T.tableProject` on an `Array Nat` is the
-sort-erased form, for columns that are only known at run time.
+Columns are written `cols% [2, 0]`. `Untyped.Term.tableProject` takes them as an `Array Nat`, for
+columns known only at run time.
 -/
 def tableProject (cols : Cols α β α' β') (table : Term (Tab α β)) : Env (Term (Tab α' β')) :=
   T.tableProject cols.toArray table.erase

@@ -24,27 +24,23 @@ public import Cvc.Typed.Core.Value
 
 /-! # Records, typed
 
-`Record fields` is the index, so a record's field names *and* the type of each are static. That is
-enough to make everything the sort-erased layer checks at runtime a type error instead, and it
-leaves nothing to look up: unlike a declared datatype, whose constructors and field sorts are facts
-about a runtime declaration, a record sort is structural, so there is no handle to carry and
-`Datatype.Ctor`/`Field` have no counterpart here.
+A record with fields `a : Int` and `b : Bool` is a `Term (Record [("a", Int), ("b", Bool)])`. Its
+field names, their order and their types are part of the index, so a missing field, a field out of
+order, an unknown name or a field at the wrong type does not compile.
 
-What the index does:
+```lean
+Term.mkRecord (.cons "a" x (.last "b" y))   -- `x : Term Int`, `y : Term Bool`
+smt! {a := x, b := y}                       -- the same record
+smt! {r with a := 9}                        -- `r`, its field `a` replaced
+smt! r.a                                    -- `r`'s field `a`; also `e |>.a`
+```
 
-- the field list is written **once**, in the `Fields` spine, and inferred from there;
-- fields in the wrong order, or one omitted, are a type error rather than a constructor arity or
-  sort error out of cvc5;
-- `recordGet` at a name that is not a field, or at the wrong type, does not resolve `FieldOf` and
-  does not compile.
-
-What stays a runtime fact is what a type here cannot state: that a *declared* sort matches, which
-does not arise, records being structural. So nothing in this module can fail on a well-typed call.
-
-`Fields` holds its terms **erased**, with the types only in the index, and `FieldOf` carries a
-position rather than a projection. That is not an optimisation: a spine binding one type variable
-per field would land in `Type 1`, and `Env` answers only `Type`.
+A field of a literal may state its sort, `{a : Int := 7}`, which is then checked. A record has at
+least one field.
 -/
+-- `Fields` holds its terms erased, with the types only in the index, and `FieldOf` carries a
+-- position rather than a projection: a list binding one type variable per field would land in
+-- `Type 1`, and `Env` answers only `Type`.
 namespace Cvc.Typed public section variable [Ω]
 
 open Cvc renaming Untyped.Term → T
@@ -53,10 +49,9 @@ open Cvc renaming Untyped.Term → T
 
 /-! ## A record's fields, by name -/
 
-/-- One term per field, along with the fields they are.
+/-- One term per field, the field names and types in the index.
 
-`nil` and `cons` are the only ways to build one, and between them they keep the terms and the index
-in step — so a record's fields cannot come out reordered, short, or at the wrong type.
+Built with `last` and `cons`: `.cons "a" x (.last "b" y)`.
 -/
 structure Fields (fields : List (String × Type)) where
   private mk ::
@@ -79,10 +74,7 @@ def cons (name : String) (value : Term gamma) (rest : Fields fields)
 : Fields ((name, gamma) :: fields) :=
   ⟨⟨#[value.erase] ++ rest.values.toArray, by simp; omega⟩⟩
 
-/-- A field's term, at the type the index gives it.
-
-Total: a name that is not a field has no `FieldOf` instance, so there is no `none` to answer.
--/
+/-- A field's term, at the type the index gives it; a name that is not a field does not compile. -/
 def get (name : String) [F : FieldOf fields name gamma] : Term gamma := fs.values[F.idx]
 
 /-- The same fields, with one field's term replaced. -/
@@ -95,7 +87,7 @@ def terms : Untyped.Terms := fs.values.toArray
 /-- The fields as name/term pairs, sort-erased, in the order the fields are. -/
 def pairs : Array (String × Untyped.Term) := (fields.map Prod.fst).toArray.zip fs.terms
 
-/-- The sort-erased spine, its field names read off the index; free. -/
+/-- The sort-erased fields, their names read off the index; free. -/
 def toUntyped : Untyped.Fields (fields.map Prod.fst) := ⟨fs.values.cast (by simp)⟩
 
 @[inherit_doc toUntyped]
@@ -108,11 +100,10 @@ instance : ToString (Fields fields) where
 
 end Fields
 
-/-- Types a sort-erased spine at `fields`, checking each field's term against its type's sort.
+/-- Types sort-erased fields at `fields`, checking each field's term against its type's sort.
 
-The names are the sort-erased spine's index, so that they agree with `fields` is a proof, which
-`rfl` finds whenever both are written out. `toTyped` infers `fields` from the expected type;
-`typeCheckAs` and `typeCheck` are the same two functions under the names that say what they do.
+The field names must be `fields`' names, a proof `rfl` finds when both are written out. `toTyped`
+infers `fields` from the expected type; `typeCheckAs` and `typeCheck` are the same two functions.
 -/
 def _root_.Cvc.Untyped.Fields.toTypedAs (fields : List (String × Type)) [Fs : ToTypFields fields]
   (fs : Untyped.Fields names)
@@ -147,27 +138,20 @@ abbrev _root_.Cvc.Untyped.Fields.typeCheck := @Untyped.Fields.toTyped
 
 namespace Term
 
-/-- Builds a record value.
-
-Takes no sort: the index says which record this is. It takes no field *names* either, the spine
-carrying them, so the one confusion a record invites — its fields in the wrong order — is a type
-error rather than something to check.
--/
+/-- Builds a record value from its fields: `mkRecord (.cons "a" x (.last "b" y))`. -/
 def mkRecord [ToTypFields fields] (fs : Fields fields) : Env (Term (Record fields)) := do
   T.mkRecord (← Srt.of (Record fields)) fs.pairs
 
-/-- Checks a field's term against a stated sort, and answers it unchanged.
-
-What a record literal's optional sort annotation expands to. The index already fixes the sort, so
-an annotation can only confirm it — which is worth doing, since a reader of the literal takes it on
-trust.
--/
+/-- Answers `term` unchanged, failing unless `expected` is its sort. -/
 def checkFieldSrt [ToTyp gamma] (field : String) (expected : Srt) (term : Term gamma)
 : Env (Term gamma) := do
   let actual ← Srt.of gamma
   unless actual == expected do
     throwUser s!"field `{field}` is stated at sort `{expected}`, but its term has sort `{actual}`"
   return term
+-- What a record literal's optional sort annotation expands to. The index already fixes the sort, so
+-- an annotation can only confirm it — which is worth doing, since a reader of the literal takes it
+-- on trust.
 
 /-- Reads a field out of a record value. -/
 def recordGet (record : Term (Record fields)) (name : String) [FieldOf fields name gamma]
@@ -179,10 +163,7 @@ def recordSet (record : Term (Record fields)) (name : String) [FieldOf fields na
 (value : Term gamma) : Env (Term (Record fields)) :=
   T.recordSet record.erase name value.erase
 
-/-- Reads a record value apart, into all of its fields.
-
-Needs no field names, unlike its sort-erased counterpart: they are what the index is.
--/
+/-- Reads a record value apart, into all of its fields. -/
 def recordFields (record : Term (Record fields)) : Env (Fields fields) :=
   go fields
 where
@@ -192,11 +173,9 @@ where
     | (name, _) :: rest => do
       return Fields.cons name (← T.recordGet record.erase name) (← go rest)
 
-/-- A record's fields, if the term is a record literal: `fs.get "a"` then reads one, by a name
-checked at compile time.
+/-- A record literal's fields, `none` if the term is not a literal.
 
-`none` unless the term is a construction, which its kind says: a declared constant, an update or an
-`ite` of a record sort is not one. Generic code meets records through the datatype view instead.
+A declared constant, an update or an `ite` is not a literal. `fs.get "a"` then reads a field.
 -/
 def recordFields? (t : Term (Record fields)) : Env (Option (Fields fields)) := do
   let raw := t.erase
@@ -212,22 +191,20 @@ end Term
 
 /-! ## Values
 
-`Record fields` is the Lean value a record-sorted term denotes as well as its index, so
-`Solver.getValue` answers one directly. Both directions are lifted field by field, each through its
-own class, so a record demands of its fields only what is asked of the record.
-
-The reader walks the term's **children**, not its selectors: a record value is an
-`APPLY_CONSTRUCTOR` whose arguments are the fields in order. That is what makes it work on a term
-that was *built* as well as on one a model answered, as bags and nullables do and sets and
-sequences do not.
+`Record fields` is also the Lean value a record term denotes, so `Solver.getValue` answers one. It
+converts field by field, so a record needs of its fields only the conversions asked of it. Reading
+works on a built record literal as well as on a model's answer.
 -/
+-- The reader walks the term's children, not its selectors: a record value is an
+-- `APPLY_CONSTRUCTOR` whose first child is the constructor and whose others are the fields in
+-- order.
 
 /-- Reads a record's fields off the arguments of its constructor application. -/
 class TermToValues (fields : List (String × Type)) where
   /-- Reads one value per field, in order. -/
   ofTerms : [Ω] → List Untyped.Term → Env (Values fields)
 
-/-- A sort-erased term at the index its field gives it. -/
+/-- A sort-erased term at any index, unchecked: the caller vouches for its sort. -/
 def ofErased (term : Untyped.Term) : Term gamma := term
 
 /-- The record term of a list of field terms, in the sort's order. -/
@@ -272,19 +249,15 @@ public meta section
 
 open Lean
 
-/-! ## The DSL's record forms, typed
-
-The *syntax* is declared once, beside the sort-erased constructors, exactly as an operator's
-notation is — this layer imports it and adds only what its expansion differs in. Being the later
-module, these alternatives are tried first, and they decline anything that is not this layer.
--/
+-- The record forms of `smt!`, shown in the module doc. The syntax is declared once, beside the
+-- sort-erased constructors; this layer adds only its own expansion, tried first and declining
+-- anything that is not this layer.
 
 /-- Resolves a dotted identifier of the typed layer into a head and the fields read off it. -/
 syntax (name := smtProjT) "smtProjT% " ident : term
 
-/-! The DSL's machinery for these forms lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash
-with the API a user opens.
--/
+-- The DSL's machinery lives in `Cvc.Ext`, never in `Cvc`, so that it cannot clash with the API a
+-- user opens.
 namespace Ext
 
 open Cvc.Ext

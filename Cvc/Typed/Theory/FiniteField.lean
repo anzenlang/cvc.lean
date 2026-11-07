@@ -21,7 +21,7 @@ public import Cvc.Spec.FiniteField
 
 
 
-/-! # Generated FiniteField constructors, typed -/
+/-! # Finite fields, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T

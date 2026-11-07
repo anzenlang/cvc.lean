@@ -21,7 +21,7 @@ public import Cvc.Spec.Array
 
 
 
-/-! # Generated Array constructors, typed -/
+/-! # Arrays, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T

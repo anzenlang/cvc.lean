@@ -30,8 +30,7 @@ formulas are not falls back to `other`, so a `Term Bool` here is never a guess.
 
 namespace Cvc.Typed public section variable [Ω]
 
-/-- A step of a typed proof, taken apart: `Cvc.Proof.View` with formulas as `Term Bool` and other
-terms sort-erased. -/
+/-- A step of a typed proof, taken apart: formulas as `Term Bool`, other terms sort-erased. -/
 abbrev Solver.ProofView (s : Solver) (pc : Proof.Component) : Type :=
   Cvc.Proof.View (s.Proof pc) (Term Bool) Untyped.Term
 
@@ -61,8 +60,7 @@ def viewWith (premises : Array X) : Cvc.Proof.View X (Term Bool) Untyped.Term :=
   v.mapM (m := Option) pure formula? pure
   |>.getD (.other p.getRule premises p.getArguments)
 
-/-- The root step of `p`, taken apart: its rule as a constructor, its premises and arguments as
-fields. -/
+/-- The root step of `p`, taken apart: its rule as a constructor, its premises and arguments. -/
 def view : s.ProofView pc := p.viewWith p.getChildren
 
 
@@ -84,8 +82,10 @@ def foldUp [Monad m] (f : s.Proof pc → Cvc.Proof.View β (Term Bool) Untyped.T
     p.getChildren
   f p (p.viewWith premises)
 
-/-- `for step in p do …` visits the distinct steps of `p` in the order `fold` enters them, and
-`break` ends the loop. -/
+/-- `for step in p do …` visits the distinct steps of `p`, in the order `fold` enters them.
+
+`break` ends the loop.
+-/
 instance [Monad m] : ForIn m (s.Proof pc) (s.Proof pc) where
   forIn p init f :=
     Cvc.Proof.foldWith (·.getChildren) id #[p] init

@@ -28,24 +28,19 @@ public meta import Cvc.Ext
 
 /-! # SyGuS grammars, typed
 
-A grammar restricts the shape of a term the solver may produce. Two things about one go wrong
-easily, and both are stated in the types here.
+A grammar restricts the shape of a term the solver may produce, for `synthFun`, `getInterpolant` or
+`getAbduct`. `smt.grammar!` writes one as a block, its first non-terminal being the start symbol:
 
-A **rule must have its non-terminal's sort** — cvc5 answers `expected ntSymbol and rule to have the
-same sort`, which `addRule` turns into a type error.
+```lean
+smt.grammar! s (x y : Int) where
+  start : Int  := x | y | 0 | if c then start else start
+  c     : Bool := start ≤ start
+```
 
-A grammar's **parameters must be the very same variables** the `synth-fun` is declared with. In
-SyGuS they are one thing, `(synth-fun f ((x Int)) Int G)`, but two arguments in the API, so this
-`Grammar` carries its own parameters and `synthFun` takes nothing else. Its index is the *signature*
-the grammar can generate: `Grammar (bvs.signatureTo α)`, folded exactly as `Solver.defineFun`
-folds its own parameters. With no parameters that is just the start symbol's sort, which is the
-shape `getInterpolant` and `getAbduct` want.
-
-A grammar is built through a solver, `s.mkGrammar`, but belongs to the scope as a term does: any
-solver of the scope accepts it.
-
-**A grammar freezes once it is used**, as in the sort-erased layer: the rule builders answer a new
-`Grammar`, but the object underneath is shared and cvc5 rejects further rules after `synthFun`.
+A rule must have its non-terminal's sort, or it does not compile. A `Grammar σ` carries the
+parameters it was built over, and `σ` is their sorts arrowed onto the start symbol's
+(`Int → Int → Int` above), so `synthFun` needs nothing else. Any solver of the scope accepts a
+grammar, but **a grammar freezes once used**: after `synthFun`, cvc5 rejects further rules.
 -/
 namespace Cvc.Typed public section variable [Ω]
 
@@ -136,19 +131,16 @@ end NTs
 
 
 
-/-! ## Grammars
-
-The type is declared beside `Solver`, whose interpolant and abduct queries take one; what is here
-builds one. Like a term, a grammar belongs to the scope rather than to the solver that built it.
--/
+/-! ## Grammars -/
+-- The type is declared beside `Solver`, whose interpolant and abduct queries take one; what is here
+-- builds one.
 
 namespace Solver variable (s : Solver)
 
 /-- A grammar over the given parameters, starting at `start`.
 
-`boundVars` are the parameters of the `synth-fun` this grammar will constrain; the resulting index
-is the signature those parameters and `start`'s sort describe. `others` are further non-terminals
-the rules may mention.
+`boundVars` are the parameters of the function the grammar will constrain, and the index is their
+sorts arrowed onto `start`'s. `others` are the other non-terminals the rules may mention.
 -/
 def mkGrammar [ToTyp α] (boundVars : BVars) (start : NT α) (others : NTs := [])
 : Env (Grammar (boundVars.signatureTo α)) := do
@@ -158,13 +150,8 @@ end Solver
 
 /-- Types a sort-erased grammar at signature `σ`, checking it against what the grammar generates.
 
-The grammar counterpart of `Untyped.Term.toTypedAs`. `σ` is compared with the grammar's
-`Untyped.Grammar.signatureSrt`: its parameters' sorts arrowed onto its start symbol's, or the start
-symbol's sort alone when there are no parameters. Arrows flatten, so a one-parameter grammar whose
-start symbol is a function checks against the same `σ` as a grammar taking those arguments as
-parameters; that is harmless, cvc5 flattening a function sort the same way, so the function
-`synthFun` declares has sort `σ` either way. `toTyped` infers `σ` from the expected type;
-`typeCheckAs` and `typeCheck` are the same two functions under the names that say what they do.
+`σ` is compared with the grammar's parameters' sorts arrowed onto its start symbol's. `toTyped`
+infers `σ` from the expected type; `typeCheckAs` and `typeCheck` are the same two functions.
 -/
 def _root_.Cvc.Untyped.Grammar.toTypedAs (σ : Type) [ToTyp σ] (g : Untyped.Grammar)
 : Env (Grammar σ) := do
@@ -173,6 +160,9 @@ def _root_.Cvc.Untyped.Grammar.toTypedAs (σ : Type) [ToTyp σ] (g : Untyped.Gra
   if srt != srt' then
     throwUser s!"cannot type the following grammar as `{srt'}`, it generates `{srt}`:\n{g}"
   return ⟨g⟩
+-- Arrows flatten, so a one-parameter grammar whose start symbol is a function checks against the
+-- same `σ` as a grammar taking those arguments as parameters; that is harmless, cvc5 flattening a
+-- function sort the same way, so the function `synthFun` declares has sort `σ` either way.
 
 @[inherit_doc Untyped.Grammar.toTypedAs]
 def _root_.Cvc.Untyped.Grammar.toTyped [ToTyp σ] (g : Untyped.Grammar) : Env (Grammar σ) :=
@@ -217,31 +207,40 @@ end Cvc.Typed
 
 /-! ## `smt.grammar!`
 
-The syntax is declared beside the sort-erased grammar; this is the typed expansion, and the scoped
-`smt.grammar!` that `open Cvc.Typed` selects. A sort is the Lean type of the non-terminal's or the
-parameter's index, and the result is `Grammar σ` with `σ` the parameters folded over the start
-sort, exactly what `Solver.mkGrammar` answers.
-
-`smt.mkGrammar!` and `smt.letGrammar!` answer the parameters as `BVar α` and the non-terminals as
-`NT α`, each at its declared index, so a rule added afterwards is checked against its non-terminal's
-sort, and a parameter passed where a non-terminal is wanted does not typecheck.
+Available under `open Cvc.Typed`. A parameter's or a non-terminal's sort is written as a Lean type.
+To add rules afterwards, `smt.mkGrammar!` and `smt.letGrammar!` also hand back the parameters, as
+`BVar α`, and the non-terminals, as `NT α`; there, a non-terminal may be declared with no
+alternatives (`n : Int`).
 -/
+-- The syntax is declared beside the sort-erased grammar; this is the typed expansion.
 
 namespace Cvc.Typed
 
-/-- Typed `smt.grammar!`. -/
+/-- A grammar written as a block: `smt.grammar! s (x : Int) where start : Int := x | ?const`.
+
+After the solver building it and the parameters, one line per non-terminal, the first being the
+start symbol, with `|`-separated `smt!` alternatives. `?const` and `?var` allow any constant and
+any parameter of the non-terminal's sort.
+-/
 scoped syntax "smt.grammar! " smtGrammarBody : term
 
 macro_rules
   | `(smt.grammar! $body) => `(grammarT! $body)
 
-/-- Typed `smt.mkGrammar!`: the grammar together with its parameters and non-terminals. -/
+/-- `smt.grammar!`, also answering the parameters and non-terminals it made.
+
+The result is `(g, nt₁, …)`, or `((g, p₁, …), nt₁, …)` when there are parameters `p₁, …`.
+-/
 scoped syntax "smt.mkGrammar! " smtGrammarBody : term
 
 macro_rules
   | `(smt.mkGrammar! $body) => `(mkGrammarT! $body)
 
-/-- Typed `smt.letGrammar!`: binds the grammar, its parameters and its non-terminals. -/
+/-- `smt.grammar!` as a `do` element, binding the grammar, its parameters and its non-terminals.
+
+`smt.letGrammar! g ← s (x : Int) where …` binds `g`, and each parameter and non-terminal under its
+own name.
+-/
 scoped syntax "smt.letGrammar! " ident " ← " smtGrammarBody : doElem
 
 end Cvc.Typed

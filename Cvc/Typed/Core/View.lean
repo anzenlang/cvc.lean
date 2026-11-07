@@ -19,18 +19,19 @@ public import Cvc.Types.Denote
 
 /-! # What typed views are built from
 
-A typed view takes a term of sort `τ` apart one level, with its kids typed. Each theory's is
+A typed view takes a term of sort `τ` apart one level, with its kids typed. Each theory's view is
 indexed by the sort it takes apart — `View.Arith : Typ → Type` — so that matching on an operator
-refines the sort, and a kid whose sort the operator does not fix is a `Term σ.Denote` for a
-`σ : Typ` it carries. It is built from the theory's sort-erased view, converting constructor by
-constructor: the sort-erased view has read the kind, the kids and the indices, and the typed one
-adds the sorts and the facts about them. `def.term_view V`, under `open Cvc.Typed`, gathers them
-into `V : Typ → Type`. This module holds what those need.
+refines the sort. `def.term_view V`, under `open Cvc.Typed`, gathers the views of the imported
+theories into `V : Typ → Type`. This module holds what those are built from.
 
-A typed view reads sorts, which the library does in `Env`. A node whose sort no `Typ` describes,
-or whose operator the typed view cannot type, is a typed view's `none`, and the aggregate's
-`other`.
+`τ.Denote` is the Lean type a sort `τ : Typ` denotes (`Typ.int.Denote` is `Int`), so a kid at
+`Term σ.Denote` is a term of sort `σ`; `Term.cast` moves it to an index you name. A typed view
+reads sorts, so it runs in `Env`. A node whose sort no `Typ` describes, or whose operator no
+imported view can type, is the aggregate's `other`.
 -/
+-- A typed view is built from the theory's sort-erased view, constructor by constructor: the
+-- sort-erased view has read the kind, the kids and the indices, and the typed one adds the sorts
+-- and the facts about them.
 
 namespace Cvc.Typed public section variable [Ω]
 
@@ -39,8 +40,10 @@ abbrev Kids (α : Type) := { ks : Array (Term α) // 2 ≤ ks.size }
 
 namespace View
 
-/-- A sort-erased term at an index, unchecked: what a typed view does with a kid whose sort cvc5
-has already checked against the operator's signature. -/
+/-- A sort-erased term at an index, unchecked.
+
+For a kid whose sort cvc5 has already checked against the operator's signature.
+-/
 def reindex (t : Untyped.Term) : Term α := t
 
 /-- Sort-erased kids at an index, unchecked, keeping their arity. -/

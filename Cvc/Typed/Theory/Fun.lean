@@ -20,25 +20,18 @@ public import Cvc.Spec.Fun
 
 
 
-/-! # Function-application constructors, typed
+/-! # Function application, typed
 
-A function's index is the curried arrow `α → β → γ`, which `Typ.toSrt` flattens into the SMT sort
-`(-> α β γ)`. `applyN` takes an `Args` spine and so covers every arity; `apply`/`apply2`/`apply3`
-are the fixed-arity spellings over it.
+A function's index is the curried arrow `α → β → γ`, the SMT sort `(-> α β γ)`. A function term
+applies directly, `f a b : Env (Term γ)`, or through `apply`/`apply2`/`apply3`, or
+`applyN f (.cons a (.last b))` at any arity. Fewer arguments than the arity is a partial
+application, at the remaining function index.
 
-**They flatten**, inheriting that from the sort-erased constructors: applying a term that is
-already an `APPLY_UF` appends to its children rather than nesting. So the `CoeFun` chain `f a b c`
-builds the same flat term `applyN` does, and stays clear of the function-sorted intermediates that
-would otherwise force a higher-order logic.
-
-**`Args φ β` is the arguments that take a `φ` down to a `β`**, and the spine you build is what says
-how many there are. `done` is an explicit base case, so nothing ever has to ask whether `β` is
-"still an arrow" — the question that makes drop-last on a right-nested index intractable.
-
-Stopping the spine early is a **partial application**, and it is sound: cvc5 accepts fewer
-arguments than the arity and gives the term the remaining function sort, which is exactly the `β`
-the spine computes.
+Applications flatten: applying a term that is already an application appends to its arguments, so
+all these spellings build the same flat term, which needs no higher-order logic.
 -/
+-- `Args` has an explicit base case, `last`, so nothing ever has to ask whether `β` is "still an
+-- arrow" — the question that makes drop-last on a right-nested index intractable.
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -52,11 +45,9 @@ gen_typed_view% from Cvc.Spec.Fun
 
 /-! ## Applying any number of arguments -/
 
-/-- Arguments taking a function of index `φ` down to a result of index `β`.
+/-- Arguments taking a function of index `φ` down to a result of index `β`, at least one.
 
-`last` and `cons` are the only builders, so the terms collected and the arrows consumed stay in
-step — and `last` carrying an argument is what makes "at least one" structural, where an array
-would have needed a side condition.
+Built with `last` and `cons`: `.cons a (.last b)` is `a` then `b`.
 -/
 structure Args (φ : Type) (β : Type) where private mk ::
   private terms : Untyped.Terms
@@ -65,8 +56,7 @@ structure Args (φ : Type) (β : Type) where private mk ::
 
 namespace Args
 
-/-- The final argument. Its `β` is whatever the function has left, so stopping here is a partial
-application. -/
+/-- The final argument; `β` is whatever the function has left, a function sort if it is partial. -/
 def last (arg : Term α) : Args (α → β) β where
   terms := #[arg.erase]
   nonEmpty := by simp
@@ -87,14 +77,7 @@ abbrev erase (args : Args φ β) : Untyped.Terms := args.toUntyped
 
 end Args
 
-/-- Applies a function to the arguments a spine holds.
-
-Saturating when they fill the domain, and a partial application otherwise — the spine's `β` is the
-remaining function index in that case, and cvc5 gives the term that very sort.
-
-There is always at least one argument, since `Args.last` carries one. That is what `APPLY_UF`
-requires, and it costs no side condition here.
--/
+/-- Applies a function to some arguments: all of them, or fewer for a partial application. -/
 def applyN (f : Term φ) (args : Args φ β) : Env (Term β) :=
   T.applyN f.erase args.terms args.nonEmpty
 
@@ -124,23 +107,23 @@ end Cvc.Typed.Term
 
 /-! ## Viewing an application
 
-Hand-written, since application flattens and its arity is arbitrary: `Cvc.Spec.Fun` only specifies
-`applyHo`, whose view `View.Fun` is generated. The arguments' sorts are whatever the function's
-domain is, which the application's sort does not fix, so they are a list of `Typ`s from which the
-function's index is computed. Matching on the list refines both: `.apply [.int, .bool] f (.cons x
-(.last b))` gives `f : Term (Int → Bool → τ.Denote)`, `x : Term Int` and `b : Term Bool`.
+The arguments' sorts come as a list of `Typ`s, from which the function's index is computed, and
+matching on the list refines both: `.apply [.int, .bool] f (.cons x (.last b))` gives
+`f : Term (Int → Bool → τ.Denote)`, `x : Term Int` and `b : Term Bool`.
 -/
+-- Hand-written, since application flattens and its arity is arbitrary: `Cvc.Spec.Fun` only
+-- specifies `applyHo`, whose view `View.Fun` is generated.
 
 namespace Cvc.Typed public section variable [Ω]
 
-/-- An application's arguments, each at the denotation of its sort; never empty. -/
+/-- An application's arguments, each a `Term σ.Denote` at its sort `σ`; never empty. -/
 inductive View.Apply.Args : List Typ → Type where
   /-- The last argument. -/
   | last (t : Term τ.Denote) : View.Apply.Args [τ]
   /-- One more argument, in front of the others. -/
   | cons (t : Term τ.Denote) (rest : View.Apply.Args τs) : View.Apply.Args (τ :: τs)
 
-/-- The same arguments as an application spine, so that a viewed application can be rebuilt. -/
+/-- The same arguments as a `Term.Args`, so that a viewed application can be rebuilt. -/
 def View.Apply.Args.toArgs : View.Apply.Args doms → Term.Args (Typ.arrows doms β) β
   | .last t => .last t
   | .cons t rest => .cons t rest.toArgs
@@ -151,8 +134,10 @@ protected inductive View.Apply : Typ → Type where
   | apply {τ : Typ} (doms : List Typ) (f : Term (Typ.arrows doms τ.Denote))
     (args : View.Apply.Args doms) : View.Apply τ
 
-/-- Takes a term of sort `τ` apart one level, if it is an uninterpreted function's application whose
-arguments' sorts a `Typ` describes. -/
+/-- Takes a function application of sort `τ` apart one level, `none` for any other term.
+
+Also `none` when an argument's sort is one no `Typ` describes.
+-/
 def View.Apply.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Apply τ)) := do
   let some (.apply f args) := Untyped.View.Apply.of? t.erase | return none
   let some ⟨doms, args⟩ ← go args.val.toList | return none

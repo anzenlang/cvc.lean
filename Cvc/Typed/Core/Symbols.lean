@@ -18,38 +18,29 @@ public import Cvc.Typed.Core.Solver
 
 /-! # Symbols, typed
 
-A *symbol structure* is a record of the symbols a problem is stated over, written once and read at
-three different instantiations: at identifiers (`Idents`), at terms (`Terms`) and at the Lean
-values a model gives them (`Values`). `Symbols.Wrap` is what makes one record serve all three, and
-the `Symbols` class supplies the `mapM` that walks it.
-
-**A symbol structure's whole obligation is its `Symbols` instance**, and `structure.symbols`
-generates that, so an ordinary one is written with no boilerplate at all:
+A *symbol structure* is a record of the symbols a problem is stated over, written once and read as
+identifiers (`Idents`), as terms (`Terms`) or as the Lean values a model gives them (`Values`).
+`structure.symbols` declares one:
 
 ```lean
-structure.symbols MySymbols where
-  /-- A boolean symbol. -/
-  myBoolVar : Bool
-  /-- A real symbol. -/
-  myRealVar : Rat
+structure.symbols Machine where
+  running : Bool
+  steps : Int
+
+-- in `Env`, given a solver `s`
+let syms ← Machine.idents.declareIn s     -- `syms.steps : Term Int`
+s.assert syms.running
+let some v ← syms.findCex s | …           -- `v.steps : Int`
 ```
 
-The structure, the aliases and the instance are generated; `declare`, `getValues` and `findCex`
-are generic over the `Sig`, so they need no per-structure definition either.
+`Idents` and `Values` take no `Ω`, so they can be named and read outside a scope.
 
-**`Ω` is taken only where a term is actually mentioned.** `Wrap` takes none, so `Idents` and
-`Values` take none either — only `Terms` does, along with `mapM` and the operations that build or
-read terms. A caller can therefore name a structure's identifiers and read its values outside a
-scope, entering one only to solve.
+**Symbols at a step**, for transition systems: `TermsAt k` and `ValuesAt k` wrap each field in a
+`Symbols.At k`, read with `get` (`smt!` needs none). `declareAt k` names a field `count` as
+`count__@__k`, and `FunAt`, `Fun2At`, `PredAt`, `RelAt` and their primed forms are constraints over
+one step or two. `Cvc.Typed.Extra.Sys` builds bounded model checking on top.
 
-**Symbols at a step.** `TermsAt k`, `ValuesAt k` and `ValueTermsAt k` wrap every field in a
-`Symbols.At k`, read with `get`, for the symbols of step `k` of a transition system: `declareAt k`
-names a symbol `count__@__k`, and `FunAt`, `Fun2At` and their primed forms are the constraints over
-one step or two. In `smt!` a state symbol is read off its own type, so `x + y` over two of them
-needs no `get`. `Cvc.Typed.Extra.Sys` builds transition systems and bounded model checking on top.
-
-Worked examples, including the hand-written path for what `structure.symbols` cannot express, are
-in `CvcTests.Typed.Symbols`.
+A field holding a collection of symbols needs a hand-written `Symbols` instance.
 -/
 namespace Cvc.Typed public section
 
@@ -65,7 +56,7 @@ abbrev Sig : Type 1 := Wrap → Type
 protected structure At (k : Nat) (W : Symbols.Wrap) (α : Type) [ToTyp α] [TermToValue α] where
 /-- Private constructor. -/
 private mk' ::
-  /-- Accessor. -/
+  /-- The symbol at step `k`. -/
   get : W α
 
 namespace At
@@ -101,7 +92,7 @@ abbrev FunAt (α : Type) (k : Nat) : Type := S.TermsAt k → Env (Term α)
 abbrev FunAt' (α : Type) : Type := {k : Nat} → S.FunAt α k
 /-- A predicate over the symbols. -/
 abbrev Pred : Type := S.Fun Bool
-/-- A predicate over the symbols at depth `k`. -/
+/-- A predicate over the symbols at step `k`. -/
 abbrev PredAt (k : Nat) : Type := S.FunAt Bool k
 @[inherit_doc PredAt]
 abbrev PredAt' : Type := {k : Nat} → S.PredAt k
@@ -119,6 +110,10 @@ end Sig
 
 end Symbols
 
+/-- A symbol structure `S`: a record of symbols that `mapM` and `foldM` walk.
+
+`structure.symbols` generates the instance; write one by hand only for what it cannot express.
+-/
 class Symbols (S : Symbols.Sig) where
   /-- Initialization data, if any (default none, *i.e.* `Unit`). -/
   InitData : Type := Unit
@@ -129,8 +124,7 @@ class Symbols (S : Symbols.Sig) where
     (s : S W) (f : {α : Type} → [ToTyp α] → [TermToValue α] → W α → m (W' α)) : m (S W')
   /-- Folds over the symbols in field order, threading a state through `f`.
 
-  Defaults to a fold derived from `mapM`, so a hand-written instance need not define it;
-  `structure.symbols` defines it directly.
+  Defaults to a fold derived from `mapM`, so a hand-written instance need not define it.
   -/
   foldM {W : Symbols.Wrap} [Monad m] (s : S W) (init : σ)
     (f : {α : Type} → [ToTyp α] → [TermToValue α] → σ → W α → m σ) : m σ := do
@@ -168,7 +162,7 @@ def Terms.foldM [Monad m] (terms : S.Terms) (init : σ)
 : m σ :=
   inst.foldM (W := (Typed.Term ·)) terms init fun {α} _ _ acc x => f (α := α) acc x
 
-/-- Folds over the symbols' terms in field order, each at its own index, threading a state. -/
+/-- Folds over the symbols' bound variables in field order, each at its own index. -/
 def BVars.foldM [Monad m] (bVars : S.BVars) (init : σ)
   (f : {α : Type} → [ToTyp α] → [TermToValue α] → σ → BVar α → m σ)
 : m σ :=
@@ -220,10 +214,9 @@ def getValues (terms : S.Terms) (solver : Solver) : solver.EnvSat S.Values :=
 def getValueTerms (terms : S.Terms) (solver : Solver) : solver.EnvSat S.ValueTerms :=
   S.mapM terms solver.getValueTerm
 
-/-- Checks satisfiability and, where sat, reads every symbol's value out of the model.
+/-- Checks satisfiability: `some` of every symbol's value if sat, `none` if unsat.
 
-Needs no per-`Sig` code: `mapM` is what makes it generic, so a user's symbol structure gets this
-by instancing `Symbols` and nothing else.
+An unknown answer fails.
 -/
 def findCex (terms : S.Terms) (solver : Solver)
   (assuming : Option (Typed.Terms Bool) := none)
@@ -234,11 +227,11 @@ end Terms
 
 namespace TermsAt variable [Ω]
 
-/-- The Lean-values of some `Term`-symbols at depth `k`. -/
+/-- The Lean-values of some `Term`-symbols at step `k`. -/
 def getValues (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValuesAt k) :=
   S.mapM terms fun term => return ⟨← solver.getValue term⟩
 
-/-- The `Term`-values of some `Term`-symbols at depth `k`. -/
+/-- The `Term`-values of some `Term`-symbols at step `k`. -/
 def getValueTerms (terms : S.TermsAt k) (solver : Solver) : solver.EnvSat (S.ValueTermsAt k) :=
   S.mapM terms fun term => return ⟨← solver.getValueTerm term⟩
 
@@ -266,17 +259,19 @@ end Solver
 
 
 
-/-! ## The `symbols structure` command
+/-! ## The `structure.symbols` command
 
-Declared `scoped`, so `open Cvc.Typed` selects the typed spelling. It is the sort-erased command
-with this layer's two extra aliases: `Fun`, which a typed `Sig` parameterizes by its codomain, and
-`Pred`, which is `Fun Bool`.
+Available under `open Cvc.Typed`. Beside the sort-erased command's aliases, it emits `Pred`,
+`PredAt`, `RelAt` and their primed forms, the `Bool`-valued constraints.
 -/
 
 open Lean Elab Command in
 meta section
 
-/-- Declares a symbols structure and everything a `Symbols` instance needs. -/
+/-- Declares a symbol structure, its `Symbols` instance, its `idents` and its aliases (`Terms`, …).
+
+`idents` names each symbol after its field.
+-/
 scoped syntax (name := symbolsStructure) atomic((docComment)? "structure.symbols ") ident
   " where" withPosition((ppLine colGe Lean.Parser.Command.structSimpleBinder)+) : command
 

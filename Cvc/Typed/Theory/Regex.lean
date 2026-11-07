@@ -23,7 +23,7 @@ public meta import Cvc.Ext
 
 
 
-/-! # Generated Regex constructors, typed -/
+/-! # Regular expressions, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -37,11 +37,12 @@ gen_typed_view% from Cvc.Spec.Regex
 
 /-! ## Values
 
-A regular expression reads back only as a term for now: cvc5 exposes no accessor for the language
-a constant regex denotes, and nothing reconstructs one from a `Cvc.Regex`.
+A regular expression has no Lean value: cvc5 exposes no accessor for the language a constant regex
+denotes, so reading one (`getRegexValue`, `Solver.getValue`) and building one from a `Cvc.Regex`
+(`mkValue`) always fail. Read a model's regex as a term, with `Solver.getValueTerm`.
 -/
 
-@[inherit_doc T.getRegexValue]
+/-- Always fails: cvc5 offers no way to read a regular expression back. -/
 def getRegexValue (term : Term Regex) : Env Regex := T.getRegexValue term
 
 instance : SrtLike Regex where
@@ -56,13 +57,14 @@ end Cvc.Typed.Term
 
 /-! ## `regex!`
 
-The syntax is declared beside the sort-erased constructors; this is the typed expansion, answering
-an `Env (Term Regex)`. A regex term in scope, or a `![…]` escape, must be a `Term Regex`.
+`regex! "ab" ['0'-'9']+ | .*` writes a regular expression in the usual notation, as an
+`Env (Term Regex)`. A regex term in scope, or a `![…]` escape, must be a `Term Regex`.
 -/
+-- The syntax is declared beside the sort-erased constructors; this is the typed expansion.
 
 namespace Cvc.Typed
 
-/-- Typed `regex!`. -/
+/-- A regular expression in the usual notation, as an `Env (Term Regex)`: `regex! "a"+ | .*`. -/
 scoped syntax "regex! " smtRegex : term
 
 macro_rules

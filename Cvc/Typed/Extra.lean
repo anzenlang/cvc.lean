@@ -8,3 +8,10 @@ Authors: Adrien Champion
 module
 
 public import Cvc.Typed.Extra.Sys
+
+
+
+/-! # Extras, typed
+
+Transition systems and bounded model checking over them, in `Cvc.Typed.Extra.Sys`.
+-/

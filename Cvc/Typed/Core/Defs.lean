@@ -21,12 +21,9 @@ import all Cvc.Untyped.Core
 
 /-! # The typed term type, and this layer's `smt!` entry point
 
-A typed term is a sort-erased one carrying a phantom Lean index describing its sort. The index is
-erased at runtime: `Term α` is definitionally `Untyped.Term`, and the conversions either way are
-`id`, so stating a sort costs nothing.
-
-`Cvc.Typed.Term` names both this type and the namespace holding the generated constructors,
-so a signature can mention `Term α` without reaching outside the layer.
+A typed term is a sort-erased one carrying a Lean index describing its sort. The index exists only
+at compile time: `Term α` is definitionally `Untyped.Term`, so going down to a sort-erased term is
+free, and going up checks the term's sort once.
 -/
 namespace Cvc.Typed public section variable [Ω]
 
@@ -56,7 +53,7 @@ abbrev erase := @toUntyped
 
 instance : CoeDep (Term α) t Untyped.Term := ⟨t.erase⟩
 
-/-- Types an untyped term. -/
+/-- Types a sort-erased term at `α`, failing if its sort is not `α`'s. -/
 def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
   let srt ← t.getSort
   let srt' ← Srt.of α
@@ -67,26 +64,25 @@ def ofUntypedAs (α : Type) [ToTyp α] (t : Untyped.Term) : Env (Term α) := do
 @[inherit_doc ofUntypedAs]
 abbrev ofUntyped [ToTyp α] (t : Untyped.Term) : Env (Term α) := ofUntypedAs α t
 
-/-- Re-indexes a term at another Lean type of the same sort.
+/-- Re-indexes a term at another Lean type of the same sort, for free.
 
-The static counterpart of `ofUntypedAs`: the two indices must have the same `Typ`, which is checked
-at compile time, by `rfl`, so the cast costs nothing at runtime. It is sound because a term's sort
-is determined by its index's `Typ`: two Lean types with the same `Typ` index the same terms. It is
-how a term indexed by a `Typ.Denote` that cannot reduce — over a sort variable, or at the stand-in
-`Sorted` of a declared sort — is moved to the index a user works with.
+The two indices must have the same `Typ`, which is checked at compile time. This is how a term a
+view hands over, indexed by a `Typ.Denote` that does not reduce, is moved to the index you work
+with.
 -/
 def cast [ToTyp α] [ToTyp β] (t : Term α)
   (_sameSort : Typ.of α = Typ.of β := by
     first | rfl | fail "cannot cast: the two types index different sorts")
 : Term β := t
+-- Sound because a term's sort is determined by its index's `Typ`: two Lean types with the same
+-- `Typ` index the same terms. A `Typ.Denote` fails to reduce over a sort variable, or at the
+-- stand-in `Sorted` of a declared sort.
 
 /-! ## Substitution
 
-Simultaneous and applied once, as sort-erased — see `Untyped.Term.substitute'`.
-
-A pair's two terms share an index, which is what keeps the result at `α`: replacing a sub-term of
-sort `β` by another of sort `β` cannot change the sort of the whole. `heteroSubstitute` relaxes
-only *across* pairs, never within one.
+Simultaneous and applied once, as in the sort-erased layer (`Untyped.Term.substitute'`). The two
+terms of a pair share an index, so the result keeps the sort of the original term;
+`heteroSubstitute` lets the pairs differ from one another.
 -/
 
 /-- Simultaneously replaces each `src[i]` by `tgt[i]` throughout `t`.
@@ -143,12 +139,10 @@ private example (ts : Terms α) : ofUnsafe ts.toUnsafe = ts := rfl
 end Terms
 
 
-/-- Typed `smt!`.
+/-- A typed term in notation close to Lean's, as an `Env (Term α)`: `smt! x + 1 ≤ y`.
 
-`scoped`, so that `open Cvc.Typed` selects this layer's DSL. It forwards to `smtT!`, which
-expands to fully-qualified `Cvc.Typed.Term.…` calls; nothing needs to be in scope.
-
-Opening both layers at once makes the two `smt!` parsers ambiguous — open the one you mean.
+Available under `open Cvc.Typed`; it accepts the notations of the theories imported. Opening both
+layers makes `smt!` ambiguous, so open the one you mean.
 -/
 scoped syntax "smt! " ppLine group(colGt smtTerm) : term
 

@@ -23,7 +23,7 @@ import all Cvc.Typed.Core.BVar
 
 
 
-/-! # Generated Set constructors, typed -/
+/-! # Sets, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -48,7 +48,11 @@ def mkSetValue [ValueToTerm α] : (set : Cvc.Set α) → Env (Term (Cvc.Set α))
   have := ValueToTerm.toUntyped (α := α)
   T.mkSetValue
 
-/-- The set of values a constant set term denotes. -/
+/-- The set of values a constant set term denotes.
+
+Only a set value in cvc5's normal form, such as a model's answer, is accepted: a term built by
+`mkSetValue` is not one.
+-/
 def getSetValue [TermToValue α] : Term (Cvc.Set α) → Env (Cvc.Set α) :=
   have := TermToValue.toUntyped (α := α)
   T.getSetValue

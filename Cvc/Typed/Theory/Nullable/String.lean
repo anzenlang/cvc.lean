@@ -23,9 +23,6 @@ public import Cvc.Spec.String
 Each lifted operator has its plain counterpart's signature with an `Option` around every argument
 and around the result, and nothing else changed. The lift is **strict**: `none` unless every
 argument is `some`.
-
-The indexed operators do not lift, for the reason bit-vectors' do not: an `Op` cannot be handed to
-`mkNullableLift`.
 -/
 namespace Cvc.Typed.Term public section
 

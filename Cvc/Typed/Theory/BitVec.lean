@@ -19,9 +19,9 @@ public import Cvc.Spec.BitVec
 
 
 
-/-! # Generated bit-vector constructors, typed
+/-! # Bit-vectors, typed
 
-`bvConcat` is the entry whose result index is computed from its arguments': its Lean signature is
+A result's width is computed from its arguments' and indices: `bvConcat` is
 `Term (BitVec n) → Term (BitVec m) → Env (Term (BitVec (n + m)))`, matching `BitVec.append`.
 -/
 namespace Cvc.Typed.Term public section

@@ -24,19 +24,19 @@ import all Cvc.Typed.Core.BVar
 
 /-! # Quantifiers, typed
 
-A quantified formula is a `Term Bool` whatever it binds, and so is its body. Two spellings are
-offered, as sort-erased.
+A quantified formula is a `Term Bool` whatever it binds, and so is its body. There are three
+spellings:
 
-- `mkForall`/`mkExists` take the bound variables as a `BVars` spine, as `BVars.lambda` does.
+- `mkForall`/`mkExists` take the bound variables as a `BVars` list, as `BVars.lambda` does.
 - `forallH`/`existsH` take the body as a Lean function of the variables. Here each variable's sort
   comes from the type of its argument, so a quantifier reads like a Lean one:
 
   ```lean
   Term.forallH fun (x y : Term Int) => smt! x + y = y + x
   ```
+- `smt! ∀ (x y : Int), x + y = y + x`, and `∃` likewise.
 
-A quantifier binds at least one variable: an empty spine is ruled out by an autoparam, and a body
-taking no argument has no `Binder` instance.
+A quantifier binds at least one variable: neither spelling accepts none.
 -/
 namespace Cvc.Typed.Term public section variable [Ω]
 
@@ -121,14 +121,14 @@ end Cvc.Typed.Term
 
 /-! ## Viewing a quantifier
 
-Quantifiers are hand-written rather than specified, so their view is too. The variables' sorts are a
-list of `Typ`s, as an application's arguments are, and the body mentions the variables: walking into
-it meets them as the aggregate's `bvar` leaf.
+The variables' sorts come as a list of `Typ`s, as an application's arguments do, and the body
+mentions the variables: walking into it meets them as the aggregate's `bvar` leaf.
 -/
+-- Quantifiers are hand-written rather than specified, so their view is too.
 
 namespace Cvc.Typed public section variable [Ω]
 
-/-- A binder's variables, each at the denotation of its sort, in order; never empty. -/
+/-- A binder's variables, each a `BVar σ.Denote` at its sort `σ`, in order; never empty. -/
 inductive View.Quant.Vars : List Typ → Type where
   /-- The last variable. -/
   | last (x : BVar τ.Denote) : View.Quant.Vars [τ]
@@ -137,17 +137,15 @@ inductive View.Quant.Vars : List Typ → Type where
 
 namespace View.Quant.Vars
 
-/-- The same variables as a `BVars` list, so that a viewed binder can be rebuilt.
-
-`BVars` collects in reverse — the variable pushed last is the binder's last — so the spine is folded
-from its head onto an accumulator.
--/
+/-- The same variables as a `BVars` list, so that a viewed binder can be rebuilt. -/
 def toBVars (vars : Vars doms) : BVars := go vars []
 where
   /-- Pushes the variables in order onto `acc`. -/
   go {ds : List Typ} : Vars ds → BVars → BVars
     | .last x, acc => BVars.push x acc
     | .cons x rest, acc => go rest (BVars.push x acc)
+-- `BVars` is pushed in order — the variable pushed last is the binder's last — so the variables
+-- are folded from the first onto an accumulator.
 
 /-- A binder always has a variable, so its `BVars` are never empty: what `mkForall` asks for. -/
 theorem toBVars_ne_nil (vars : Vars doms) : vars.toBVars ≠ [] := by
@@ -177,8 +175,10 @@ protected inductive View.Quant : Typ → Type where
   | exists' (doms : List Typ) (vars : View.Quant.Vars doms) (body : Term Bool)
     (patterns : Option Untyped.Term) : View.Quant .bool
 
-/-- Takes a term of sort `τ` apart one level, if it is a quantified formula whose variables' sorts a
-`Typ` describes. -/
+/-- Takes a quantified formula apart one level, `none` for any other term.
+
+Also `none` when a variable's sort is one no `Typ` describes.
+-/
 def View.Quant.of (τ : Typ) (t : Term τ.Denote) : Env (Option (View.Quant τ)) :=
   match τ, Untyped.View.Quant.of? t.erase with
   | .bool, some (.forall' vars body pats) => do
@@ -216,9 +216,9 @@ open Lean
 
 /-! ## `smt!`
 
-The syntax is declared beside the sort-erased constructors; this is the typed expansion. A binder's
-type is the Lean type of the variable's index, so `smt! ∀ (x : Int), x + 0 = x` binds a `Term Int`.
+A binder's type is the variable's index, so `smt! ∀ (x : Int), x + 0 = x` binds a `Term Int`.
 -/
+-- The syntax is declared beside the sort-erased constructors; this is the typed expansion.
 
 @[inherit_doc Cvc.Ext.expandSmt]
 macro_rules

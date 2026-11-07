@@ -14,3 +14,11 @@ public import Cvc.Typed.Core.Bool
 public import Cvc.Typed.Core.BVar
 public import Cvc.Typed.Core.Solver
 public import Cvc.Typed.Core.Symbols
+
+
+
+/-! # The typed layer's core
+
+What every theory needs: terms and their values, bound variables, the Boolean operators, the
+`Solver`, and symbol structures.
+-/

@@ -21,16 +21,24 @@ public import Cvc.Typed.Core.Bool
 
 /-! # The solver, typed
 
-A solver is the same object whichever layer you drive it from, so `Solver` is an abbreviation
-rather than a new type. What differs between the layers is only how precisely a function's
-signature describes the terms it takes and returns, and a function mentioning no term does not
-differ at all — those are inherited here rather than restated.
+A solver is the same object in both layers, so the functions mentioning no term — `s.setOption`,
+`s.push`, `s.declareSrt`, … — are shared, and those below take and answer typed terms.
 
-Because the two `Solver`s are the same type, dot notation on a typed solver already resolves to
-the shared functions: `s.setOption`, `s.push`, `s.declareSrt` need no restating. Two kinds of name
-do need it — those that must be *spelled* in a signature (the mode monads, the result type), and
-`new`, which has no solver to dot on.
+```lean
+let s ← Solver.new
+s.setOption "produce-models" "true"
+let x ← s.declareConstAs Int "x"
+s.assert (← smt! x + x = 6)
+s.checkSat (ifSat := s.getValue x)   -- 3
+```
+
+`checkSat` runs one branch per answer, each in a monad allowing only the queries that answer makes
+meaningful — `getValue` after sat, `getUnsatCore` after unsat — and only on the solver that
+answered. Each such query also has a `!` twin in `Env`, which skips that check.
 -/
+-- Two kinds of name are restated here although `Solver` is the sort-erased type: those that must
+-- be *spelled* in a signature (the mode monads, the result type), and `new`, which has no solver to
+-- dot on.
 namespace Cvc.Typed public section
 
 /-- A solver instance. -/
@@ -55,8 +63,7 @@ abbrev Solver.relax [Ω] : Solver → Untyped.Solver := Solver.toUntyped
 /-- The typed solver it is, for free: the two layers share one solver type. -/
 abbrev _root_.Cvc.Untyped.Solver.toTyped [Ω] : Untyped.Solver → Solver := id
 
-/-- The sort-erased proof it is, for free: a typed proof is a sort-erased one under a type of its
-own. -/
+/-- The sort-erased proof it is, for free. -/
 def Solver.Proof.toUntyped [Ω] {s : Solver}
 : Solver.Proof s pc → Untyped.Solver.Proof s pc := id
 
@@ -64,8 +71,7 @@ def Solver.Proof.toUntyped [Ω] {s : Solver}
 abbrev Solver.Proof.relax [Ω] {s : Solver} : Solver.Proof s pc → Untyped.Solver.Proof s pc :=
   Solver.Proof.toUntyped
 
-/-- The typed proof it is, for free: there is nothing to check, a proof's conclusions being formulas
-whatever the layer. -/
+/-- The typed proof it is, for free: a proof's conclusions are formulas whatever the layer. -/
 def _root_.Cvc.Untyped.Solver.Proof.toTyped [Ω] {s : Untyped.Solver}
 : Untyped.Solver.Proof s pc → Solver.Proof s pc := id
 
@@ -83,11 +89,10 @@ abbrev Solver.Proofs [Ω] (s : Solver) (pc : Proof.Component) : Type := Array (S
 -- `Terms`: the element type has to be *this* layer's, or taking an element out of the array — with
 -- `for`, `map`, `getElem` — unfolds to the sort-erased head and the sort-erased accessors answer.
 
-/-- A grammar generating terms of signature `σ`.
+/-- A grammar generating terms of signature `σ`, built by `Solver.mkGrammar` or `smt.grammar!`.
 
-A sort-erased grammar under an index. That one carries the parameters it was declared over and its
-start symbol's sort, so `synthFun` cannot be given different parameters, and `σ` is what they
-describe. Like the sort-erased one it belongs to the scope, not to the solver that built it.
+It carries the parameters it was built over, so `synthFun` needs nothing else, and `σ` is those
+parameters' sorts arrowed onto the start symbol's. Any solver of the scope accepts it.
 -/
 structure Grammar [Ω] (σ : Type) where
   private mk ::
@@ -138,7 +143,10 @@ section variable [Ω] [Monad m] [MonadLiftT BaseIO m] (s : Solver)
 
 open Cvc renaming Untyped.Solver → U
 
-/-- Declares a function symbol of type `α`. -/
+/-- Declares a function symbol of type `α`, or a constant if `α` is not an arrow.
+
+With `fresh := false`, declaring the same name at the same type again answers the same symbol.
+-/
 def declareFunAs (α : Type) (symbol : String) [ToTyp α] (fresh : Bool := true) : Env (Term α) := do
   let srt ← Srt.of α
   let domCod? : Option (Array Srt × Srt) := do
@@ -214,21 +222,21 @@ def% getNextAbduct! : (s : Solver) → Env (Term Bool) ← getNextAbduct!
 
 /-! ## Declaring and defining symbols
 
-The sort comes from the index, so these name the Lean type instead of a `Srt`. A function symbol
-is one of these too, at an arrow index.
+The sort comes from the index, so these name a Lean type instead of a `Srt`; `fresh` is as for
+`declareFun`.
 -/
 
-/-- Declares a symbol of the given sort. -/
+/-- Declares a constant of the sort `α` describes. -/
 def declareConstAs (α : Type) [ToTyp α] (symbol : String) (fresh : Bool := true)
 : Env (Term α) := do
   U.declareConst s symbol (← Srt.of α) fresh
 
-/-- Declares a symbol, infers its sort. -/
+/-- Declares a constant, its sort inferred from the expected type. -/
 def declareConst [ToTyp α] (symbol : String) (fresh : Bool := true)
 : Env (Term α) :=
   s.declareConstAs α symbol fresh
 
-/-- Defines a symbol of the given sort as the given body. -/
+/-- Defines a constant as `body`, at `body`'s sort; `global` keeps it across `pop`. -/
 def defineConst [ToTyp α] (symbol : String) (body : Term α) (global : Bool := false)
 : Env (Term α) := do
   U.defineConst s symbol (← Srt.of α) body global
@@ -248,7 +256,11 @@ def checkIsSat? : Env Cvc.Untyped.Solver.Result.Sat? := U.checkIsSat? s assuming
 @[inherit_doc U.checkSatResult]
 def checkIsSat : Env Bool := U.checkIsSat s assuming
 
-@[inherit_doc U.checkSat]
+/-- Checks satisfiability, under `assuming` if given, and runs the branch for the answer.
+
+`ifSat` runs in `s.EnvSat`, where the model can be read, `ifUnsat` in `s.EnvUnsat` (unsat cores,
+proofs), `ifUnknown` on cvc5's explanation. An omitted branch throws if its answer comes up.
+-/
 def checkSat
   (ifSat : s.EnvSatT m α := s.unexpectedSat)
   (ifUnsat : s.EnvUnsatT m α := s.unexpectedUnsat)
@@ -256,7 +268,7 @@ def checkSat
 : EnvT m α :=
   U.checkSat s assuming ifSat ifUnsat ifUnknown
 
-@[inherit_doc U.checkSat]
+/-- `checkSat`, whose sat and unsat branches default to `none`. -/
 def checkSat? {α : Type} (s : Solver)
   (assuming : Option (Terms Bool) := none)
   (ifSat : s.EnvSatT m (Option α) := return none)
@@ -289,7 +301,7 @@ def getValue [TermToValue α] (term : Term α) : s.EnvSat α := do
 abbrev _root_.Cvc.Typed.Term.getValue [TermToValue α] {s : Solver} (term : Term α) : s.EnvSat α :=
   s.getValue term
 
-@[inherit_doc getValue]
+@[inherit_doc getValueTerm]
 abbrev _root_.Cvc.Typed.Term.getValueTerm [TermToValue α] {s : Solver} (term : Term α)
 : s.EnvSat (Term α) :=
   s.getValueTerm term

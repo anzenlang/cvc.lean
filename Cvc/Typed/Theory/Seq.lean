@@ -20,7 +20,7 @@ public import Cvc.Spec.Seq
 
 
 
-/-! # Generated Seq constructors, typed -/
+/-! # Sequences, typed -/
 namespace Cvc.Typed.Term public section
 
 open Cvc renaming Untyped.Term → T
@@ -38,7 +38,11 @@ gen_typed_view% from Cvc.Spec.Seq
 def isSeqValue (term : Term (Array α)) : Bool := T.isSeqValue term
 
 
-/-- The elements a constant sequence term denotes. -/
+/-- The elements a constant sequence term denotes.
+
+Only a sequence value in cvc5's normal form, such as a model's answer, is accepted: a term built by
+`mkSeqValue` is not one.
+-/
 def getSeqValue [TermToValue α] (term : Term (Array α)) : Env (Array α) :=
   have := TermToValue.toUntyped (α := α)
   T.getSeqValue term
