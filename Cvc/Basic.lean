@@ -16,6 +16,12 @@ import all Cvc.Basic.Env
 
 
 
+/-! # cvc5's enumerations
+
+The cvc5 enumerations the API takes or answers, mirrored as Lean inductives, plus the constant
+combinators `𝕂` and `𝕂²`.
+-/
+
 namespace Cvc
 
 section open Lean Elab Command
@@ -112,23 +118,40 @@ public meta def enumDefStxElab : CommandElab
 
 public section
 
+/-- Why a check answered "unknown". -/
 enum_def% Unknown.Explanation ← cvc5.UnknownExplanation
+  /-- A full check is required, for instance after preprocessing only. -/
   | requiresFullCheck ← REQUIRES_FULL_CHECK
+  /-- A theory solver is incomplete. -/
   | incomplete ← INCOMPLETE
+  /-- The time limit was reached. -/
   | timeOut ← TIMEOUT
+  /-- The resource limit was reached. -/
   | resourceOut ← RESOURCEOUT
+  /-- The memory limit was reached. -/
   | memOut ← MEMOUT
+  /-- The solver was interrupted. -/
   | interrupted ← INTERRUPTED
+  /-- An unsupported feature was encountered. -/
   | unsupported ← UNSUPPORTED
+  /-- Another reason. -/
   | other ← OTHER
+  /-- Another check is required. -/
   | requiresCheckAgain ← REQUIRES_CHECK_AGAIN
+  /-- No specific reason was given. -/
   | default! unknownReason ← UNKNOWN_REASON
 
+/-- The SMT-LIB rounding modes of floating-point arithmetic. -/
 enum_def% Float.RoundingMode ← cvc5.RoundingMode
+  /-- To the nearest representable number, ties to the one with an even last digit. -/
   | nearestTiesToEven ← ROUND_NEAREST_TIES_TO_EVEN
+  /-- Towards positive infinity. -/
   | towardPositive ← ROUND_TOWARD_POSITIVE
+  /-- Towards negative infinity. -/
   | towardNegative ← ROUND_TOWARD_NEGATIVE
+  /-- Towards zero. -/
   | towardZero ← ROUND_TOWARD_ZERO
+  /-- To the nearest representable number, ties away from zero. -/
   | nearestTiesToAway ← ROUND_NEAREST_TIES_TO_AWAY
 
 enum_def% Model.BlockMode ← cvc5.BlockModelsMode
@@ -137,113 +160,77 @@ enum_def% Model.BlockMode ← cvc5.BlockModelsMode
   /-- Block models based on the concrete model values for the free variables. -/
   | values ← VALUES
 
-/-- Types of learned literals.
+/-- Kinds of learned literals.
 
-Note that a literal may conceptually belong to multiple categories. We
-classify literals based on the first criteria in this list that they meet.
+A literal may belong to several kinds; it is classified by the first one in this list it fits.
 -/
 enum_def% LearnedLitType ← cvc5.LearnedLitType
-  /-- An equality that was turned into a substitution during preprocessing.
-
-  In particular, literals in this category are of the form (= x t) where
-  x does not occur in t.
-  -/
+  /-- An equality `(= x t)`, `x` not occurring in `t`, turned into a substitution. -/
   | preprocessSolved ← PREPROCESS_SOLVED
-  /-- A top-level literal (unit clause) from the preprocessed set of input formulas. -/
+  /-- A top-level literal (unit clause) from the preprocessed input formulas. -/
   | preprocess ← PREPROCESS
-  /--
-  A literal from the preprocessed set of input formulas that does not
-  occur at top-level after preprocessing.
+  /-- A literal of the preprocessed input formulas that is not top-level after preprocessing.
 
-  Typically, this is the most interesting category of literals to learn.
+  Typically the most interesting kind of literal to learn.
   -/
   | input ← INPUT
-  /-- An internal literal that is solvable for an input variable.
-
-  In particular, literals in this category are of the form (= x t) where
-  x does not occur in t, the preprocessed set of input formulas contains the
-  term x, but not the literal (= x t).
-
-  Note that solvable literals can be turned into substitutions during
-  preprocessing.
-  -/
+  /-- An internal literal `(= x t)` solvable for an input variable `x` not occurring in `t`. -/
   | solvable ← SOLVABLE
-  /-- An internal literal that can be made into a constant propagation for an input term.
-
-  In particular, literals in this category are of the form (= t c) where
-  c is a constant, the preprocessed set of input formulas contains the
-  term t, but not the literal (= t c).
-  -/
+  /-- An internal literal `(= t c)`, `c` a constant, propagating a constant for an input term. -/
   | constantProp ← CONSTANT_PROP
-  /-- Any internal literal that does not fall into the above categories. -/
+  /-- Any other internal literal. -/
   | internal ← INTERNAL
-  /-- Special case for when produce-learned-literals is not set. -/
+  /-- Answered when the `produce-learned-literals` option is not set. -/
   | unknown ← UNKNOWN
 
+/-- The part of a refutation a proof is asked for. -/
 enum_def% Proof.Component ← [ofUnsafe / toUnsafe] cvc5.ProofComponent
+  /-- Proofs of the preprocessed input formulas, from the input formulas. -/
   | rawPreprocess ← RAW_PREPROCESS
+  /-- Proofs of the clauses the SAT proof uses, from the input formulas it uses. -/
   | preprocess ← PREPROCESS
+  /-- A proof of `false` from the preprocessed input clauses and the theory lemmas. -/
   | sat ← SAT
+  /-- Proofs of the theory lemmas the SAT proof uses. -/
   | theoryLemmas ← THEORY_LEMMAS
+  /-- A proof of `false` from the input formulas. -/
   | default! full ← FULL
 
+/-- The format a proof is printed in. -/
 enum_def% Proof.Format ← [ofUnsafe / toUnsafe] cvc5.ProofFormat
+  /-- cvc5's own output, untranslated; the only format a non-`full` proof can be printed in. -/
   | no ← NONE
+  /-- DOT, for Graphviz. -/
   | dot ← DOT
+  /-- LFSC. -/
   | lfsc ← LFSC
+  /-- Alethe. -/
   | alethe ← ALETHE
+  /-- The Cooperating Proof Calculus, over Eunoia signatures. -/
   | cpc ← CPC
+  /-- The format the solver's options select. -/
   | default! fromSolver ← DEFAULT
 
 
 
-/--
-Find synthesis targets, used as an argument to Solver::findSynth. These
-specify various kinds of terms that can be found by this method.
--/
+/-- What `Solver.findSynth` looks for. -/
 enum_def% Synth.FindTarget ← cvc5.FindSynthTarget
-  /--
-  Find the next term in the enumeration of the target grammar.
-  -/
+  /-- The next term in the enumeration of the grammar. -/
   | enum ← ENUM
-  /--
-  Find a pair of terms (t,s) in the target grammar which are equivalent
-  but do not rewrite to the same term in the given rewriter
-  (--sygus-rewrite=MODE). If so, the equality (= t s) is returned by
-  findSynth.
+  /-- A pair of equivalent terms `t`, `s` of the grammar that do not rewrite to the same term.
 
-  This can be used to synthesize rewrite rules. Note if the rewriter is set
-  to none (--sygus-rewrite=none), this indicates a possible rewrite when
-  implementing a rewriter from scratch.
+  Answers the equality `(= t s)`; useful to synthesize rewrite rules. The rewriter is the one the
+  `sygus-rewrite` option selects.
   -/
   | rewrite ← REWRITE
-  /--
-  Find a term t in the target grammar which rewrites to a term s that is
-  not equivalent to it. If so, the equality (= t s) is returned by
-  findSynth.
+  /-- A term `t` of the grammar rewriting to a term `s` not equivalent to it.
 
-  This can be used to test the correctness of the given rewriter. Any
-  returned rewrite indicates an unsoundness in the given rewriter.
+  Answers the equality `(= t s)`; any answer is an unsoundness of the rewriter.
   -/
   | rewriteUnsound ← REWRITE_UNSOUND
-  /--
-  Find a rewrite between pairs of terms (t,s) that are matchable with terms
-  in the input assertions where t and s are equivalent but do not rewrite
-  to the same term in the given rewriter (--sygus-rewrite=MODE).
-
-  This can be used to synthesize rewrite rules that apply to the current
-  problem.
-  -/
+  /-- Like `rewrite`, for terms matching terms of the input assertions. -/
   | rewriteInput ← REWRITE_INPUT
-  /--
-  Find a query over the given grammar. If the given grammar generates terms
-  that are not Boolean, we consider equalities over terms from the given
-  grammar.
-
-  The algorithm for determining which queries to generate is configured by
-  --sygus-query-gen=MODE. Queries that are internally solved can be
-  filtered by the option --sygus-query-gen-filter-solved.
-  -/
+  /-- A query over the grammar, as equalities if its terms are not Boolean. -/
   | query ← QUERY
 
 /-- Option category enumeration.
@@ -260,7 +247,7 @@ enum_def% Option.Category ← cvc5.OptionCategory
   /-- Undocumented options. -/
   | undocumented ← UNDOCUMENTED
 
-/-- The different reasons for returning an "unknown" result. -/
+/-- An input language cvc5 can parse. -/
 enum_def% InputLanguage ← cvc5.InputLanguage
   /-- The SMT-LIB version 2.6 language. -/
   | smtLib_2_6 ← SMT_LIB_2_6

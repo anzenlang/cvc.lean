@@ -478,13 +478,13 @@ private inductive FoldTask (P N : Type) where
   | enter (p : P)
   | leave (n : N)
 
-/-- Folds over the distinct steps reachable from `roots`, presented as `present` builds them: what
-both layers' `fold` are built on.
+/-- Folds over the distinct steps reachable from `roots`, each presented as `present` builds it.
 
-Depth-first: each step is entered — `pre` — then, unless that answered `skip`, its premises
-(`kids`) are folded over left to right, and then it is left — `post`. A step reached again is
-passed over entirely unless `revisit` is set, in which case it is entered every time it is reached,
-which can take exponentially long on a proof sharing many sub-proofs.
+What both layers' `fold` are built on. Depth-first: each step is entered — `pre` — then, unless
+that answered `skip`, its premises (`kids`) are folded over left to right, and then it is left —
+`post`. A step reached again is passed over entirely unless `revisit` is set, in which case it is
+entered every time it is reached, which can take exponentially long on a proof sharing many
+sub-proofs.
 -/
 def foldWith [Monad m] [BEq P] [Hashable P] (kids : P → Array P) (present : P → N)
   (roots : Array P) (init : σ) (pre : N → σ → m (FoldPre σ)) (post : N → σ → m (FoldPost σ))
@@ -517,12 +517,12 @@ private inductive FoldUpTask (P : Type) where
   | enter (p : P)
   | leave (p : P) (arity : Nat)
 
-/-- Computes a value for every distinct step reachable from `roots`, bottom-up: what both layers'
-`foldUp` are built on.
+/-- Computes a value for every distinct step reachable from `roots`, bottom-up.
 
-`step` is handed a step and the values of its premises (`kids`), in order, and is called once per
-distinct step, so a sub-proof shared by many steps is computed once. Answers the roots' values, in
-order. Ending early is the monad's business, by throwing for instance.
+What both layers' `foldUp` are built on. `step` is handed a step and the values of its premises
+(`kids`), in order, and is called once per distinct step, so a sub-proof shared by many steps is
+computed once. Answers the roots' values, in order. Ending early is the monad's business, by
+throwing for instance.
 -/
 def foldUpWith [Monad m] [BEq P] [Hashable P] (kids : P → Array P) (step : P → Array β → m β)
   (roots : Array P)

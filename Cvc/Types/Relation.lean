@@ -17,30 +17,22 @@ public meta import Lean.Elab.Command
 
 /-! # Indices for tuples, relations and tables
 
-A tuple's components are a **list**, and this is the index that says so: `Tup α β` describes the
-components `α ++ [β]`. Splitting the last one off does two jobs at once.
-
-It makes the list *non-empty*, since a tuple has at least one component. And — the part that earns
-the encoding — it makes "the last component" a **parameter position**, so unification can find it.
-`?α ++ [?β]` against a concrete list is higher-order and Lean will not solve it; `Tup ?α ?β` against
-`Tup [Int, Bool] Real` is first-order and solves at once. That is what lets relational join say
-"drop the left's last and the right's first" as nothing but a signature:
+`Tup α β` is the tuple of components `α ++ [β]`, `Rel α β` a set of such tuples and `Tab α β` a
+bag of them. Splitting the last component off keeps the list non-empty and lets signatures name it,
+so that relational join is typed by its signature alone:
 
 ```lean
 relJoin : Term (Rel α μ) → Term (Rel (μ :: α') β') → Env (Term (Rel (α ++ α') β'))
 ```
 
-with the shared `μ` expressing, structurally, cvc5's requirement that the two be joinable.
-
-**This is why `α × β` was not enough.** A right-nested product has no terminator, so the slot for
-"rest of the tuple" and the slot for "last component" are the same one: `α × (β × γ)` cannot say
-whether it means three components or two whose second is a pair. `Tup [α] (β × γ)` and
-`Tup [α, β] γ` are different indices, and denote different sorts.
-
-`Rel` and `Tab` are sets and bags of tuples. Neither is a sort of its own — cvc5 has no
-`RELATION_SORT` or `TABLE_SORT` — so these are indices over the same underlying terms, and
-`toSet`/`toBag` cross over for free.
+Neither a relation nor a table is a sort of its own, so `relToSet`/`relOfSet` and
+`tableToBag`/`tableOfBag` cross over for free.
 -/
+-- Why a list: `?α ++ [?β]` against a concrete list is higher-order and Lean will not solve it,
+-- while `Tup ?α ?β` against `Tup [Int, Bool] Real` is first-order and solves at once. A
+-- right-nested product `α × β` cannot do this: it has no terminator, so "rest of the tuple" and
+-- "last component" are the same slot, and `α × (β × γ)` cannot say whether it has three components
+-- or two.
 namespace Cvc public section
 
 
@@ -66,8 +58,7 @@ end ToTypList
 
 /-- A tuple of the components `α ++ [β]`.
 
-Carries no data: it names a sort, and the terms it indexes are ordinary terms. Built with
-`Term.mkTuple` from a `Components` spine.
+Carries no data: it only indexes terms, which `Cvc.Typed.Term.mkTup` builds.
 -/
 structure Tup (α : List Type) (β : Type) where
   private mk ::
@@ -82,15 +73,13 @@ structure Tab (α : List Type) (β : Type) where
 
 /-! ### Instances for nesting
 
-These indices carry no data — they name a sort — so their comparisons are trivial. They exist only
-so that a container of them can be *spelled*: `relGroup` answers a `Set (Rel α β)`, and `Set` wants
-its element ordered. No `Std.TreeSet` of relations is ever built, since these indices have no value
-conversion, so the triviality never shows.
-
-They are written out rather than derived because `deriving` constrains the type parameters even
-though nothing uses them, which would demand `Ord β` — and not every component type has one, a
-function's for instance.
+These indices carry no data, so their comparisons are trivial. They exist only so that a container
+of them can be written: `relGroup` answers a `Set (Rel α β)`.
 -/
+-- No `Std.TreeSet` of relations is ever built, these indices having no value conversion, so the
+-- triviality never shows. Written out rather than derived because `deriving` constrains the type
+-- parameters even though nothing uses them, which would demand `Ord β` — and not every component
+-- type has one, a function's for instance.
 
 instance : DecidableEq (Tup α β) := fun _ _ => isTrue rfl
 instance : DecidableEq (Rel α β) := fun _ _ => isTrue rfl
@@ -117,12 +106,10 @@ instance [ToTypList α] [ToTyp β] : ToTyp (Tab α β) :=
 
 /-! ## Positions
 
-A component's position, as a value that knows the component's type. This is what makes projection
-*typed*: cvc5 takes an `Array Nat`, whose contents are a runtime value, so a projection built from
-one cannot say what it lands at. A `Col` is the same number with its meaning attached, and a `Cols`
-spine assembles the result index as it collects positions.
-
-Positions count from zero over `α ++ [β]`, exactly as `tupleProject`'s indices do.
+A `Col` is a component's position that knows the component's type, and a `Cols` a selection of
+positions that knows the index it lands at, which is what types projection
+(`Cvc.Typed.Term.tupProject` and friends). Positions count from zero over `α ++ [β]`, and are
+written with `col%` and `cols%` under `open Cvc`.
 -/
 
 /-- The component a position-zero column has: the head of `α`, or `β` when `α` is empty. -/
@@ -159,8 +146,7 @@ end Col
 
 `last` and `cons` are the only builders, so the positions collected and the components the result
 index describes stay in step, and the selection cannot come out empty. A position may appear twice
-and they need not increase, so this reorders and duplicates as readily as it selects — exactly what
-`tupleProject` does.
+and they need not increase, so this reorders and duplicates as readily as it selects.
 -/
 structure Cols (α : List Type) (β : Type) (α' : List Type) (β' : Type) where
   private mk ::

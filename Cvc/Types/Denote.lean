@@ -105,11 +105,12 @@ their own; a record or a tuple has one exactly when all its components do, lexic
     | ⟨T, some _⟩, ⟨Fs, some _⟩ => ⟨(n, T) :: Fs, some inferInstance⟩
     | ⟨T, _⟩, ⟨Fs, _⟩ => ⟨(n, T) :: Fs, none⟩
 
-/-- A tuple's denotation: the right-nested product of its components', as `α × β × γ` indexes a
-three-component tuple, and `OneTuple` for one component; ordered if every component is.
+/-- A tuple's denotation, ordered if every component is.
 
-A tuple whose last component is itself a tuple has no product to denote it — the product would
-flatten it — and neither has the empty tuple: those are `Sorted`.
+The right-nested product of its components' denotations, as `α × β × γ` indexes a three-component
+tuple, and `OneTuple` for one component. A tuple whose last component is itself a tuple has no
+product to denote it — the product would flatten it — and neither has the empty tuple: those are
+`Sorted`.
 -/
 @[expose, reducible] def Typ.denoteProdWithOrd : List Typ → (T : Type) × Option (Ord T)
   | [] => ⟨Sorted (.prod []), some inferInstance⟩
@@ -126,8 +127,7 @@ flatten it — and neither has the empty tuple: those are `Sorted`.
       | ⟨A, some _⟩, ⟨B, some _⟩ => ⟨A × B, some inferInstance⟩
       | ⟨A, _⟩, ⟨B, _⟩ => ⟨A × B, none⟩
 
-/-- `Typ.denoteWithOrd` lifted to `Typ?`. An abstract sort is never a term's, so it denotes nothing.
--/
+/-- `Typ.denoteWithOrd` lifted to `Typ?`; an abstract sort, never a term's, denotes `Empty`. -/
 @[expose, reducible] def Typ?.denoteWithOrd : Typ? → (T : Type) × Option (Ord T)
   | .typ t => t.denoteWithOrd
   | _ => ⟨Empty, none⟩

@@ -19,8 +19,8 @@ The Lean type denoting a value of SMT sort `(_ FiniteField size)`, held as the i
 it. cvc5 answers in the *symmetric* representation, so an element of `GF(5)` comes back in
 `[-2, 2]` rather than `[0, 4]`: `3` reads back as `-2`.
 
-Only the Lean side lives here. Turning an element into a term and back is in
-`Cvc/{Untyped,Typed}/Term/FiniteField.lean`, beside the constructors that do it.
+Converting an element to a term and back is done by `Cvc.Untyped.Theory.FiniteField` and
+`Cvc.Typed.Theory.FiniteField`.
 -/
 namespace Cvc public section variable [Ω]
 

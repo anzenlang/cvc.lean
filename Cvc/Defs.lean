@@ -12,27 +12,21 @@ public import Cvc.Basic.Env
 
 
 
-/-! # Zero-cost wrappers over lean-cvc5, and the sort type
+/-! # Sorts and their Lean descriptions
 
-`def0%`–`def3%` declare a `def` equal to a cvc5 type, with `private` conversions either way, so
-that a wrapper costs nothing at runtime while staying opaque to a user who imports it plainly. The
-level says which instances come with it: `1` adds `ToString`, `2` adds `BEq`/`Hashable`, `3` adds
-`Ord`/`LT`/`LE`/`compare`. An optional `( ofId / toId )` suffix renames the conversions.
-
-A doc comment in front of one documents the declared type. Without one the type inherits the
-underlying cvc5 type's docstring, which a downstream `module` only sees under `import all` of
-lean-cvc5's own module, so a type a user is meant to read about should carry its own.
-
-The tokens are `wrap*%` rather than `def*%` because a syntax category and its command are global:
-`Cvc.Untyped.Defs` already claims `def*%`, and two commands matching the same syntax make every use
-ambiguous.
-
-On top of the machinery this declares `Srt` — an SMT-LIB sort — along with `Srts`, the abstract
-sort kinds, the pure Lean description `Typ` and the `ToTyp` class mapping a Lean type to one. Sort
-*constructors* are in `Cvc/Srt.lean`; only the types are here, so that the macros and the
-types they declare stay separable.
+`Srt` is an SMT-LIB sort of the current scope, `Typ` a pure Lean description of one, and `ToTyp`
+the class mapping a Lean type to the `Typ` it denotes. The sort constructors are in `Cvc.Srt`.
 -/
 namespace Cvc
+
+-- `def0%`–`def3%` declare a `def` equal to a cvc5 type, with `private` conversions either way, so
+-- that a wrapper costs nothing at runtime while staying opaque to a user who imports it plainly.
+-- The level says which instances come with it: `1` adds `ToString`, `2` adds `BEq`/`Hashable`, `3`
+-- adds `Ord`/`LT`/`LE`/`compare`. An optional `( ofId / toId )` suffix renames the conversions.
+--
+-- A doc comment in front of one documents the declared type. Without one the type inherits the
+-- underlying cvc5 type's docstring, which a downstream `module` only sees under `import all` of
+-- lean-cvc5's own module, so a type a user is meant to read about should carry its own.
 
 
 
@@ -187,10 +181,11 @@ end codeGen
 
 /-! ## Re-exported from lean-cvc5
 
-Three enums and one type are used raw rather than wrapped: `Kind` and `SortKind` because restating
-a 320- or 23-variant enum buys nothing, `Op` because it is only ever produced and consumed by the
-term API. They are re-exported here so that naming one does not mean reaching into `cvc5`.
+The enums `Kind`, `SortKind`, `ProofRule` and `ProofRewriteRule`, and the type `Op`, are lean-cvc5's
+own, re-exported so that naming one does not mean reaching into `cvc5`.
 -/
+-- Not wrapped: restating a 320- or 23-variant enum buys nothing, and `Op` is only ever produced and
+-- consumed by the term API.
 
 public section variable [Ω]
 
@@ -198,30 +193,37 @@ export cvc5 (Kind SortKind Op ProofRule ProofRewriteRule)
 
 def1% Command ← cvc5.Command
 
+/-- A datatype declaration being built, which `Srt.datatype` turns into a sort. -/
 def2% Datatype.Decl ← cvc5.DatatypeDecl
+/-- A declared datatype, as read back from its sort. -/
 def2% Datatype ← cvc5.Datatype
+/-- A constructor declaration being built, added to a `Datatype.Decl`. -/
 def2% Datatype.Ctor.Decl ← cvc5.DatatypeConstructorDecl
+/-- A constructor of a declared datatype. -/
 def2% Datatype.Ctor ← cvc5.DatatypeConstructor
+/-- A field selector of a datatype constructor. -/
 def2% Datatype.Selector ← cvc5.DatatypeSelector
 
 
 
+/-- An SMT-LIB sort of the current scope.
+
+Built with `Srt.int`, `Srt.set` and the other constructors, or from a Lean type with `Srt.of`.
+-/
 def3% Srt ← cvc5.Sort
 
 namespace Srt
 
-/-- A sort abstracted over its parameters, of a known kind.
-
-Only the four kinds cvc5 really keeps abstract. An abstract *container* is not one of them:
-`mkAbstractSort SET_SORT` is literally `mkSetSort ?`, of sort kind `SET_SORT`, so it is
-`Typ.set .any` rather than an abstract sort — verified, not assumed.
--/
+/-- The kinds of abstract sort: a sort of a known family, its parameters left unspecified. -/
 inductive Abstract
 | bitVec
 | float
 | finiteField
 | function
 deriving Inhabited, DecidableEq, BEq, Ord, Hashable, Repr
+-- Only the four kinds cvc5 really keeps abstract. An abstract *container* is not one of them:
+-- `mkAbstractSort SET_SORT` is literally `mkSetSort ?`, of sort kind `SET_SORT`, so it is
+-- `Typ.set .any` rather than an abstract sort.
 
 namespace Abstract
 
@@ -277,28 +279,16 @@ end Srts
 
 /-! ## Sort descriptions
 
-`Typ` describes a sort purely Lean-side, and `Typ?` is `Typ` plus the sorts cvc5 calls *abstract*.
-
-The split is cvc5's own **first-class** distinction, not a convention of ours. A non-first-class
-sort — the fully abstract `?`, or one of `?BITVECTOR_TYPE`, `?FLOATINGPOINT_TYPE`,
-`?FINITE_FIELD_TYPE`, `?->` — is accepted as a set, bag or sequence element, as either parameter of
-an array, and as a function *codomain*. cvc5 rejects it everywhere else: as a nullable element, a
-tuple component, or a function *domain*. So `Typ?` sits at exactly the first set of positions and
-`Typ` at the second, and a `Typ` that cvc5 would refuse cannot be written.
-
-Two consequences worth knowing:
-
-- **No `Typ` denotes a sort cvc5 would reject as ill-sorted**, which is what the split buys.
-  `Typ.toSrt` can still fail, but only on `datatype`/`uninterpreted`, whose name has to be in the
-  scope's registry — a fact about the scope, not about the description.
-- an abstract *container* is not an abstract sort to cvc5: `mkAbstractSort SET_SORT` is literally
-  `(Set ?)`, of sort kind `SET_SORT`. So it is `Typ.set .any` here, and `Abstract` carries only the
-  four kinds cvc5 really keeps abstract.
+`Typ` describes a sort Lean-side, and `Typ?` adds the sorts cvc5 calls *abstract*: the fully
+abstract `?`, and `?BITVECTOR_TYPE`, `?FLOATINGPOINT_TYPE`, `?FINITE_FIELD_TYPE` and `?->`. cvc5
+accepts an abstract sort only as a set, bag or sequence element, as an array's index or element, and
+as a function's codomain. Those positions take a `Typ?` and every other takes a `Typ`, so no `Typ`
+describes a sort cvc5 would reject.
 -/
 
 mutual
 
-/-- A sort, described Lean-side. Every `Typ` is a *first-class* sort. -/
+/-- A sort, described Lean-side; never an abstract sort. -/
 inductive Typ
 | bool | int | real | string | regex | roundingMode
 | bitVec (size : Nat)
@@ -306,45 +296,31 @@ inductive Typ
 | finiteField (size : Nat)
 | arrayTo (idx elm : Typ?)
 | bag (elm : Typ?) | set (elm : Typ?) | seq (elm : Typ?)
-/-- cvc5's `Nullable`, denoted Lean-side by `Option`.
-
-A *structural* sort constructor like `set` or `seq`, not a declared datatype: building it twice
-gives the same sort, so `toSrt` rebuilds it rather than looking it up. cvc5 implements it as a
-mono-morphized datatype underneath, one per element sort, which is invisible from here.
-
-The element is a `Typ`: cvc5 rejects `(Nullable ?)`.
--/
+/-- cvc5's `Nullable`, denoted Lean-side by `Option`. -/
 | nullable (elm : Typ)
-/-- A tuple. The components are `Typ`s: cvc5 rejects an abstract component. -/
+/-- A tuple, of the given components. -/
 | prod (args : List Typ)
-/-- A record: named, ordered, first-class fields.
+/-- A record, of named fields.
 
-*Structural*, like `set` or `prod` and unlike a datatype: cvc5 builds the same sort from the same
-fields, so `toSrt` rebuilds it rather than looking it up. The order is part of the sort —
-`{a : Int, b : Bool}` and `{b : Bool, a : Int}` are **different** — which is why this is a list and
-not a map. The fields are `Typ`s: cvc5 refuses a field that is not first-class.
-
-cvc5 implements it as a mono-morphized datatype with one constructor and one selector per field,
-named after the fields, which is how `Srt.toTyp` reads one back.
+The order is part of the sort: `{a : Int, b : Bool}` and `{b : Bool, a : Int}` are different.
 -/
 | record (fields : List (String × Typ))
 /-- A datatype, by the name it was declared under.
 
-Only the name, because a declared sort cannot be rebuilt: cvc5 makes a *fresh* sort every time,
-even from an identical declaration. `Typ.toSrt` therefore looks this up in the scope's registry
-rather than reconstructing it, which is also why the case carries no constructors.
+`Typ.toSrt` fails unless a datatype of that name has been declared in the current scope, with
+`Srt.datatype`, `Srt.datatypes` or `Solver.declareDatatype`.
 -/
 | datatype (name : String)
-/-- A function. The domain is a `Typ` and the codomain a `Typ?`: cvc5 accepts `(-> Int ?)` and
-rejects `(-> ? Int)`. -/
+/-- A function sort, its codomain possibly abstract. -/
 | function (dom : Typ) (cod : Typ?)
-/-- An uninterpreted sort, by the name it was declared under — see `datatype`. -/
+/-- An uninterpreted sort, by name; like `datatype`, it must be declared (`Srt.uninterpreted`). -/
 | uninterpreted (name : String)
+-- A declared sort is known by name only because cvc5 makes a *fresh* sort on every declaration,
+-- even an identical one, so `Typ.toSrt` looks it up in the scope's state rather than rebuilding it.
+-- Nullables and records are structural: cvc5 builds the same sort from the same parts, so `toSrt`
+-- rebuilds them.
 
-/-- A `Typ`, or one of the sorts cvc5 calls abstract.
-
-Only where cvc5 permits a non-first-class sort; see the module note above.
--/
+/-- A `Typ`, or one of the sorts cvc5 calls abstract, for the positions that accept one. -/
 inductive Typ?
 /-- An ordinary, first-class sort. -/
 | typ (t : Typ)
@@ -355,12 +331,8 @@ inductive Typ?
 
 end
 
-/-- Lexicographic order on pairs, which core does not provide.
-
-`local`, and only so that `Ord` derives: `record`'s fields are a `List (String × Typ)`, and while
-`Ord (List ·)` exists, `Ord (· × ·)` does not — that, and not any circularity, is what stops the
-derivation. Keeping it local means the library does not impose an orphan instance on its users.
--/
+-- Lexicographic order on pairs, `local` and only so that `Ord` derives: `record`'s fields are a
+-- `List (String × Typ)`, and core has `Ord (List ·)` but no `Ord (· × ·)`.
 local instance [Ord α] [Ord β] : Ord (α × β) where
   compare | (a₁, b₁), (a₂, b₂) => match compare a₁ a₂ with | .eq => compare b₁ b₂ | o => o
 
@@ -402,18 +374,15 @@ end Typ?
 
 
 
-/-! ### Decidable equality
-
-`prod` makes `Typ` a *nested* inductive — it recurses through `List` — and it is mutual with
-`Typ?` besides, so no `deriving` handler covers equality: it is decided by hand, as a boolean
-equality by mutual structural recursion, proved reflexive and sound, then transported onto
-`DecidableEq`.
-
-Two things shape the proofs. Reflexivity matches a single argument, so every case is diagonal and
-there is nothing else to discharge. Soundness matches only the *first* argument and splits the
-second with `cases`, because a catch-all in a dependent match is elaborated once against generic
-scrutinees, where it cannot know the two constructors differ.
--/
+-- Decidable equality. `prod` makes `Typ` a *nested* inductive — it recurses through `List` — and
+-- it is mutual with `Typ?` besides, so no `deriving` handler covers equality: it is decided by
+-- hand, as a boolean equality by mutual structural recursion, proved reflexive and sound, then
+-- transported onto `DecidableEq`.
+--
+-- Two things shape the proofs. Reflexivity matches a single argument, so every case is diagonal and
+-- there is nothing else to discharge. Soundness matches only the *first* argument and splits the
+-- second with `cases`, because a catch-all in a dependent match is elaborated once against generic
+-- scrutinees, where it cannot know the two constructors differ.
 
 mutual
 
@@ -605,14 +574,14 @@ protected def Typ?.toString (t : Typ?) (paren : Bool := false) : String :=
   | .any => "?"
   | .abstract a => if paren then s!"(Abstract {a})" else s!"Abstract {a}"
 
-@[inherit_doc Cvc.Typ.toString]
+/-- Renders a record's fields, for `Typ.toString`. -/
 protected def Typ.fieldsFold : (fields : List (String × Typ)) → (acc : String) → String
   | [], acc => acc
   | (name, ty) :: tl, acc =>
     let field := s!"{name} : {Cvc.Typ.toString ty}"
     Cvc.Typ.fieldsFold tl (if acc.isEmpty then field else s!"{acc}, {field}")
 
-@[inherit_doc Cvc.Typ.toString]
+/-- Renders a tuple's components, for `Typ.toString`. -/
 protected def Typ.tupleArgsFold : (args : List Typ) → (acc : String) → String
   | [], "" => "Unit"
   | [ty], "" => s!"(× {Cvc.Typ.toString ty})"
@@ -626,7 +595,11 @@ end
 instance : ToString Typ := ⟨(Cvc.Typ.toString · )⟩
 instance : ToString Typ? := ⟨(Cvc.Typ?.toString · )⟩
 
-/-- Associates a `Typ` to a `Type`. -/
+/-- The sort a Lean type denotes, which lets it index terms.
+
+For a declared datatype, name it and declare it in the scope before use:
+`instance : ToTyp Pair := ⟨.datatype "Pair"⟩`.
+-/
 class ToTyp (α : Type) where
   /-- `Typ` associated to a type through `ToTyp`. -/
   typ : Typ

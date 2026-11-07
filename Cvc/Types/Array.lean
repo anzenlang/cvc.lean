@@ -19,8 +19,8 @@ public import Std.Data.TreeMap.Basic
 The Lean type denoting an SMT array: a default element plus the finitely many indices that differ
 from it. Indices are held in a `Std.TreeMap`, so the index type must be ordered.
 
-Only the Lean side lives here. Turning a total map into a term and back is in
-`Cvc/{Untyped,Typed}/Term/Array.lean`, beside the constructors that do it.
+Converting a total map to a term and back is done by `Cvc.Untyped.Theory.Array` and
+`Cvc.Typed.Theory.Array`.
 -/
 namespace Cvc public section variable [Ω]
 

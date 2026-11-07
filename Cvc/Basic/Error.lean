@@ -9,14 +9,19 @@ module
 
 
 
+/-! # Errors
+
+`Cvc.Error` is what every failing operation of this library throws, `Res`/`ResT` the result types
+carrying one, and `throwUser` and friends the ways to throw one.
+-/
 
 namespace Cvc public section
 
 
 
-/-- Cvc's error type -/
+/-- The error type of this library. -/
 inductive Error : Type
-/-- Internal error. -/
+/-- An error reported by cvc5, or a failure inside this library. -/
 | internal (msg : String)
 /-- Unsupported feature. -/
 | unsupported (msg : String)
@@ -37,7 +42,7 @@ class AsString (α : Type) : Type where
 instance : AsString String := ⟨id⟩
 instance : AsString (Unit → String) := ⟨fun f => f ()⟩
 
-/-- Map over an error's internal message -/
+/-- Maps over an error's message. -/
 def mapMsg (f : String → String) : Error → Error
 | .internal msg => f msg |> .internal
 | .unsupported msg => f msg |> .unsupported
@@ -65,14 +70,12 @@ section variable [Monad m] [MonadExcept Error m] (msg : String)
 def throwUser : m α := do
   throw <| Error.user msg
 
-/-- Unwraps an `Option`, throwing an `Error.user` on `none`.
-
-What the `!` form of an `Option`-answering query goes through, `none` standing for cvc5's
-null term.
--/
+/-- Unwraps an `Option`, throwing an `Error.user` on `none`. -/
 def someOrThrowUser : Option α → m α
   | some a => return a
   | none => throwUser msg
+-- What the `!` form of an `Option`-answering query goes through, `none` standing for cvc5's null
+-- term.
 
 /-- Throws an `Error.internal`. -/
 def throwInternal : m α := do
@@ -82,7 +85,7 @@ def throwInternal : m α := do
 def throwTodo : m α := do
   throw <| Error.internal s!"[unsupported] {msg}"
 
-/-- Throws an `Error.internal`. -/
+/-- Throws an `Error.internal` reporting that unreachable code was reached. -/
 def throwUnreachable (msg : String := "") : m α := do
   let sep := if msg.isEmpty then "" else ": "
   throw <| Error.internal s!"reached unreachable code{sep}{msg}"

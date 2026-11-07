@@ -20,34 +20,15 @@ public import Std.Data.TreeSet
 
 
 
-/-! # `Ω` class and environment monad
+/-! # Scopes and the environment monad
 
-The scope's state carries a **registry of declared sorts** alongside the term manager. That is what
-makes a datatype nameable by `ToTyp`: see `State`.
+cvc5 creates sorts, terms and solvers through a *term manager*, and objects of two managers must
+never meet. This library hides term managers behind the class `Ω`: an instance stands for "the term
+manager of the current scope", and nearly every type and function takes one implicitly.
 
-## `Ω` class
-
-Most of the types and functions in this library have an implicit `Ω`-class parameter. Under the hood
-cvc5 has a notion of *term manager*, and term/sort/solver/*etc.* can only be used with
-term/sort/solver/*etc.* if they user/are managed by the same term manager. Values of class `Ω`
-encode belonging to a specific term manager, causing compilation errors when two quantities are not
-guaranteed to agree on their manager.
-
-> Note that this library does not expose term managers directly, precisely to avoid runtime errors
-> related to using different term managers.
-
-`Ω`'s design is heavily inspired by `ST.Ref` and `StateRefT'`, and it provides the same *scoping*
-property: it is not possible to use an `Ω`-sort/term/solver/*etc.* after its underlying manager has
-been destroyed (which would cause a runtime error); see `Env.run` for details. This holds of nested
-runs too — a sort of an outer scope is not a sort of an inner one, and an inner scope's sorts
-cannot be returned to the outer one — which is why `Ω` is a `Type` rather than a `Prop`; see `Ω`.
-
-## Environment monad
-
-Almost all sort/term/solver operations happen in the `Env` monad (and/or its transformer, `EnvT`).
-An `Ω`-`Env` allows creating and operating on `Ω`-sorts, `Ω`-terms, `Ω`-solvers, *etc.* which are
-guaranteed to be compatible.
-
+Work happens in the `Env` monad (`EnvT` for another base monad), and `Env.run`/`Env.runIO` run it
+in a fresh scope. As with `runST`, nothing mentioning the scope can escape the run, and two scopes'
+sorts and terms cannot be mixed, nested runs included.
 -/
 namespace Cvc public section
 
@@ -81,11 +62,10 @@ end Error
 private def liftRes5 (code : Except Error5 α) : Except Error α := code.mapError Error.ofUnsafe
 
 
-/-- Argument of the `Env` monad representing a specific term manager.
+/-- The current scope: an instance stands for one term manager.
 
-Each run of an `Env` computation binds an instance of its own, and nothing else can make one. Two
-runs' instances are distinct variables, so `@Srt ω` and `@Srt ω'` are distinct types: a sort or a
-term cannot leave the run it was made in, nor meet one made in another run, nested runs included.
+Only `Env.run` and its variants make one, so a sort, term or solver cannot leave the run it was
+made in, nor meet one made in another run, nested runs included.
 -/
 @[nospecialize]
 class Ω : Type 1 where private mk :: private scope : Type
@@ -104,22 +84,17 @@ class Ω : Type 1 where private mk :: private scope : Type
 -- which other modules may not reference — into its callers, to specialize them on an argument
 -- every scope gives the same constant value.
 
-/-- What an `Env` threads.
-
-The term manager, plus the sorts that had to be **declared** rather than built. cvc5 makes a
-*fresh* sort every time one is declared, even from an identical declaration, so a datatype sort
-cannot be recovered by rebuilding it — see `Typ.toSrt`. Keeping it here is what lets `ToTyp` name a
-datatype: the `Typ` carries the name, and the sort is looked up.
-
-Keyed by name. Two datatypes declared under one name in the same scope therefore alias, which is
-why the declaration functions reject a name already taken.
--/
+/-- What an `Env` threads: the scope's term manager and the sorts declared in it. -/
 structure State where
   private mk ::
   /-- The term manager every sort and term of this scope belongs to. -/
   private tm : Tm
   /-- Sorts that were declared, by name. -/
   private declaredSorts : Std.HashMap String cvc5.Sort := {}
+-- Declared sorts are kept because cvc5 makes a *fresh* sort every time one is declared, even from
+-- an identical declaration, so a datatype sort cannot be recovered by rebuilding it. This is what
+-- lets `ToTyp` name a datatype: the `Typ` carries the name, and `Typ.toSrt` looks the sort up.
+-- Keyed by name, so the declaration functions reject a name already taken.
 
 /-- The environment monad transformer. -/
 structure EnvT [Ω] (m : Type → Type) (α : Type) : Type where private mk ::
@@ -227,6 +202,10 @@ end Env
 
 namespace EnvT
 
+/-- Runs `code` in a fresh scope, with a term manager of its own, answering its result or error.
+
+`α` is chosen outside the scope, so nothing mentioning the scope can escape the run.
+-/
 def run [Monad m] [MonadLiftT BaseIO m] (code : [Ω] → EnvT m α) : m (Res α) := do
   let _scope : Ω := ⟨Unit⟩
   match ← Tm.new.run with
@@ -237,8 +216,10 @@ end EnvT
 
 namespace Env
 
+@[inherit_doc EnvT.run]
 def run (code : [Ω] → Env α) : BaseIO (Res α) := EnvT.run code
 
+/-- `Env.run`, raising an error as an `IO` exception. -/
 def runIO (code : [Ω] → Env α) : IO α := do
   match ← run code with
   | .ok a => return a
@@ -252,11 +233,8 @@ section variable [Ω]
 
 private def getManager : Env Tm := ⟨fun ref => return (← ref.get).tm⟩
 
-/-! ### The declared-sort registry
-
-`private`, like `runUnsafe`: only the sort layer registers and looks sorts up, and it does so
-through `Srt`-level functions that state what they mean.
--/
+-- The declared-sort registry. `private`, like `runUnsafe`: only the sort layer registers and
+-- looks sorts up, and it does so through `Srt`-level functions that state what they mean.
 
 /-- Remembers a declared sort under a name, failing if the name is taken. -/
 private def registerSort (name : String) (srt : cvc5.Sort) : Env Unit :=

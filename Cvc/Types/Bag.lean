@@ -21,17 +21,20 @@ The Lean type denoting an SMT bag: a `Std.TreeMap` from elements to their multip
 element type must be ordered. A zero multiplicity is not represented, which is what `alter` keeps
 true.
 
-Only the Lean side lives here. Turning a bag into a term and back is in
-`Cvc/{Untyped,Typed}/Term/Bag.lean`, beside the constructors that do it.
+Converting a bag to a term and back is done by `Cvc.Untyped.Theory.Bag` and
+`Cvc.Typed.Theory.Bag`.
 -/
 namespace Cvc public section variable [Ω]
 
+/-- An SMT bag (multiset): each element's multiplicity, absent elements standing for zero. -/
 abbrev Bag (α : Type) [Ord α] := Std.TreeMap α Int
 
 namespace Bag variable [Ord α] (bag : Bag α)
 
+/-- The empty bag. -/
 def empty : Bag α := Std.TreeMap.empty
 
+/-- Applies `f` to an element's multiplicity, removing the element when the result is zero. -/
 def alter (key : α) (f : Int → Int) : Bag α :=
   Std.TreeMap.alter bag key fun val? => match val?.getD 0 |> f with | 0 => none | n => n
 
@@ -45,8 +48,10 @@ def sub (key : α) (n : Int) := bag.alter key (· - n)
 
 def get? (key : α) : Option Int := Std.TreeMap.get? bag key
 
+/-- An element's multiplicity, zero if absent. -/
 def get (key : α) : Int := bag.get? key |>.getD 0
 
+/-- Whether an element's multiplicity is positive. -/
 def contains (key : α) : Bool := 0 < bag.get key
 
 protected abbrev mem (key : α) : Prop := bag.contains key

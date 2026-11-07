@@ -18,14 +18,14 @@ public import Std.Data.TreeSet.Iterator
 /-! # Sets
 
 The Lean type denoting an SMT set. It is a `Std.TreeSet`, so its element type must be ordered —
-which is where the `Ord` binders on the generated set operators come from.
+which is why the set operators take an `Ord` instance on it.
 
-Only the Lean side lives here. Turning a set into a term and back is in
-`Cvc/{Untyped,Typed}/Term/Set.lean`, beside the constructors that do it.
+Converting a set to a term and back is done by `Cvc.Untyped.Theory.Set` and
+`Cvc.Typed.Theory.Set`.
 -/
 namespace Cvc public section variable [Ω]
 
-/-- Alias for `Std.TreeSet`. -/
+/-- An SMT set: a `Std.TreeSet`, so its elements must be ordered. -/
 abbrev Set (α : Type) [Ord α] := Std.TreeSet α
 
 namespace Set variable [Ord α]

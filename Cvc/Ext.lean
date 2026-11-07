@@ -12,26 +12,25 @@ public meta import Lean.Parser.Term
 
 
 
-/-! # The `smt!` term DSL, layer-parameterized
+/-! # The `smt!` term DSL
 
-This module holds the parts of the DSL that do not depend on a theory: the `smtTerm`
-category, the forms that are not operators (literals, identifiers, `if`/`let`, escapes), the two
-layer entry points, and the expander shared by both.
+`smt!` writes a term in notation close to Lean's own — `smt! i + 2 * j ≤ k ∧ ¬ b` — and builds it
+in `Env`. `smtU!` builds a sort-erased term and `smtT!` a typed one; `open Cvc.Untyped` or
+`open Cvc.Typed` makes `smt!` stand for the matching one.
 
-Operator grammar is *not* here. `gen_untyped%` emits one grammar rule per operator carrying a
-notation, named `…smtOp.<shape>.<id>`, so a theory's notation is compiled with that theory and no
-other. `expandSmt` dispatches on the last three components of a node's kind, which is what lets the
-grammar be generated per theory while the expansion logic is written once.
-
-There are two entry points rather than one because each expands to a *different* namespace:
-`smtU!` builds `Cvc.Untyped.Term.…` and `smtT!` builds `Cvc.Typed.Term.…`, both
-fully qualified. Nothing has to be in scope at the use site. Each layer additionally exposes a
-`scoped` `smt!` alias, so opening one layer gives the short spelling.
-
-The `smtTerm` category is deliberately *not* declared with `behavior := symbol`: symbol
-behavior breaks the longest match between an infix token and its bracket form (`∧` versus `∧[`).
-Nothing is reserved by this, since the category's atoms are symbols rather than identifiers.
+This module declares the forms that belong to no theory: parentheses, `![e]` to splice a Lean term,
+identifiers, application `f a b`, `let x ← t; u` and `fun (x : s) => t`. Every other form —
+literals, operators, `if`, `match`, quantifiers — is declared by the theory module it belongs to, so
+`smt!` accepts exactly the notations of the theories imported.
 -/
+-- Operator grammar is generated per theory: `gen_untyped%` emits one grammar rule per operator
+-- carrying a notation, named `…smtOp.<shape>.<id>`, and `expandSmt` dispatches on the last three
+-- components of a node's kind, so the expansion logic is written once. Each entry point expands to
+-- fully qualified names of its layer, so nothing has to be in scope at the use site.
+--
+-- The `smtTerm` category is deliberately *not* declared with `behavior := symbol`: symbol behavior
+-- breaks the longest match between an infix token and its bracket form (`∧` versus `∧[`). Nothing
+-- is reserved by this, since the category's atoms are symbols rather than identifiers.
 namespace Cvc public meta section
 
 open Lean Elab
@@ -42,13 +41,11 @@ open Lean Elab
 -- namespace — so the name is prefixed to keep it collision-free
 declare_syntax_cat smtTerm
 
-/-! ### Atoms
-
-All five are at `:max`, as their counterparts in Lean's own `term` category are, because that is
-what `smtApp` parses its function and its arguments at. Anything below `max` — `if`, `let`,
-`match`, and every operator — needs parentheses to be an argument, which is exactly how Lean reads
-its own application.
--/
+-- Atoms. All of them — these three, and the number and string literals the theories declare — are
+-- at `:max`, as their counterparts in Lean's own `term` category are, because that is what `smtApp`
+-- parses its function and its arguments at. Anything below `max` — `if`, `let`, `match`, and every
+-- operator — needs parentheses to be an argument, which is exactly how Lean reads its own
+-- application.
 
 /-- Parenthesized SMT term. -/
 syntax:max (name := smtParen) "(" smtTerm ")" : smtTerm
@@ -56,7 +53,7 @@ syntax:max (name := smtParen) "(" smtTerm ")" : smtTerm
 syntax:max (name := smtEscape) "![" term "]" : smtTerm
 /-- An identifier denotes an already-built term, lifted with `pure`. -/
 syntax:max (name := smtIdent) ident : smtTerm
-/-- Binds an intermediate term. -/
+/-- `let x ← t; u` binds the term `t` to `x` in `u`. -/
 syntax (name := smtLet) "let " ident " ← " smtTerm "; " ppLine smtTerm : smtTerm
 /-- Function application, `f arg₁ arg₂ …`, spelled as Lean spells it.
 
@@ -75,9 +72,8 @@ syntax:lead (name := smtApp) smtTerm:max (ppSpace colGt smtTerm:max)+ : smtTerm
 /-! ### Binders
 
 A lambda and a quantifier bind their variables the way Lean's do, in parentheses with a sort after
-the colon: `(x y : s)`. What the sort is depends on the layer: a Lean type (`Int`) or a `Srt` value
-(`int`) sort-erased, the Lean type of the variable's index typed. Declared here, being shared by
-`fun` and by the quantifiers of `Cvc.Untyped.Theory.Quant`.
+the colon: `(x y : s)`. Sort-erased, the sort is a Lean type (`Int`) or a `Srt` value (`int`);
+typed, it is the Lean type indexing the variable.
 -/
 
 /-- Binders of an `smt!` lambda or quantifier. -/
@@ -89,8 +85,7 @@ syntax (name := smtQuantBinder) "(" ident+ " : " term ")" : smtQuantBinder
 /-- A lambda, `fun (x y : s) => body`, spelled as Lean spells it.
 
 The body extends as far right as it can, as in Lean, so a lambda in argument position needs
-parentheses. Each layer expands it beside its own `Term.lambdaH`, through which the variables are
-bound under the names the writer gave them, which are also the names cvc5 prints.
+parentheses. cvc5 prints the variables under the names written.
 -/
 syntax:lead (name := smtFun) ("fun" <|> "λ") (ppSpace smtQuantBinder)+ " => " smtTerm : smtTerm
 
@@ -112,20 +107,21 @@ syntax (name := smtExpand) "smtExpand% " ident ppSpace smtTerm : term
 /-- An identifier leaf of the layer whose root is named, elaborated by `Cvc.Ext.elabSmtIdent`. -/
 syntax (name := smtIdentElab) "smtIdent% " ident ppSpace ident : term
 
-/-- Builds a sort-erased term. -/
+/-- Builds a sort-erased term in `Env` from `smt!` notation. -/
 syntax (name := smtUStx) "smtU! " ppLine group(colGt smtTerm) : term
-/-- Builds a typed term. -/
+/-- Builds a typed term in `Env` from `smt!` notation. -/
 syntax (name := smtTStx) "smtT! " ppLine group(colGt smtTerm) : term
 
 
 
 /-! ## The expander
 
-Everything below is the DSL's own machinery, and it lives in `Cvc.Ext` rather than in `Cvc` so that
-none of it can clash with the API a user opens. Names like `bindArgs`, `freshId` and `patArgs` would
-otherwise sit beside the term constructors — and `deferSmt` was `sub` once, which shadowed
-`Cvc.Untyped.Term.sub` wherever both were open.
+The DSL's own machinery, used by the theory modules to declare their forms.
 -/
+-- It lives in `Cvc.Ext` rather than in `Cvc` so that none of it can clash with the API a user
+-- opens: names like `bindArgs`, `freshId` and `patArgs` would otherwise sit beside the term
+-- constructors, and a helper named like one — `sub`, say — would shadow `Cvc.Untyped.Term.sub`
+-- wherever both namespaces are open.
 namespace Ext
 
 /-- The layer an `smt!` expansion targets. -/
@@ -201,11 +197,7 @@ def bindArgs (args : Array (TSyntax `term)) (mk : Array Ident → MacroM (TSynta
 def freshId (base : String) : MacroM Ident := do
   return mkIdent (← MonadQuotation.addMacroScope (Name.mkSimple base))
 
-/-- A sub-term's expansion, deferred to `smtExpand%` so that a theory's forms can be reached.
-
-Not named `sub`: `Cvc.Untyped.Term.sub` is subtraction, and a `Cvc.sub` beside it shadows that
-wherever both namespaces are open.
--/
+/-- A sub-term's expansion, deferred to `smtExpand%` so that a theory's forms can be reached. -/
 def deferSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) := do
   let l := layer.ident
   let t : TSyntax `smtTerm := ⟨stx⟩
@@ -271,8 +263,10 @@ partial def expandSmt (layer : Layer) (stx : Syntax) : MacroM (TSyntax `term) :=
         `($applyN $fnId #[ $argIds,* ])
   | _ => Macro.throwErrorAt stx s!"unsupported SMT term (kind `{kind}`)"
 
-/-- Whether a type is one of the layers' terms, or what converts to one: where a dotted identifier
-stops being a Lean projection and starts reading SMT record fields. -/
+/-- Whether a type is one of the layers' terms, or what converts to one.
+
+This is where a dotted identifier stops being a Lean projection and starts reading record fields.
+-/
 def isSmtTermType (type : Expr) : Bool :=
   match type.consumeMData.getAppFn.constName? with
   -- written out rather than resolved, this module importing neither layer
@@ -324,8 +318,7 @@ def elabSmtIdentTerm : Elab.Term.TermElab := fun stx expected? => do
   let `(smtIdent% $l $id) := stx | Elab.throwUnsupportedSyntax
   elabSmtIdent (Layer.ofIdent l) id expected?
 
-/-- The variables of a lambda's or quantifier's binders, in order, each with the sort it was written
-with. -/
+/-- The variables of a lambda's or quantifier's binders, in order, each with its written sort. -/
 def quantBinders (binders : Syntax) : Array (Ident × Term) := Id.run do
   let mut acc := #[]
   for binder in binders.getArgs do

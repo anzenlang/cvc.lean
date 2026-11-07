@@ -15,26 +15,20 @@ public import Cvc.Srt
 
 /-! # Records
 
-`Record fields` is a record's index: the *named, ordered* fields it has. Both halves of that matter,
-and both come from cvc5.
+`Record fields` is both the index of a record-sorted term and the Lean value such a term denotes,
+`fields` being its named fields in order. **The order is part of the sort**: `{a : Int, b : Bool}`
+and `{b : Bool, a : Int}` are different sorts.
 
-Named, because a record's fields are reached by name and nothing else — cvc5 mono-morphises a
-record into a datatype whose single constructor is called `__cvc5_record_a_Int_b_Bool`, a name no
-user should ever write, and whose selectors are named after the fields, which they should.
-
-Ordered, because **the order is part of the sort**: `{a : Int, b : Bool}` and `{b : Bool, a : Int}`
-are different sorts, and cvc5 refuses to mix their terms. So the index is a list, not a map.
-
-**A record sort is structural**, unlike every other datatype: cvc5 builds the same sort from the
-same fields, where declaring the same datatype twice gives two different sorts. That is what makes
-this index work at all — `Typ.record` rebuilds the sort on demand rather than looking a declared one
-up in the scope's registry, so `Record fields` denotes one sort wherever it is written.
-
-It is also why the index is a field list rather than a Lean structure. A Lean `structure Point`
-would be nominal, so two identical structures would denote one SMT sort while being different
-indices, and `Srt.toTyp` could not say which one a sort came from. `Record [("a", Int)]` is
-canonical in both directions: `Typ.record` maps to it, and it maps back.
+```lean
+def origin : Record [("x", Int), ("y", Int)] := .cons "x" 0 (.last "y" 0)
+#eval origin.get "y"   -- 0
+```
 -/
+-- A record sort is structural, unlike every other datatype: cvc5 builds the same sort from the same
+-- fields, so `Typ.record` rebuilds it on demand and `Record fields` denotes one sort wherever it is
+-- written. That is also why the index is a field list rather than a Lean structure: a `structure
+-- Point` would be nominal, so two identical structures would denote one SMT sort while being
+-- different indices, and `Srt.toTyp` could not say which one a sort came from.
 namespace Cvc public section
 
 
@@ -55,8 +49,7 @@ end ToTypFields
 
 
 
-/-- A record's field values: `gamma` for each field, in order, as nested pairs ending in `PUnit`.
--/
+/-- A record's field values: `gamma` for each field, in order, as nested pairs ending in `PUnit`. -/
 @[expose] def Values : List (String × Type) → Type
   | [] => PUnit
   | (_name, gamma) :: rest => gamma × Values rest
@@ -67,23 +60,16 @@ end ToTypFields
 -- `expose`d because every instance below reduces it: a downstream module has to see that a
 -- record's values *are* a product to lift `Ord` or `ToString` over them.
 
-/-- A record of the named, ordered `fields`, and its values.
-
-Both the index of a record-sorted term and the Lean value such a term denotes, exactly as `Set` and
-`TotalMap` are — which is what lets `Solver.getValue` answer one.
--/
+/-- A record of the named, ordered `fields`: a record sort, and a value of it. -/
 structure Record (fields : List (String × Type)) where
   /-- The field values, in order. -/
   values : Values fields
 
 namespace Record
 
-/-- A record's last field, and its value.
-
-There is no empty record: `Srt.record` refuses one, so making it unrepresentable here costs
-nothing and says so a step earlier.
--/
+/-- A record's last field, and its value. -/
 def last (_name : String) (value : gamma) : Record [(_name, gamma)] := ⟨(value, ⟨⟩)⟩
+-- There is no empty record: `Srt.record` refuses one, so building starts from the last field.
 
 /-- Adds a field's value in front of the ones collected so far. -/
 def cons (_name : String) (value : gamma) (rest : Record fields)
@@ -95,16 +81,8 @@ end Record
 
 /-- `name` is one of `fields`, with type `gamma`: where it sits, and how to reach it.
 
-This is what makes a field access *typed* while still being written as a name: the instances walk
-the list, and the one that matches the head wins, so resolution both finds the field and answers
-its type. A name that is not there, or one asked for at the wrong type, has no instance and does
-not compile.
-
-It carries both accessors a record needs: the field's **position**, which reaches its term in a
-record of terms, and a **projection**, which reaches its value in a record's `Values`.
-
-Where a field name occurs twice the head match wins, matching `Srt.record`'s "first duplicate"
-report — but such an index has no sort at all, `Srt.record` refusing duplicate names.
+Resolved by instance search, so a name that is not a field, or one asked for at the wrong type,
+does not compile.
 -/
 class FieldOf (fields : List (String × Type)) (name : String) (gamma : outParam Type) where
   /-- Where the field sits in `fields`. -/
@@ -120,6 +98,9 @@ class FieldOf (fields : List (String × Type)) (name : String) (gamma : outParam
 --
 -- The position is a `Fin`, which is safe here in a way a hand-written one would not be —
 -- resolution produces it, so there is no numeral for `Fin`'s modular `OfNat` to reduce.
+--
+-- Where a field name occurs twice the head match wins, matching `Srt.record`'s "first duplicate"
+-- report — but such an index has no sort at all, `Srt.record` refusing duplicate names.
 
 instance (priority := high) : FieldOf ((name, gamma) :: fields) name gamma where
   idx := 0
@@ -149,11 +130,8 @@ end Record
 
 /-! ### Instances for nesting
 
-A record carries its fields' values, so unlike the relation indices these comparisons are *not*
-trivial — a `Set (Record …)` keyed by a constant order would collapse every record to one. Each is
-lifted field by field through its own class, so that a record demands of its fields only what is
-actually asked of the record: a field whose type has no order, a function's for instance, costs
-nothing until someone wants the record ordered.
+A record's order, equality, hash and string form are lifted field by field, each through its own
+class, so a record demands of its fields only what is asked of the record.
 -/
 
 /-- Lifts `Ord` over a record's fields, lexicographically. -/

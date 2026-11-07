@@ -40,7 +40,18 @@ namespace Cvc public section
 
 
 
-/-! # Logic -/
+/-! # SMT-LIB logics
+
+A `Logic` names the fragment a solver should expect, as `Solver.setLogic` takes it: `QF_LIA`,
+`UFBV`, `ALL`… Start from a named logic and extend it, or build one from nothing with `Logic.mk`:
+
+```lean
+s.setLogic Logic.qf_lia.uf                        -- QF_UFLIA
+s.setLogic (Logic.mk.uf.arith .lia).toLogic.qf    -- QF_UFLIA
+```
+
+`Logic.ofSmtLib` parses a logic's name, and `Logic.toSmtLib` prints one.
+-/
 namespace Logic open Std.Internal (Parsec) open Std.Internal.Parsec.String (Parser)
 
 
@@ -240,12 +251,9 @@ end Logic
 
 
 
-/-- An SMT-LIB logic.
-
-Based on [cvc5's `logic_info.cpp`][cpp].
-
-[cpp] https://github.com/cvc5/cvc5/blob/7ee7051df025e6db566fc67086a7aa4e1023c8f2/src/theory/logic_info.cpp#L270-L367
--/
+/-- An SMT-LIB logic, such as `QF_LIA`. -/
+-- Based on cvc5's `src/theory/logic_info.cpp`, at commit 7ee7051df025e6db566fc67086a7aa4e1023c8f2,
+-- lines 270 to 367.
 structure Logic : Type where private mkRaw ::
   /-- Trumps the rest of the specification and turns everything on.
 
@@ -317,7 +325,7 @@ section variable (self : Logic)
 private def oneAfterArray? : Bool :=
   self.oneTrailing? true
 
-/-- Either `Logic.all?` or at least one actual fragment is active. -/
+/-- Whether the logic is `ALL` or enables at least one theory. -/
 @[simp]
 def isValid : Bool :=
   self.all? ∨ self.oneTrailing? false
@@ -333,46 +341,60 @@ end
 
 
 
+/-- A logic built from nothing, started by `Logic.mk` and finished by `toLogic`. -/
 structure Builder extends toLogic : Logic
 where private mk' ::
 
 namespace Builder
 
+/-- The empty logic, to add theories to. -/
 def mk : Builder where
   toLogic := {}
 
 variable (self : Builder)
 
+/-- Adds higher-order reasoning, `HO_`. -/
 def ho : Builder := {self with ho? := true}
+/-- Makes the logic quantifier-free, `QF_`. -/
 def qf : Builder := {self with qf? := true}
+/-- Adds separation logic, `SEP_`. -/
 def sep : Builder := {self with sep? := true}
+/-- Adds arrays, `A` or `AX`. -/
 def array : Builder := {self with array? := true}
+/-- Adds uninterpreted functions, `UF`. -/
 def uf : Builder := {self with uf? := true}
 
+/-- Adds cardinality constraints, `C`. -/
 def card : Builder := {self with card? := true}
 theorem card_valid {b : Builder} : b.card.valid := by
   simp [Builder.card]
 
+/-- Adds bit-vectors, `BV`. -/
 def bitVec : Builder := {self with bitVec? := true}
 theorem bitVec_valid {b : Builder} : b.bitVec.valid := by
   simp [Builder.bitVec]
 
+/-- Adds finite fields, `FF`. -/
 def ff : Builder := {self with ff? := true}
 theorem ff_valid {b : Builder} : b.ff.valid := by
   simp [Builder.ff]
 
+/-- Adds floating-point arithmetic, `FP`. -/
 def float : Builder := {self with float? := true}
 theorem float_valid {b : Builder} : b.float.valid := by
   simp [Builder.float]
 
+/-- Adds datatypes, `DT`. -/
 def datatype : Builder := {self with datatype? := true}
 theorem datatype_valid {b : Builder} : b.datatype.valid := by
   simp [Builder.datatype]
 
+/-- Adds strings, `S`. -/
 def string : Builder := {self with string? := true}
 theorem string_valid {b : Builder} : b.string.valid := by
   simp [Builder.string]
 
+/-- Sets the arithmetic part, such as `Arith.lia`. -/
 def arith (arith : Arith) : Builder := {self with arith? := arith}
 theorem arith_valid {b : Builder} {a : Arith} : (b.arith a).valid := by
   simp [Builder.arith]
@@ -380,75 +402,98 @@ theorem arith_valid {b : Builder} {a : Arith} : (b.arith a).valid := by
 private
 def getArith : Arith := self.arith?.getD .simplest
 
+/-- Makes the arithmetic linear rather than difference logic. -/
 def nonDiff : Builder := {self with arith? := self.getArith.setNonDiff}
+/-- Makes the arithmetic non-linear. -/
 def nonLinear : Builder := {self with arith? := self.getArith.setNonLinear}
+/-- Adds transcendental functions to the arithmetic. -/
 def transcendental : Builder := {self with arith? := self.getArith.setTranscendental}
+/-- Adds integers to the arithmetic. -/
 def int : Builder := {self with arith? := self.getArith.setInt}
+/-- Adds reals to the arithmetic. -/
 def real : Builder := {self with arith? := self.getArith.setReal}
+-- Each starts from integer difference logic when no arithmetic was set yet.
 
 end Builder
 
 
+/-- `ALL`: every theory cvc5 supports. -/
 def all : Logic where
   all? := true
 theorem all_valid : all.valid := by simp [all]
 
+/-- Starts building a logic from nothing. -/
 def mk : Builder := ⟨{}⟩
 
 variable (self : Logic)
 
+/-- Adds higher-order reasoning, `HO_`. -/
 def ho : Logic := {self with ho? := true}
 theorem ho_valid {l : Logic} : l.valid → l.ho.valid := by
   simp [ho]
 
+/-- Makes the logic quantifier-free, `QF_`. -/
 def qf : Logic := {self with qf? := true}
 theorem qf_valid {l : Logic} : l.valid → l.qf.valid := by
   simp [qf]
 
+/-- Adds separation logic, `SEP_`. -/
 def sep : Logic := {self with sep? := true}
 theorem sep_valid {l : Logic} : l.valid → l.sep.valid := by
   simp [sep]
 
+/-- Adds arrays, `A` or `AX`. -/
 def array : Logic := {self with array? := true}
 theorem array_valid {l : Logic} : l.valid → l.array.valid := by
   simp [array]
 
+/-- Adds uninterpreted functions, `UF`. -/
 def uf : Logic := {self with uf? := true}
 theorem uf_valid {l : Logic} : l.valid → l.uf.valid := by
   simp [uf]
 
 
+/-- Adds cardinality constraints, `C`. -/
 def card : Logic := {self with card? := true}
 theorem card_valid {l : Logic} : l.card.valid := by
   simp [card]
 
+/-- Adds bit-vectors, `BV`. -/
 def bitVec : Logic := {self with bitVec? := true}
 theorem bitVec_valid {l : Logic} : l.bitVec.valid := by
   simp [bitVec]
 
+/-- Adds finite fields, `FF`. -/
 def ff : Logic := {self with ff? := true}
 theorem ff_valid {l : Logic} : l.ff.valid := by
   simp [ff]
 
+/-- Adds floating-point arithmetic, `FP`. -/
 def float : Logic := {self with float? := true}
 theorem float_valid {l : Logic} : l.float.valid := by
   simp [float]
 
+/-- Adds datatypes, `DT`. -/
 def datatype : Logic := {self with datatype? := true}
 theorem datatype_valid {l : Logic} : l.datatype.valid := by
   simp [datatype]
 
+/-- Adds strings, `S`. -/
 def string : Logic := {self with string? := true}
 theorem string_valid {l : Logic} : l.string.valid := by
   simp [string]
 
+/-- Sets the arithmetic part, such as `Arith.lia`. -/
 def arith (arith : Arith) : Logic := {self with arith? := arith}
 theorem arith_valid {l : Logic} {a : Arith} : (l.arith a).valid := by
   simp [arith]
 
 
 
-/-! ### Convenient `Logic` constructors for `Arith` -/
+/-! ### Pure arithmetic logics
+
+Each is the logic of its name: `Logic.lira` is `LIRA`, `Logic.qf_nia` is `QF_NIA`.
+-/
 
 def lia := mk |>.arith .lia |>.toLogic
 def lra := mk |>.arith .lra |>.toLogic
@@ -470,7 +515,6 @@ def idl := mk |>.arith .idl |>.toLogic
 def rdl := mk |>.arith .rdl |>.toLogic
 def irdl := mk |>.arith .irdl |>.toLogic
 
-/-! ### Ubiquitous logics -/
 
 def qf_lia := lia.qf
 def qf_lra := lra.qf
@@ -543,6 +587,7 @@ where
   parseBit (tag : String) (f : Builder → Builder) (builder : Builder) : Parser Builder := do
     if ← pstring tag |>.opt then return f builder else return builder
 
+/-- Parses an SMT-LIB logic name, such as `QF_UFLIA`. -/
 def ofSmtLib (s : String) : Res Logic :=
   parseSmtLib (thenEoi := true) |>.run s |>.mapError Error.user
 

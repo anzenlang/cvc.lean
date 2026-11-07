@@ -23,12 +23,12 @@ bits *including* the hidden leading one, so the stored pattern is one sign bit, 
 and `sig - 1` stored significand bits — `exp + sig` in total, not `1 + exp + sig`. Single precision
 is `Float 8 24` and its pattern is 32 bits wide.
 
-Only the Lean side lives here. Turning a float into a term and back is in
-`Cvc/{Untyped,Typed}/Term/Float.lean`, beside the constructors that do it.
+Converting a float to a term and back is done by `Cvc.Untyped.Theory.Float` and
+`Cvc.Typed.Theory.Float`.
 -/
 namespace Cvc public section variable [Ω]
 
-/-- Floats with exponent `exp` and significand `sig`. -/
+/-- A floating-point value of exponent width `exp` and significand width `sig`. -/
 inductive Float (exp sig : Nat)
 /-- Positive infinity. -/
 | posInf
@@ -36,9 +36,9 @@ inductive Float (exp sig : Nat)
 | negInf
 /-- Not-a-number. -/
 | nan
-/-- Zero-right-limit. -/
+/-- Positive zero. -/
 | posZero
-/-- zero-left-limit. -/
+/-- Negative zero. -/
 | negZero
 /-- Bit-pattern representation of a floating point, `exp + sig` bits wide. -/
 | ofBitVec (bv : BitVec (exp + sig))
@@ -65,7 +65,7 @@ structure Erased where
 /-- Erases a floating-point's exponent and significand. -/
 def erase (f : Float exp sig) : Erased := {exp, sig, get := f}
 
-/-- String representation.-/
+/-- String representation. -/
 protected def toString (f : Float exp sig) : String :=
   let inner := match f with
   | posInf => "+∞"

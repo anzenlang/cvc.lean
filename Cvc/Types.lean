@@ -21,10 +21,8 @@ public import Cvc.Types.Denote
 
 /-! # The Lean types denoting SMT sorts
 
-One module per container sort, each holding the Lean type, its `ToTyp` instance and whatever
-operations and instances the type needs on the Lean side. They are layer-neutral: a sort is the
-same whichever layer names it, so these sit beside the layers rather than inside one.
-
-Turning a value into a term and back is *not* here. Those conversions need a theory's constructors,
-so they live in that theory's module under `Cvc/{Untyped,Typed}/Term/`.
+The Lean types that sorts denote — sets, bags, total maps, floats, finite-field elements, tuples,
+relations, records — each with its `ToTyp` instance and the Lean-side operations it needs. They are
+shared by both layers. Converting a value to a term and back is done by each theory's module, such
+as `Cvc.Typed.Theory.Set`.
 -/

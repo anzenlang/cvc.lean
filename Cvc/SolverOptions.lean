@@ -18,7 +18,8 @@ inductive for an option taking one of a fixed set of modes. `Solver.Option.toStr
 flag and value cvc5's string-based `setOption` wants.
 
 Each option is also an abbreviation on `Solver.Option` named after its category and itself, so
-`.smt_produceModels` can be written for `.smt .produceModels`.
+`.smt_produceModels` can be written for `.smt .produceModels`. A solver's `setOpt` sets one:
+`s.setOpt .smt_produceModels true`.
 
 The options are cvc5's own, minus three kinds:
 
