@@ -42,7 +42,10 @@ gen_untyped_view% from Cvc.Spec.Set
 A `Cvc.Set` denotes an SMT set: the empty set, with each element inserted.
 -/
 
-@[inherit_doc T.isSetValue]
+/-- Whether a term is a set value: a canonical union of singletons of values, as a model answers.
+
+A set built from constructors is generally not one, and the universe set never is.
+-/
 def isSetValue (term : Term) : Bool := T.isSetValue term.toUnsafe
 
 

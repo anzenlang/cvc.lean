@@ -211,13 +211,23 @@ def setOpt (opt : Solver.Option) (val : opt.argType) : Env Unit :=
   let (opt, val) := opt.toStrings val
   s.setOption opt val
 
-@[inherit_doc S.getOption]
+/-- The value of the option named `flag`.
+
+```smtlib
+(get-option <keyword>)
+```
+-/
 def getOption (flag : String) : Env String := runUnsafe' do s.toUnsafe.getOption flag
 
-@[inherit_doc S.getOptionNames]
+/-- The names of all the options `setOption` and `getOption` accept. -/
 def getOptionNames : Env (Array String) := runUnsafe' do s.toUnsafe.getOptionNames
 
-@[inherit_doc S.setInfo]
+/-- Sets the info flag `option` to `value`.
+
+```smtlib
+(set-info <attribute>)
+```
+-/
 def setInfo (option value : String) : Env Unit := runUnsafe' do
   s.toUnsafe.setInfo option value
 
@@ -320,7 +330,7 @@ end unexpected
 @[inherit_doc S.getAssertions]
 def getAssertions : Env Terms := runUnsafe' do s.toUnsafe.getAssertions
 
-@[inherit_doc S.assertFormula]
+/-- Asserts a formula. -/
 def assert (t : Term) : Env Unit := runUnsafe' do s.toUnsafe.assertFormula t
 
 @[inherit_doc S.getLearnedLiterals]
@@ -331,7 +341,15 @@ def getLearnedLiterals (t : LearnedLitType := LearnedLitType.input) : Env Terms 
 
 /-! ### Declarations and definitions -/
 
-@[inherit_doc S.declareFun]
+/-- Declares a function symbol named `symbol`, of domain `sorts` and codomain `sort`.
+
+```smtlib
+(declare-fun <symbol> ( <sort>* ) <sort>)
+```
+
+A fresh symbol is declared by default. With `fresh := false`, a call with the same symbol and sorts
+as an earlier non-fresh call answers the same term.
+-/
 def declareFun (symbol : String) (sorts : Srts) (sort : Srt) (fresh : Bool := true) : Env Term :=
   runUnsafe' do s.toUnsafe.declareFun symbol sorts sort fresh
 
@@ -347,7 +365,14 @@ def declareFunAs (α : Type) [ToTyp α] (symbol : String) (fresh : Bool := true)
   else
     s.declareConst symbol srt fresh
 
-@[inherit_doc S.defineFun]
+/-- Defines a function named `symbol`, of parameters `bvs`, codomain `sort` and body `body`.
+
+```smtlib
+(define-fun <function_def>)
+```
+
+A `global` definition persists when the assertion stack is popped.
+-/
 def defineFun (symbol : String) (bvs : BVars) (sort : Srt) (body : Term)
   (global : Bool := false)
 : Env Term :=
@@ -357,18 +382,42 @@ def defineFun (symbol : String) (bvs : BVars) (sort : Srt) (body : Term)
 def defineConst (symbol : String) (sort : Srt) (body : Term) (global : Bool := false) : Env Term :=
   s.defineFun symbol #[] sort body global
 
-@[inherit_doc S.defineFunRec]
+/-- Defines a function that may be recursive, named `symbol`, of parameters `bvs`, codomain `sort`.
+
+The function does not exist before this call, so `body` cannot mention it; a self-referencing body
+needs `defineFunRecTerm`. A `global` definition persists when the assertion stack is popped.
+
+```smtlib
+(define-fun-rec <function_def>)
+```
+-/
 def defineFunRec (symbol : String) (bvs : BVars) (sort : Srt) (body : Term)
   (global : Bool := false)
 : Env Term :=
   runUnsafe' do s.toUnsafe.defineFunRec symbol bvs sort body global
 
-@[inherit_doc S.defineFunRecTerm]
+/-- Defines the recursive function `fn`, of parameters `bvs` and body `body`.
+
+`fn` is a function symbol declared beforehand, with `declareFun` for instance, so `body` can mention
+it. A `global` definition persists when the assertion stack is popped.
+
+```smtlib
+(define-fun-rec <function_def>)
+```
+-/
 def defineFunRecTerm (fn : Term) (bvs : BVars) (body : Term) (global : Bool := false)
 : Env Term :=
   runUnsafe' do s.toUnsafe.defineFunRecTerm fn bvs body global
 
-@[inherit_doc S.defineFunsRec]
+/-- Defines mutually recursive functions: `funs[i]` has parameters `bvs[i]` and body `bodies[i]`.
+
+Each function is a function symbol declared beforehand, with `declareFun` for instance. A `global`
+definition persists when the assertion stack is popped.
+
+```smtlib
+(define-funs-rec ( <function_decl>* ) ( <body>* ))
+```
+-/
 def defineFunsRec (funs : Terms) (bvs : Array BVars) (bodies : Terms)
   (global : Bool := false)
   (_oneBodyPerFun : funs.size = bodies.size := by
@@ -391,7 +440,16 @@ answer `none`. Each has a `!` form answering the term itself and failing there i
 /-- `none` for the null term, the term itself otherwise. -/
 private def nonNull? (t : cvc5.Term) : Option Term := if t.isNull then none else some t
 
-@[inherit_doc S.getQuantifierElimination]
+/-- Quantifier elimination: a quantifier-free formula equivalent to `q` under the assertions.
+
+Given the assertions `A`, the answer `Φ` is such that `A ∧ q` and `A ∧ Φ` are equivalent, and `Φ`
+mentions only the free variables of `q`. Complete only for logics such as LRA, LIA and BV;
+experimental in cvc5.
+
+```smtlib
+(get-qe <q>)
+```
+-/
 def qe (q : Term) : Env Term := runUnsafe' do s.toUnsafe.getQuantifierElimination q
 
 /-- Partial quantifier elimination, `none` if cvc5 answers the null term.
@@ -522,13 +580,23 @@ end check_sat
 
 /-! ### Where the answer was sat -/
 
-@[inherit_doc S.getValue]
+/-- The value of `term` in the model.
+
+```smtlib
+(get-value ( <term> ))
+```
+-/
 def getValue (term : Term) : s.EnvSat Term := runUnsafe' do s.toUnsafe.getValue term
 
-@[inherit_doc S.getValue]
+@[inherit_doc Cvc.Untyped.Solver.getValue]
 abbrev _root_.Cvc.Untyped.Term.getValue {s: Solver} (term : Term) : s.EnvSat Term := s.getValue term
 
-@[inherit_doc S.getValues]
+/-- The values of `terms` in the model.
+
+```smtlib
+(get-value ( <term>* ))
+```
+-/
 def getValues (terms : Terms) : s.EnvSat Terms := runUnsafe' do s.toUnsafe.getValues terms
 
 /-- The value the model gives a term, as the Lean value `α` denotes. -/
@@ -539,23 +607,48 @@ def getValueAs (α : Type) [TermToValue α] (term : Term) : s.EnvSat α := do
 def getValuesAs (α : Type) [TermToValue α] (terms : Terms) : s.EnvSat (Array α) := do
   (← s.getValues terms).mapM fun value => (Term.extractValue value : s.EnvSat α)
 
-@[inherit_doc S.getModelDomainElements]
+/-- The elements of the uninterpreted sort `sort` in the model, which interprets it as finite. -/
 def getModelDomainElements (sort : Srt) : s.EnvSat Terms :=
   runUnsafe' do s.toUnsafe.getModelDomainElements sort
 
-@[inherit_doc S.isModelCoreSymbol]
+/-- Whether the model value of the free constant `term` was essential for showing satisfiability.
+
+Always `true` unless the `model-cores` option is set. Experimental in cvc5.
+-/
 def isModelCoreSymbol (term : Term) : s.EnvSat Bool :=
   runUnsafe' do s.toUnsafe.isModelCoreSymbol term
 
-@[inherit_doc S.getModel]
+/-- The model, printed as SMT-LIB, over the uninterpreted sorts `sorts` and free constants `consts`.
+
+A subset of `consts` may be printed, depending on `isModelCoreSymbol`. Needs `produce-models`;
+experimental in cvc5.
+
+```smtlib
+(get-model)
+```
+-/
 def getModelAsString (sorts : Srts) (consts : Terms) : s.EnvSat String :=
   runUnsafe' do s.toUnsafe.getModel sorts consts
 
-@[inherit_doc S.blockModel]
+/-- Blocks the current model, as `mode` says, so that later checks look for another one.
+
+Needs `produce-models`; experimental in cvc5.
+
+```smtlib
+(block-model)
+```
+-/
 def blockModel (mode : Model.BlockMode) : s.EnvSat Unit :=
   runUnsafe' do s.toUnsafe.blockModel mode.toUnsafe
 
-@[inherit_doc S.blockModelValues]
+/-- Blocks the current model values of (at least) `terms`, so that later checks look for others.
+
+Needs `produce-models`; experimental in cvc5.
+
+```smtlib
+(block-model-values ( <term>+ ))
+```
+-/
 def blockModelValues (terms : Terms) : s.EnvSat Unit :=
   runUnsafe' do s.toUnsafe.blockModelValues terms
 
@@ -598,16 +691,38 @@ def blockModelValues! (terms : Terms) : Env Unit := (s.blockModelValues terms).t
 
 /-! ### Where the answer was unsat -/
 
-@[inherit_doc S.getUnsatAssumptions]
+/-- The assumptions the unsat answer rests on, among those `checkSat` was given in `assuming`.
+
+Needs `produce-unsat-assumptions`.
+
+```smtlib
+(get-unsat-assumptions)
+```
+-/
 def getUnsatAssumptions : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatAssumptions
 
-@[inherit_doc S.getUnsatCore]
+/-- An unsat core: assertions, and assumptions of the check if any, that are unsatisfiable together.
+
+Needs `produce-unsat-cores`. Unlike SMT-LIB, named and unnamed assertions are not told apart.
+
+```smtlib
+(get-unsat-core)
+```
+-/
 def getUnsatCore : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCore
 
 @[inherit_doc S.getUnsatCoreLemmas]
 def getUnsatCoreLemmas : s.EnvUnsat Terms := runUnsafe' do s.toUnsafe.getUnsatCoreLemmas
 
-@[inherit_doc S.getProof]
+/-- The proofs of the unsat answer for the component `pc`: the whole refutation by default.
+
+`full` answers one proof; the other components may answer several, one per lemma for instance.
+Needs `produce-proofs`; experimental in cvc5.
+
+```smtlib
+(get-proof :c)
+```
+-/
 def getUnsatProof (pc : Proof.Component := .full) : s.EnvUnsat (s.Proofs pc) :=
   runUnsafe' do s.toUnsafe.getProof pc.toUnsafe
 
@@ -628,12 +743,30 @@ def getUnsatProof! (pc : Proof.Component := .full) : Env (s.Proofs pc) :=
 
 /-! ### Where the answer was unknown -/
 
-@[inherit_doc S.getTimeoutCore]
+/-- A subset of the assertions that makes the solver time out, with the result of checking it.
+
+Each internal check is limited by the `timeout-core-timeout` option. On an unknown result caused by
+a timeout, the assertions are a timeout core; on an unsat result, an unsat core; on a sat result,
+the assertions are satisfiable and the core is empty. Experimental in cvc5.
+
+```smtlib
+(get-timeout-core)
+```
+-/
 def getTimeoutCore : s.EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCore
   return (Result.ofUnsafe res, terms)
 
-@[inherit_doc S.getTimeoutCoreAssuming]
+/-- A subset of `assumptions` that makes the solver time out when added to the assertions.
+
+Each internal check is limited by the `timeout-core-timeout` option. On an unknown result caused by
+a timeout, the assumptions answered are a timeout core; on an unsat result, they form an unsat core
+together with the assertions; on a sat result, the core is empty. Experimental in cvc5.
+
+```smtlib
+(get-timeout-core (<assert>*))
+```
+-/
 def getTimeoutCoreAssuming (assumptions : Terms) : s.EnvUnknown (Result × Terms) := runUnsafe' do
   let (res, terms) ← s.toUnsafe.getTimeoutCoreAssuming assumptions
   return (Result.ofUnsafe res, terms)
@@ -649,7 +782,7 @@ end
 
 namespace Proof variable {solver : Solver} (p : solver.Proof pc)
 
-@[inherit_doc cvc5.Proof.getRule]
+/-- The proof rule used by the root step of the proof. -/
 def getRule : ProofRule := cvc5.Proof.getRule p
 
 @[inherit_doc cvc5.Proof.getResult]

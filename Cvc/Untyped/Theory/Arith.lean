@@ -37,7 +37,7 @@ gen_untyped_view% from Cvc.Spec.Arith
 negative value rather than answer.
 -/
 
-@[inherit_doc T.getRealOrIntegerValueSign]
+/-- The sign of an integer or real value, `-1`, `0` or `1`, failing on any other term. -/
 def getSign (term : Term) : Res Int :=
   T.getRealOrIntegerValueSign term.toUnsafe |>.mapError Error.ofUnsafe
 

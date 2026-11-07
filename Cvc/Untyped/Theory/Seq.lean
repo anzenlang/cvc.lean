@@ -39,7 +39,11 @@ A Lean `Array` denotes an SMT sequence: the empty sequence, then one unit sequen
 concatenated.
 -/
 
-@[inherit_doc T.isSequenceValue]
+/-- Whether a term is a sequence value, of kind `CONST_SEQUENCE`.
+
+Such values are what a model answers; a sequence built from constructors, such as
+`seqConcat (seqUnit 0) (seqUnit 1)`, is not one even when its elements are values.
+-/
 def isSeqValue (term : Term) : Bool := T.isSequenceValue term.toUnsafe
 
 

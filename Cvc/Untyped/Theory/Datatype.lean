@@ -67,7 +67,7 @@ def mk (name : String) : Env Datatype.Ctor.Decl :=
 
 variable (d : Datatype.Ctor.Decl)
 
-@[inherit_doc DtCD.addSelector]
+/-- Adds a selector named `name`, of codomain sort `srt`. -/
 def addSelector (name : String) (srt : Srt) : Env Datatype.Ctor.Decl :=
   runUnsafe' do d.toUnsafe.addSelector name srt.toUnsafe
 
@@ -196,11 +196,11 @@ def countCtors : Nat := dt.toUnsafe.getNumConstructors
 def getCtorAt (idx : Fin dt.countCtors) : Datatype.Ctor :=
   dt.toUnsafe.getConstructorAt idx
 
-@[inherit_doc getCtorAt]
+/-- The constructor at index `idx`, `none` if there is none. -/
 def getCtorAt? (idx : Nat) : Option Datatype.Ctor :=
   if h : idx < dt.countCtors then dt.getCtorAt ⟨idx, h⟩ else none
 
-@[inherit_doc getCtorAt]
+/-- The constructor at index `idx`, failing if there is none. -/
 def getCtor (idx : Nat) : Res Datatype.Ctor := do
   let ub := dt.countCtors
   if h : idx < ub then return dt.getCtorAt ⟨idx, h⟩
@@ -215,7 +215,7 @@ instance [Monad m] : ForIn m Datatype Datatype.Ctor := inferInstanceAs (ForIn m 
 def getSelector (name : String) : Env Datatype.Selector :=
   runUnsafe' do dt.toUnsafe.getSelector name
 
-@[inherit_doc Dt.getParameters]
+/-- The sort parameters of this datatype, failing unless it is parametric. -/
 def getParameters : Env Srts := runUnsafe' do dt.toUnsafe.getParameters
 
 @[inherit_doc Dt.isParametric]
@@ -228,7 +228,10 @@ def isTuple : Bool := dt.toUnsafe.isTuple
 def isRecord : Bool := dt.toUnsafe.isRecord
 @[inherit_doc Dt.isFinite]
 def isFinite : Res Bool := dt.toUnsafe.isFinite
-@[inherit_doc Dt.isWellFounded]
+/-- Whether this datatype is well-founded.
+
+A datatype that is not a codatatype is well-founded when it has a value of finite size.
+-/
 def isWellFounded : Bool := dt.toUnsafe.isWellFounded
 
 end Datatype

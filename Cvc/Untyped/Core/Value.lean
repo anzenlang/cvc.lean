@@ -100,7 +100,7 @@ def getKind? (term : Term) : Option Kind := T.getKind? term.toUnsafe
 
 @[inherit_doc T.hasSymbol]
 def hasSymbol (term : Term) : Res Bool := T.hasSymbol term.toUnsafe |>.mapError Error.ofUnsafe
-@[inherit_doc T.getSymbol]
+/-- The symbol a term was built with (`Term.mkSymbol`, `BVar.mk`, …), failing if it has none. -/
 def getSymbol (term : Term) : Res String := T.getSymbol term.toUnsafe |>.mapError Error.ofUnsafe
 
 /-- The sub-terms of a term. -/

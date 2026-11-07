@@ -42,19 +42,19 @@ def mkNull (elm : Srt) : Env Term := do
 -- Takes the *element* sort, as every constructor of a polymorphic sort does; cvc5's own method
 -- wants the nullable sort, which is built here.
 
-@[inherit_doc cvc5.TermManager.mkNullableSome]
+/-- The nullable value holding `elem`, `nullable.some elem`. -/
 def nullableSome (elem : Term) : Env Term :=
   runUnsafe fun tm => tm.mkNullableSome elem
 
-@[inherit_doc cvc5.TermManager.mkNullableVal]
+/-- The element the nullable term `nullable` holds, `nullable.val`. -/
 def nullableVal (nullable : Term) : Env Term :=
   runUnsafe fun tm => tm.mkNullableVal nullable
 
-@[inherit_doc cvc5.TermManager.mkNullableIsNull]
+/-- Whether the nullable term `nullable` is null, `nullable.is_null`. -/
 def nullableIsNull (nullable : Term) : Env Term :=
   runUnsafe fun tm => tm.mkNullableIsNull nullable
 
-@[inherit_doc cvc5.TermManager.mkNullableIsSome]
+/-- Whether the nullable term `nullable` holds an element, `nullable.is_some`. -/
 def nullableIsSome (nullable : Term) : Env Term :=
   runUnsafe fun tm => tm.mkNullableIsSome nullable
 

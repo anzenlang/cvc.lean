@@ -32,7 +32,7 @@ gen_untyped_view% from Cvc.Spec.String
 
 /-! ## Values -/
 
-@[inherit_doc T.isStringValue]
+/-- Whether a term is a string value. -/
 def isStringValue (term : Term) : Bool := T.isStringValue term.toUnsafe
 
 /-- The value of a hexadecimal digit. -/
@@ -46,8 +46,11 @@ private def hexDigit? (c : Char) : Option Nat :=
 private def hexValue? (digits : List Char) : Option Nat :=
   digits.foldlM (fun acc d => (acc * 16 + ·) <$> hexDigit? d) 0
 
-/-- The characters an SMT-LIB string literal's contents stand for: `""` is a quote, `\u{d}` (one
-to five hex digits) and `\udddd` a code point; anything else stands for itself. -/
+/-- The characters an SMT-LIB string literal's contents stand for.
+
+`""` is a quote, `\u{d}` (one to five hex digits) and `\udddd` a code point, and anything else
+stands for itself.
+-/
 private partial def unescape : List Char → List Char
   | '"' :: '"' :: rest => '"' :: unescape rest
   | '\\' :: tl@('u' :: '{' :: rest) =>
