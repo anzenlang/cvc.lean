@@ -11,6 +11,8 @@ import CvcManual.Overview
 import CvcManual.Env
 import CvcManual.Sorts
 import CvcManual.Terms
+import CvcManual.Smt
+import CvcManual.Datatypes
 import CvcManual.Solver
 import CvcManual.Proofs
 
@@ -32,7 +34,7 @@ shortTitle := "Cvc.lean user manual"
 
 _Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on top of the [lean-cvc5 Lean library][lean-cvc5]. It adds a lot of quality of life features and strives to provide strong static guarantees. The following sections of this manual present the library in detail.
 
-[The Overview section](overview) showcases various features of cvc.lean to give an overview for newcomers to survey quickly. The rest of this document goes over the technical details needed to understand and use cvc.lean properly.
+{ref "overview"}[The Overview section] showcases various features of cvc.lean to give an overview for newcomers to survey quickly. The rest of this document goes over the technical details needed to understand and use cvc.lean properly.
 
 {include 1 CvcManual.Overview}
 
@@ -41,6 +43,10 @@ _Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on 
 {include 1 CvcManual.Sorts}
 
 {include 1 CvcManual.Terms}
+
+{include 1 CvcManual.Smt}
+
+{include 1 CvcManual.Datatypes}
 
 {include 1 CvcManual.Solver}
 
