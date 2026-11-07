@@ -21,7 +21,9 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
 - Toolchain: `leanprover/lean4:v4.35.0`, and the same in `CvcManual` — keep the two in step,
   with Verso's `rev` pinned to the same version tag. The API reference's project is generated and
   follows `lean-toolchain` on its own (see "Documentation").
-- One dependency: `cvc5 @ 41e4779` (`inputRev = "main"`, so `lake update` moves it).
+- One dependency: `cvc5 @ d19a134` (`inputRev = "main"`, so `lake update` moves it). lean-cvc5 tags
+  every commit with its short hash and attaches its build archives to that release; `d19a134` carries
+  a second tag, `0e593cc`, whose release Lake picks, with the same archives.
   `precompileModules := true` on the `cvc` package.
 - **No `lake update` is needed to build.** A fresh clone builds with `lake build` alone: Lake
   clones lean-cvc5 at the manifest's revision, and lean-cvc5's `cvc5Enums` build target downloads
