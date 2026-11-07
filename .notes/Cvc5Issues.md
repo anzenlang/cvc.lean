@@ -3,9 +3,9 @@
 Bugs and sharp edges found in cvc5 itself while building this wrapper. Everything here is at the
 **C++ API level** — reproduced against cvc5's own headers and static library, with no Lean and no
 [lean-cvc5](https://github.com/abdoo8080/lean-cvc5) involved, so that each entry is something the
-cvc5 maintainers can act on directly. The exceptions are entries 8 and 11, which concern
-lean-cvc5 rather than cvc5's API — the cvc5 build it distributes, and its C++ glue. Each is written
-as an issue to file against lean-cvc5.
+cvc5 maintainers can act on directly. The exceptions are entries 8, 11 and 12, which concern
+lean-cvc5 rather than cvc5's API — the cvc5 build it distributes, its C++ glue, and its docstrings.
+Each is written as an issue to file against lean-cvc5.
 
 This is not the list of things cvc.lean does not wrap — that is [MISSING.md](MISSING.md) — nor of
 things it has decided not to do, which is [TODO.md](TODO.md).
@@ -815,3 +815,48 @@ would mean carrying a fork of lean-cvc5.
 **What it costs a wrapper.** On Windows, cvc.lean's `Srt.any`, `Srt.abstract`, and building the sort
 of an abstract `Typ?` each fail with that error, or work, depending on the call. Its `CvcTests.Srt`
 fails there for that reason, which is what keeps Windows out of cvc.lean's CI.
+
+
+## 12. lean-cvc5 docstrings that describe another declaration, or are not Markdown
+
+**Severity: low.** Documentation only, but a library inheriting these docstrings
+(`@[inherit_doc cvc5.…]`) passes the mistakes on to its own users. Addressed to
+[lean-cvc5](https://github.com/abdoo8080/lean-cvc5) and written to be filed there as is.
+
+**Title:** Docstring fixes: copy-paste slips, typos, leftover reStructuredText
+
+### Summary
+
+At lean-cvc5 `41e4779`, in `cvc5.lean` unless noted:
+
+- `Term.isStringValue` carries `getIntegerValue`'s docstring: "Get the native integral value of an
+  integral value." It should read "Determine if this term is a string value."
+- `Solver.getUnsatAssumptions` says "Requires to enable option `produce-unsat-assumption`"; the
+  option is `produce-unsat-assumptions`.
+- `Sort.hasSymbol` is `Term.hasSymbol`'s docstring: "Determine if this term has a symbol (a name).
+  For example, free constants and variables have symbols."
+- `Sort.getSymbol` says "consrtucting", and names `Solver.mkUninterpretedSort`,
+  `Solver.mkUnresolvedSort` and `Solver.mkUninterpretedSortConstructorSort`, which are
+  `TermManager` functions.
+- `Sort.getArrayIndexSort` and `Sort.getArrayElementSort`: "The array index sort of an array index",
+  "The array element sort of an array index", for "of an array sort".
+- `DatatypeSelector.toString`: "Gte the string representation of this datatype selector."
+- `DatatypeConstructor.toString`: "A string representation of this datatype", for this constructor.
+- `DatatypeConstructorDecl.hash`: "Hash function for datatype declarations", for constructor
+  declarations.
+- `Datatype.isWellFounded`: "thre are no values".
+- `Proof.getRule`: "the proof rule used by the root step of the root", for "of the proof".
+- `InputLanguage`, in the generated `cvc5/Types.lean`: "The different reasons for returning an
+  "unknown" result", which is `UnknownExplanation`'s docstring. The file is generated from cvc5's
+  headers by `PreBuild.lean`, so the slip is either there or in the header.
+- `Solver.declareFun`, `getUnsatCore`, `getValue` and `getValues` still hold cvc5's reStructuredText
+  (`\verbatim embed:rst:leading-asterisk`, `.. code:: smtlib`, `\endverbatim`), which renders as
+  text; the other docstrings write the same SMT-LIB snippet as a ```` ```smtlib ```` fence.
+
+### Suggested fix
+
+Correct the wording as indicated above, and replace each `\verbatim` block with a
+```` ```smtlib ```` fence.
+
+**What it costs a wrapper.** cvc.lean gives these declarations docstrings of its own rather than
+inheriting lean-cvc5's.
