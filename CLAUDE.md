@@ -25,8 +25,8 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   `precompileModules := true` on the `cvc` package.
 - **No `lake update` is needed to build.** A fresh clone builds with `lake build` alone: Lake
   clones lean-cvc5 at the manifest's revision, and lean-cvc5's `cvc5Enums` build target downloads
-  the precompiled cvc5 for the platform — verified on a clean clone. The README still says
-  otherwise. lean-cvc5 has no post-update hook.
+  the precompiled cvc5 for the platform — verified on a clean clone. lean-cvc5 has no post-update
+  hook.
 - **TEMPORARY, to remove: a glibc shim on Linux.** lean-cvc5's Linux cvc5 was compiled against
   glibc ≥ 2.38 and references `__isoc23_strtol`/`__isoc23_fscanf`, which the older glibc Lean links
   executables against lacks, so no executable using the library linked on Linux, the manual's
