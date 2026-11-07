@@ -205,7 +205,8 @@ class TermToValues (fields : List (String × Type)) where
   ofTerms : [Ω] → List Untyped.Term → Env (Values fields)
 
 /-- A sort-erased term at any index, unchecked: the caller vouches for its sort. -/
-def ofErased (term : Untyped.Term) : Term gamma := term
+protected def ofErased (term : Untyped.Term) : Term gamma := term
+-- a declaration rather than a cast at its use, which an instance body could not unfold
 
 /-- The record term of a list of field terms, in the sort's order. -/
 def mkRecordOfTerms [ToTypFields fields] (terms : List Untyped.Term)
@@ -218,7 +219,7 @@ instance [A : TermToValue gamma] [R : TermToValues fields]
 : TermToValues ((name, gamma) :: fields) where
   ofTerms
     | [] => throwUser s!"record value has no argument for field `{name}`"
-    | term :: terms => do return (← A.termToValue (ofErased term), ← R.ofTerms terms)
+    | term :: terms => do return (← A.termToValue (Typed.ofErased term), ← R.ofTerms terms)
 
 /-- Builds the term of each of a record's field values. -/
 class ValuesToTerm (fields : List (String × Type)) where

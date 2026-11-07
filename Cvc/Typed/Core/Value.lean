@@ -64,7 +64,7 @@ class ValueToTerm (α : Type) where
   valueToTerm : [Ω] → α → Env (Term α)
 
 /-- A Lean type usable as a sort, in both directions. -/
-class abbrev SrtLike (α : Type) (β : Type := α) := ToTyp α, TermToValue α, ValueToTerm α
+class abbrev SrtLike (α : Type) := ToTyp α, TermToValue α, ValueToTerm α
 
 /-- The sort-erased conversion an instance of this layer's class induces. -/
 @[reducible]

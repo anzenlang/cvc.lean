@@ -259,7 +259,6 @@ macro_rules
 
 namespace Typed
 
-@[inherit_doc mkGrammarT]
 macro_rules
   | `(doElem| smt.letGrammar! $g ← $body) => do
     let pat ← Ext.letGrammarPattern g body

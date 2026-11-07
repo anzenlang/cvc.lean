@@ -58,7 +58,7 @@ def ofName (name : String) : Env Srt := do
   | some srt => return srt
   | none => throwUser <|
     s!"no sort named `{name}` has been declared in this scope; \
-declare the datatype before naming it"
+declare the sort before naming it"
 -- A *declared* sort — a datatype, an uninterpreted sort — is fresh every time it is created, so it
 -- cannot be rebuilt from a description the way `Srt.int` or `Srt.set` can. `Srt.datatype` and
 -- friends remember theirs in the scope's state, and this is how `Typ.toSrt` gets it back.

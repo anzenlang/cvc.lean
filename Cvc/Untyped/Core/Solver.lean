@@ -264,13 +264,13 @@ def pop (nscopes : UInt32 := 1) : Env Unit := runUnsafe' do s.toUnsafe.pop nscop
 
 Fails if a sort of that name was already declared in the scope.
 -/
-def declareSrt (symbol : String) (arity : UInt32) (fresh : Bool := false) : Env Srt := do
+def declareSrt (symbol : String) (arity : UInt32) : Env Srt := do
   Srt.checkFreshSortSymbol symbol
-  let srt ← runUnsafe' do s.toUnsafe.declareSort symbol arity fresh
+  let srt ← runUnsafe' do s.toUnsafe.declareSort symbol arity (fresh := true)
   registerSort symbol srt
   return srt
--- With `fresh := false` cvc5 would answer the existing sort for an existing name, but a name is
--- declared at most once per scope here, so `fresh` changes nothing.
+-- cvc5's `fresh := false` would answer the sort already declared under a name, but a name is
+-- declared at most once per scope here.
 
 
 

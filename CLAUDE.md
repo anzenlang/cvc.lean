@@ -367,8 +367,10 @@ Two consequences of `List (String × Typ)` worth knowing before editing:
   opaque pair is not a subterm;
 - `deriving Ord` needs a `local instance [Ord α] [Ord β] : Ord (α × β)`, since core has none.
   `Ord (List ·)` exists, `Hashable (· × ·)` exists — only the product order is missing, which is
-  why `Hashable` derived and `Ord` did not. It is `local` so the library does not impose an orphan
-  instance on its users.
+  why `Hashable` derived and `Ord` did not. The library does export one, `Cvc.instOrdProd` in
+  `Types/Tuple.lean`, since a set of tuples cannot be written without it; it is at low priority,
+  so another library's product order wins where both are present. Not `scoped`: a user spelling
+  `Cvc.Set (Int × Bool)` without opening `Cvc` would get an unexplained missing instance.
 
 `Srt.lean` covers **all 62 declarations of `cvc5.Sort`**, in three groups. The constructors, which
 live on cvc5's `TermManager` rather than on `Sort` (`Srt.bool`/`int`/…/`tuple`/`function`, plus
@@ -748,8 +750,9 @@ Three things worth knowing before touching these:
   value does. Bags and total maps are the exception: those readers walk the term's kind and
   children, so a built spine works. Asserting a `STORE_ALL` also needs cvc5's `--arrays-exp`.
 
-Two conversions remain unimplemented, both because cvc5 exposes no accessor: `getRegexValue` reads
-nothing back, and `ValueToTerm Regex` builds nothing. `getBagValue` also refuses the
+`Regex` has no value conversions at all, cvc5 exposing no accessor for a regex's language: an
+instance whose conversions always failed would let `getValue` at `Regex` compile and fail at run
+time. `getBagValue` also refuses the
 `BAG_INTER_MIN`/`BAG_DIFFERENCE_*` spines, which cvc5 never puts in a model.
 
 ## Substitution
@@ -1131,7 +1134,8 @@ false` unsolvable, `none` gave up) and `isSolved` fails on the third, exactly as
 found. A branch the caller omits falls back on `unexpectedSolved`/`unexpectedUnsolvable`/
 `unexpectedSynthUnknown`, which throw, dumping the *sygus constraints* where the sat versions dump
 the assertions. `checkSynthResult`/`checkSynthNextResult` are the raw forms, and `checkSynth?`
-defaults every branch to `return none` as `checkSat?` does.
+defaults the solved and unsolvable branches to `return none` and still fails on unknown, as
+`checkSat?` does.
 
 `checkSynthNext` lives in `EnvSolved` and *also* takes the three branches, returning `EnvSolvedT m
 α`: cvc5 requires it be called right after a successful check, and its own answer re-splits the

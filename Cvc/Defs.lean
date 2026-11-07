@@ -191,7 +191,6 @@ public section variable [Ω]
 
 export cvc5 (Kind SortKind Op ProofRule ProofRewriteRule)
 
-def1% Command ← cvc5.Command
 
 /-- A datatype declaration being built, which `Srt.datatype` turns into a sort. -/
 def2% Datatype.Decl ← cvc5.DatatypeDecl

@@ -145,7 +145,6 @@ private mk' ::
   sVars : SVars.TermTrace k
   /-- The counterexamples found, latest first: each one's step, trace and falsified candidates. -/
   falsified : List ((k : Nat) × SVars.ValueTrace k × Array String)
-  actlitCounter : Nat
 
 /-- `Sys.Bmc SVars k`, written `SVars.Bmc k`. -/
 abbrev _root_.Cvc.Typed.Symbols.Sig.Bmc := @Cvc.Typed.Sys.Bmc
@@ -163,7 +162,7 @@ def mk (sys : SVars.Sys) : Env (SVars.Bmc 0) := do
     idents := sys.idents
     next := fun curr next => sys.next curr next
     candidates := sys.candidates.map fun (name, pred) => (name, fun state => pred state)
-    solver, falsified := [], sVars := Trace.zero sVars0, actlitCounter := 0
+    solver, falsified := [], sVars := Trace.zero sVars0
   }
 
 /-- Whether every candidate has been falsified. -/

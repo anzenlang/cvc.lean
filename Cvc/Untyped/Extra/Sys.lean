@@ -147,8 +147,6 @@ private mk' ::
   Each holds its step, its trace, and the candidates it falsified.
   -/
   falsified : List ((k : Nat) × SV.ValueTrace k × Array String)
-  actlitCounter : Nat
--- `actlitCounter` is never read nor incremented.
 
 @[inherit_doc Cvc.Untyped.Sys.Bmc]
 abbrev _root_.Cvc.Untyped.Symbols.Bmc := @Cvc.Untyped.Sys.Bmc
@@ -168,7 +166,7 @@ def mk (sys : SVars.Sys) : Env (SVars.Bmc 0) := do
     idents := sys.idents
     next := fun curr next => sys.next curr next
     candidates := sys.candidates.map fun (name, pred) => (name, fun state => pred state)
-    solver, falsified := [], sVars := Trace.zero sVars0, actlitCounter := 0
+    solver, falsified := [], sVars := Trace.zero sVars0
   }
 
 /-- Whether every candidate has been falsified. -/

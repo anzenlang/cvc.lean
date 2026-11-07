@@ -445,7 +445,6 @@ macro_rules
 
 namespace Untyped
 
-@[inherit_doc mkGrammarU]
 macro_rules
   | `(doElem| smt.letGrammar! $g ← $body) => do
     let pat ← Ext.letGrammarPattern g body

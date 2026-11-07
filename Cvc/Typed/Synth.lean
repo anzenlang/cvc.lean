@@ -120,11 +120,14 @@ def checkSynthNext
 : s.EnvSolvedT m α :=
   U.checkSynthNext s ifSolved ifUnsolvable ifUnknown
 
-/-- `checkSynth`, whose branches default to `none`. -/
+/-- `checkSynth`, whose solved and unsolvable branches default to `none`.
+
+An unknown answer still fails, as with `checkSat?`.
+-/
 def checkSynth? {α : Type} (s : Solver)
   (ifSolved : s.EnvSolvedT m (Option α) := return none)
   (ifUnsolvable : s.EnvUnsolvableT m (Option α) := return none)
-  (ifUnknown : s.EnvSynthUnknownT m (Option α) := return none)
+  (ifUnknown : s.EnvSynthUnknownT m (Option α) := s.unexpectedSynthUnknown)
 : EnvT m (Option α) :=
   U.checkSynth? s ifSolved ifUnsolvable ifUnknown
 

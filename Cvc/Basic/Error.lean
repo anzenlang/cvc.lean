@@ -34,14 +34,6 @@ deriving Inhabited
 
 namespace Error
 
-/-- Used to allow `String` and `Unit → String` as context messages. -/
-class AsString (α : Type) : Type where
-  /-- Conversion to strings. -/
-  asString : α → String
-
-instance : AsString String := ⟨id⟩
-instance : AsString (Unit → String) := ⟨fun f => f ()⟩
-
 /-- Maps over an error's message. -/
 def mapMsg (f : String → String) : Error → Error
 | .internal msg => f msg |> .internal

@@ -59,7 +59,7 @@ end Srt
 
 A global instance: importing the library brings it into scope.
 -/
-instance instOrdProd [Ord α] [Ord β] : Ord (α × β) := lexOrd
+instance (priority := low) instOrdProd [Ord α] [Ord β] : Ord (α × β) := lexOrd
 -- Core provides no `Ord (α × β)`, leaving `lexOrd` a function so that the choice of order stays the
 -- user's. Making it an instance fixes that choice, and the choice is not idle: the comparator is a
 -- *type index* on `Std.TreeSet`/`Std.TreeMap`, so `Set (α × β)` means a different type under a

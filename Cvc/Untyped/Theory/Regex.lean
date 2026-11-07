@@ -36,17 +36,10 @@ gen_untyped_view% from Cvc.Spec.Regex
 
 /-! ## Values
 
-A regular expression converts neither way between a term and a `Cvc.Regex`: cvc5 exposes no
-accessor for the language a constant regex denotes. Both conversions of `SrtLike Regex` fail.
+A regular expression has no Lean value: cvc5 exposes no accessor for the language a constant regex
+denotes, so `Regex` has no value conversions. Read a model's regex as a term, with
+`Solver.getValue`.
 -/
-
-/-- Not implemented: always fails, cvc5 exposing no accessor for a regex's language. -/
-def getRegexValue (term : Term) : Env Regex :=
-  throwTodo s!"regex value extraction from a constant term: {term}"
-
-instance : SrtLike Regex where
-  valueToTerm _value := throwTodo "value-to-term for `Regex`"
-  termToValue t := t.getRegexValue
 
 end
 

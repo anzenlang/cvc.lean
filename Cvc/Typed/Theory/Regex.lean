@@ -38,16 +38,9 @@ gen_typed_view% from Cvc.Spec.Regex
 /-! ## Values
 
 A regular expression has no Lean value: cvc5 exposes no accessor for the language a constant regex
-denotes, so reading one (`getRegexValue`, `Solver.getValue`) and building one from a `Cvc.Regex`
-(`mkValue`) always fail. Read a model's regex as a term, with `Solver.getValueTerm`.
+denotes, so `Regex` has no value conversions. Read a model's regex as a term, with
+`Solver.getValueTerm`.
 -/
-
-/-- Always fails: cvc5 offers no way to read a regular expression back. -/
-def getRegexValue (term : Term Regex) : Env Regex := T.getRegexValue term
-
-instance : SrtLike Regex where
-  valueToTerm _value := throwTodo "value-to-term for `Regex`"
-  termToValue := getRegexValue
 
 end
 
