@@ -25,25 +25,26 @@ namespace Cvc
 /-! # A high-level, safety-oriented API for cvc5
 
 This library drives the [cvc5](https://cvc5.github.io) SMT solver from Lean. It sits on top of
-[lean-cvc5](https://github.com/abdoo8080/lean-cvc5), a thin binding over cvc5's C++ API, and its
-purpose is to turn the mistakes that binding reports at runtime — or does not report at all — into
-errors Lean reports at compile time.
+[lean-cvc5](https://github.com/abdoo8080/lean-cvc5), a thin binding over cvc5's C++ API, and turns
+the mistakes that binding reports at runtime, or does not report at all, into errors Lean reports at
+compile time.
+
+The [user manual](https://www.anzenlang.io/cvc.lean/manual/) explains the library in detail, and
+its [overview](https://www.anzenlang.io/cvc.lean/manual/Overview/) shows the main features on
+examples.
 
 ## Environments, `Ω`, and running them
 
 Everything cvc5 creates — sorts, terms, solvers — belongs to a *term manager*, and objects of two
 different managers must never meet. This library never shows you a term manager. In its place is the
 class `Ω`, whose instances stand for "the term manager of the current scope". Nearly every type and
-function takes one implicitly: `Term α`, `Srt` and `Solver` all mean "of the scope's
-manager", and two of them can only meet when they share one.
+function takes one implicitly, and two values can only meet when they share one.
 
-Work happens in the **environment monad** `Env`, itself (implicitly) parameterized by `Ω`. An `Env
-α` (or `@Env Ω α`) builds and manipulates terms, drives solvers, and can throw a `Cvc.Error`; it
-also lifts `IO`, so `println!` works inside it. `EnvT m` is the transformer, for a base monad other
-than `BaseIO`.
+Work happens in the **environment monad** `Env`. An `Env α` builds and manipulates terms, drives
+solvers, and can throw a `Cvc.Error`; it also lifts `IO`, so `println!` works inside it. `EnvT m` is
+the transformer, for a base monad other than `BaseIO`.
 
-**You cannot make an `Ω` yourself.** Its constructor is private, and the only place one comes from
-is running an environment:
+**You cannot make an `Ω` yourself**: running an environment is the only place one comes from.
 
 ```lean
 Env.run   : ([Ω] → Env α) → BaseIO (Res α)   -- errors as a value
@@ -52,51 +53,12 @@ EnvT.run  : ([Ω] → EnvT m α) → m (Res α)
 ```
 
 Each run creates a fresh term manager, hands your code an `Ω` standing for it, and is the whole
-lifetime of that manager. The `[Ω] →` in the argument is the point: `α` is chosen *outside*, where
-no `Ω` exists, so it cannot mention one. A `Term`, an `Srt` or a `Solver` therefore cannot escape a
-run — `Env.runIO (Term.mkInt 3) : IO (Term Int)` does not typecheck — while a Lean value read out of
-a model can. This is the `runST` discipline, applied to term managers.
+lifetime of that manager. Since `α` is chosen outside the run, a `Term`, an `Srt` or a `Solver`
+cannot escape it, while a Lean value read out of a model can.
 
-### Always write `Env` code with an `Ω` in scope
-
-The consequence for writing code is simple and worth following without exception: **every definition
-that mentions `Env`, `Term`, `Srt` or `Solver` takes an `Ω` instance**, most easily by opening a
-section with `variable [Ω]`. Such a definition does not pick a scope; it works in *whichever* scope
-calls it, and `Env.run` is called once, at the edge, to supply one.
-
-```lean
-open Cvc Typed
-
-section variable [Ω]
-
-/-- `x + x`, in whatever scope calls it. -/
-def double (x : Term Int) : Env (Term Int) := smt! x + x
-
-/-- Finds an `x` such that `double x = 6`. -/
-def solve : Env Int := do
-  let s ← Solver.new
-  s.setOption "produce-models" "true"
-  let x ← s.declareConstAs Int "x"
-  s.assert (← smt! ![double x] = 6)
-  s.checkSat (ifSat := s.getValue x)
-
-end
-
-#eval Env.runIO solve   -- 3
-```
-
-Without `variable [Ω]`, `def double … : Env (Term Int)` does not compile at all — `failed to
-synthesize Ω` — since there is no instance to find. The fix is never to look for one: it is to take
-it as a parameter. The alternative of writing everything inline, inside one `Env.runIO do …`, does
-work, but nothing in that block can be reused or tested on its own.
-
-Carrying an `Ω` everywhere costs nothing at runtime: its only field is a type, which the compiler
-erases, so an instance is passed as a constant scalar, with no allocation and no reference counting.
-It is not a `Prop`, and that matters. Proof irrelevance would make any two instances equal, so a
-term of one scope would also be a term of every other, and the only protection left would be that
-no instance exists outside a run, which nested runs defeat. As a `Type`, each run's `Ω` is its own:
-a term of an outer run is rejected by an inner one, and an inner term cannot be returned to the
-outer run.
+A definition mentioning `Env`, `Term`, `Srt` or `Solver` should take an `Ω` instance, most easily
+through `variable [Ω]`: it then works in whichever scope calls it, and `Env.run` is called once, at
+the edge. Without one, it fails to compile with `failed to synthesize Ω`.
 
 ## Two layers
 
@@ -108,10 +70,9 @@ Terms come in two flavours, which share the environment, the solver and the sort
   `Term (Set Bool)`, `Term (Int → Bool)`. A sort mistake is a Lean type error, and a model value
   comes back as an `Int`, a `Set Bool`, with nothing to convert.
 
-The two are the same type at runtime: `Typed.Term.erase` goes down for free, and
-`Untyped.Term.typeCheck` goes up by checking the term's sort. `open Cvc.Untyped` or
-`open Cvc.Typed` selects a layer, along with its spelling of the `smt!` DSL, which writes terms in
-something close to Lean's own notation: `smt! i + 2 * j ≤ k ∧ ¬ b`.
+`Typed.Term.erase` goes down for free, and `Untyped.Term.typeCheck` goes up by checking the term's
+sort. `open Cvc.Untyped` or `open Cvc.Typed` selects a layer, along with its spelling of the `smt!`
+notation, which writes terms in something close to Lean's own syntax: `smt! i + 2 * j ≤ k ∧ ¬ b`.
 
 ## Solving
 
@@ -123,9 +84,7 @@ answered, so one solver's model cannot be read through another.
 
 ## What to import
 
-This root module imports everything. That is convenient, but each theory's constructors are
-generated in a module of their own, per layer, so that a user compiles only the theories and the
-layer they import — and `smt!` accepts only the notations of the theories imported. Prefer
-importing `Cvc.Typed.Theory.Arith` and friends, or `Cvc.Untyped`, over `Cvc`, once you know
-which you need.
+This root module imports everything. Importing only the layer you use (`Cvc.Typed`, `Cvc.Untyped`)
+or only the theories you need (`Cvc.Typed.Theory.Arith`, …) compiles less, and `smt!` then accepts
+only the notations of the theories imported.
 -/
