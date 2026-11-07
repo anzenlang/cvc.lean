@@ -8,7 +8,7 @@ Authors: Adrien Champion
 module
 
 import Cvc.Typed
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Typed
 
 
@@ -17,11 +17,13 @@ public meta import Cvc.Typed
 
 The same terms as the sort-erased tour, with one difference that runs through everything: a term
 carries the Lean type its SMT sort denotes. `Term Int` and `Term Bool` are different types, so a
-sort mistake is a *Lean* error at the point it is written rather than a cvc5 error at check-sat,
-and a value read out of a model comes back as the Lean type it should be with nothing to convert.
+sort mistake is a *Lean* error at the point it is written rather than a cvc5 error when the term is
+built, and a value read out of a model comes back as the Lean type it should be with nothing to
+convert.
 
 `open Cvc.Typed` selects this layer, and with it the `smt!` spelling that expands to
-`Cvc.Typed.Term.…`.
+`Cvc.Typed.Term.…`. As in the sort-erased tour, `Env.runIO do …` runs a block in a fresh scope,
+which the instance `[Ω]` stands for.
 -/
 namespace Cvc.Typed.Examples.Tour
 
@@ -70,7 +72,8 @@ example : Env (Term Int) := smt! if a then i else j
 
 end indices
 
-/-! A sort mistake does not compile, where sort-erased it is a cvc5 error at check-sat. -/
+/-! A sort mistake does not compile, where sort-erased cvc5 refuses the term at run time. Lean's
+closing note, about `Term` being opaque, can be ignored. -/
 
 /--
 error: Application type mismatch: The argument
@@ -92,12 +95,12 @@ example (a : Term Bool) (i : Term Int) : Env (Term Bool) := Term.and a i
 
 /-! ## Datatypes
 
-A declared sort is fresh, so it cannot be rebuilt from a description — it is looked up by name in
-the scope's registry, and a Lean type is bound to that name by a `ToTyp` instance. From there the
-datatype's index is first-class: `Term Lst` is a term like any other.
+Declaring a datatype twice gives two different sorts, so the scope remembers each declared sort by
+its name, and a `ToTyp` instance ties a Lean type to that name. From there the datatype's index is
+first-class: `Term Lst` is a term like any other.
 -/
 
-/-- The Lean index standing for the SMT datatype `Lst`. -/
+/-- The Lean index standing for the SMT datatype `Lst`; it is only named in types, never built. -/
 structure Lst where private mk ::
   deriving DecidableEq, Ord, Hashable
 
@@ -131,7 +134,7 @@ match   : (match l (((cons h t) (* h 2)) (nil 0)))
   println! "head    : {← head.get one}"
   println! "is cons : {← consC.is l}"
 
-  -- a match binds each constructor's fields, and only the ones the body names are re-typed
+  -- a match binds each constructor's fields for its body
   println! "match   : {← smt!
     match l with
     | cons h t => h * 2
@@ -190,7 +193,7 @@ and they are Lean values: 10, 10
 
   (← smt! i + j = 10) |> s.assert
   (← smt! i - j = 4) |> s.assert
-  (← smt! ![pure u] &&& ![Term.mkBitVec 8 0x0f] = ![Term.mkBitVec 8 0x0a]) |> s.assert
+  (← smt! u &&& ![Term.mkBitVec 8 0x0f] = ![Term.mkBitVec 8 0x0a]) |> s.assert
 
   s.checkSat (ifSat := do
     let i : Int ← s.getValue i

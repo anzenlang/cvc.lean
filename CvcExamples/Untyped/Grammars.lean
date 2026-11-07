@@ -8,7 +8,7 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Untyped
 
 
@@ -21,10 +21,8 @@ whichever solver query should be restricted by it.
 
 Two things about grammars are worth knowing before writing one:
 
-- **the start symbol is named separately**, `mkGrammar boundVars start others`, rather than being
-  the head of one array. cvc5 treats the first non-terminal as the start symbol and then silently
-  drops whatever is unreachable from it, so passing them in the wrong order yields a grammar
-  containing neither the start symbol nor its rules, with no error at all;
+- **the start symbol is its own argument**, `mkGrammar boundVars start others`, and a non-terminal
+  the start symbol cannot reach is left out of the grammar;
 - **a grammar freezes once used.** The rule builders answer a new `Grammar`, so the API reads as
   though grammars were persistent, but the object underneath is shared: after `synthFun`, cvc5
   rejects further rules.
@@ -39,8 +37,7 @@ variable [Ω]
 
 /-! ## Building one
 
-`toString` on a grammar is its SyGuS pre-declaration followed by its rules, so it is a faithful
-picture of what was built rather than of what was asked for.
+`toString` on a grammar prints its non-terminals with their sorts, then its rules.
 -/
 
 /-- info: ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
@@ -125,8 +122,8 @@ where a solution was found.
   s.checkSynth (ifSolved := do
     println! "max := {← s.getSynthSolution mx}")
 
-/-! Without a grammar, `synthFun` allows any term of the right sort — the same specification is
-solved, but the shape of the answer is the solver's to choose. -/
+/-! Without a grammar, `synthFun` allows any term of the right sort, and the shape of the answer is
+the solver's to choose. -/
 
 /-- info: f := (lambda ((x Int)) (+ x 1))
 -/

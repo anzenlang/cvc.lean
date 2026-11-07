@@ -8,7 +8,7 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Untyped
 
 
@@ -26,6 +26,7 @@ namespace Cvc.Untyped.Examples.Views
 
 open Cvc Untyped
 
+-- `def.term_view` needs an `Ω` in scope
 public section variable [Ω]
 
 def.term_view V
@@ -169,6 +170,6 @@ field a of (__cvc5_record_a_Int_b_Bool_ctor 7 true)
   match V.of r with
   | .construct ctor args => println! "built by {ctor} from {args}"
   | _ => println! "something else"
-  match V.of (← smt! ![return r].a) with
+  match V.of (← smt! r.a) with
   | .selectField field arg => println! "field {field} of {arg}"
   | _ => println! "something else"

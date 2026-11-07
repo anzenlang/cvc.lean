@@ -8,15 +8,15 @@ Authors: Adrien Champion
 module
 
 import Cvc.Typed
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Typed
 
 
 
 /-! # Grammars, typed
 
-The same grammars as the sort-erased demo, with the index doing two jobs that are worth seeing
-side by side.
+The grammars of `CvcExamples.Untyped.Grammars` again, with the index doing two jobs that are worth
+seeing side by side.
 
 **A rule's sort cannot disagree with its non-terminal's.** Sort-erased that is a runtime error out
 of cvc5; here `addRule` takes a `Term α` at the non-terminal's own index, so it does not compile.
@@ -37,8 +37,8 @@ open Cvc Typed
 
 /-! ## Building one
 
-Parameters are collected in a `BVars` spine and non-terminals in `NTs`, so neither can come out
-empty by accident and the start symbol is named separately from the rest.
+Parameters are collected in a `BVars` spine, in order: pushing `x` then `y` gives a function of
+`x` then `y`. The start symbol is its own argument, the other non-terminals an `NTs` list.
 -/
 
 /-- info: ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
@@ -99,7 +99,7 @@ function is ordinary typed application, with no re-typing anywhere.
   let start ← NT.mk (α := Int) "start"
   let cnd ← NT.mk (α := Bool) "cnd"
 
-  let g ← s.mkGrammar (BVars.push y (BVars.push x [])) start (NTs.push cnd [])
+  let g ← s.mkGrammar (BVars.empty.push x |>.push y) start (NTs.push cnd [])
   let g ← g.addRule start x.toTerm
   let g ← g.addRule start y.toTerm
   let g ← g.addRule start (← Term.ite cnd.toTerm start.toTerm start.toTerm)
@@ -116,7 +116,7 @@ function is ordinary typed application, with no re-typing anywhere.
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {← s.getSynthSolution mx}")
 
 /-! Without a grammar, `synthAnyFun` folds the parameters and the codomain into the index itself,
 so the result is indexed just the same. -/
@@ -128,13 +128,13 @@ so the result is indexed just the same. -/
   s.setOption "sygus" "true"
 
   let x ← BVar.mk (α := Int) "x"
-  let f ← s.synthAnyFun (α := Int) "f" (BVars.push x [])
+  let f ← s.synthAnyFun (α := Int) "f" (BVars.empty.push x)
 
   let a ← s.declareSygusVar Int "a"
   s.addSygusConstraint (← smt! f a = a + 1)
 
   s.checkSynth (ifSolved := do
-    println! "f := {(← s.getSynthSolution f).erase}")
+    println! "f := {← s.getSynthSolution f}")
 
 
 
@@ -165,7 +165,7 @@ index is the same `Int → Int → Int`.
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {← s.getSynthSolution mx}")
 
 
 
@@ -211,7 +211,7 @@ def withConstants (g : Grammar σ) (nt : NT Int) (ks : List Int) : Env (Grammar 
   s.addSygusConstraint (← smt! f a = a + 10)
 
   s.checkSynth (ifSolved := do
-    println! "f := {(← s.getSynthSolution f).erase}")
+    println! "f := {← s.getSynthSolution f}")
 
 /-- The same with `smt.mkGrammar!`, whose parameter is not needed here. -/
 example (s : Solver) : Env (Grammar (Int → Int)) := do

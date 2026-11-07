@@ -7,22 +7,32 @@ Authors: Adrien Champion
 
 module
 
-meta import Cvc.Typed.Extra.Sys
-
 public import Cvc.Typed.Extra.Sys
 public import Cvc.Typed.Theory.Arith
 
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
+meta import Cvc.Typed.Extra.Sys
 
 
+
+/-! # Bounded model checking
+
+A transition system over a `structure.symbols` of state variables, and candidate invariants checked
+on it one step after another. The system is a stopwatch: `startStop` toggles `counting`, `count`
+grows by one per step while counting, and `reset` puts it back to zero. Each falsified candidate is
+reported with the run falsifying it; the others survive up to the bound.
+-/
 namespace Cvc.Typed.Examples.Bmc public section variable [Ω]
 
 
+/-- The stopwatch's state variables. -/
 structure.symbols Sv where
   startStop : Bool
   reset : Bool
   counting : Bool
   count : Int
 
+/-- The stopwatch, and the candidate invariants to check on it. -/
 def sys : Sys Sv where
   idents := Sv.idents
   init state := smt! state.counting = state.startStop ∧ state.count = 0
@@ -36,8 +46,10 @@ def sys : Sys Sv where
     ("count = 3", fun state => smt! state.count = 3),
   ]
 
+/-- A checker for `sys`, at step `0`. -/
 def bmc : Env (Sys.Bmc Sv 0) := Sys.Bmc.mk sys
 
+/-- Checks the candidates at each step, unrolling `ub` times, and prints each counterexample. -/
 partial def run (bmc : Sys.Bmc Sv k) (ub : Nat := 5) : Env Unit :=
   loop bmc ub
 where loop {k} (bmc : Sys.Bmc Sv k) : Nat → Env Unit
@@ -54,8 +66,9 @@ where loop {k} (bmc : Sys.Bmc Sv k) : Nat → Env Unit
     println! "{falsified.size} candidate(s) falsified at {k}"
     for name in falsified do
       println! "- {name}"
+    -- the counterexample `check` just recorded: its step, then its trace and candidates
     let some cex := bmc.falsified[0]?
-      | throwInternal "expected cex"
+      | throwUnreachable "`check` records the counterexample it reports"
     println! "cex"
     cex.2.1.iterM fun {k} values => do
       println! "- @{k} \{ \

@@ -8,7 +8,7 @@ Authors: Adrien Champion
 module
 
 import Cvc.Untyped
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Untyped
 
 
@@ -21,6 +21,10 @@ twice — no index to write down, no `ToTyp` to satisfy.
 
 `open Cvc.Untyped` selects this layer, and with it the `smt!` spelling that expands to
 `Cvc.Untyped.Term.…`.
+
+Terms, sorts and solvers live in a *scope*: `Env.runIO do …` runs a block in a fresh one, and the
+instance `[Ω]` stands for it. `variable [Ω]` lets a top-level definition, such as `declareLst`
+below, belong to whichever scope uses it.
 -/
 namespace Cvc.Untyped.Examples.Tour
 

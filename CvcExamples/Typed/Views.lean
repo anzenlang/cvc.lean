@@ -8,7 +8,7 @@ Authors: Adrien Champion
 module
 
 import Cvc.Typed
-
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
 public meta import Cvc.Typed
 
 
@@ -27,6 +27,7 @@ namespace Cvc.Typed.Examples.Views
 
 open Cvc Typed
 
+-- `def.term_view` needs an `Ω` in scope
 public section variable [Ω]
 
 def.term_view V
@@ -140,7 +141,7 @@ literals are folded into one literal.
 
 /-- The integer literals `ks` are, if they all are. -/
 def literals (ks : Kids Int) : Option (List Int) :=
-  ks.val.toList.mapM fun k => (k.getIntValue.run).toOption
+  ks.val.toList.mapM (·.getIntValue?)
 
 /-- Folds integer sums and products of literals, bottom-up, counting the folds. -/
 def foldConstants (t : Term Bool) : Env (Term Bool × Nat) :=

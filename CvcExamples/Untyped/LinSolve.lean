@@ -13,18 +13,26 @@ public import Cvc.Untyped.Core.Solver
 
 
 
+/-! # A linear-arithmetic solver over a symbols structure
+
+`LinSolve.run` takes the symbols to declare and named constraints over them, and answers either a
+model, as Lean values, or the names of the constraints an unsat core holds. The symbols are a
+`structure.symbols`, so a model's values are read off by field name.
+-/
 namespace Cvc.Untyped.Examples public section
 
 
 
 namespace LinSolve open Cvc Untyped variable {Syms : Symbols.Sig}
 
+/-- What `run` answers. -/
 inductive Result (S : Symbols Syms)
 | sat (values : Syms.Values)
 | unsat (core : Array String)
 | unknown
 | error (e : Error)
 
+/-- A solver holding the symbols and the named constraints asserted over them. -/
 structure State [Ω] (S : Symbols Syms) where
   solver : Solver
   terms : Syms.Terms
@@ -32,6 +40,7 @@ structure State [Ω] (S : Symbols Syms) where
 
 namespace State variable [Ω] [S : Symbols Syms]
 
+/-- Declares the symbols on a fresh solver and asserts the constraints. -/
 def init (vars : Syms.Idents) (constraints : Array (String × Syms.Fun)) : Env (State S) := do
   let terms ← vars.declare
   let solver ← Solver.new
@@ -45,9 +54,11 @@ def init (vars : Syms.Idents) (constraints : Array (String × Syms.Fun)) : Env (
 
 section variable (state : State S)
 
+/-- The symbols' values in the model. -/
 def getValues : state.solver.EnvSat Syms.Values :=
   state.solver.getSymbolValues state.terms
 
+/-- The names of the constraints in the unsat core. -/
 def getUnsatCore : state.solver.EnvUnsat (Array String) := do
   let core ← state.solver.getUnsatCore
   let mut core' := Array.mkEmpty core.size
@@ -57,10 +68,12 @@ def getUnsatCore : state.solver.EnvUnsat (Array String) := do
     core' := core'.push name
   return core'
 
+/-- Checks the constraints, answering a model, an unsat core or `unknown`. -/
 def check : Env (Result S) := do
   state.solver.checkSat
     (ifSat := Result.sat <$> state.getValues)
     (ifUnsat := Result.unsat <$> state.getUnsatCore)
+    (ifUnknown := fun _ => return .unknown)
 
 end
 
@@ -68,6 +81,7 @@ end State
 
 
 
+/-- Solves `constraints` over `symbols`, in a scope of its own. -/
 def run [S : Symbols Syms]
   (symbols : Syms.Idents) (constraints : [Ω] → Array (String × Syms.Fun))
 : BaseIO (Result S) := do
@@ -87,7 +101,7 @@ namespace LinSolve
 
 namespace Test1 open scoped Cvc.Untyped
 
-/-- Symbol structure with all necessary helpers. -/
+/-- Three rational unknowns. -/
 structure.symbols Syms where
   x : Rat
   y : Rat
@@ -113,13 +127,13 @@ def unsat := sat.push c4
 
 end Constraints
 
-def testSat : IO Unit := do
-  let idents := Syms.idents
-  match ← LinSolve.run idents Constraints.sat with
+/-- Solves `constraints` and prints the answer. -/
+def test (constraints : [Ω] → Array (String × Syms.Fun)) : IO Unit := do
+  match ← LinSolve.run Syms.idents constraints with
   | .sat values =>
     println! "sat:\n- x := {values.x}\n- y := {values.y}\n- z := {values.z}"
   | .unsat core =>
-    println! "unsat by{core.foldl (init := "") (s!"{·}\n{·}")}"
+    println! "unsat by{core.foldl (init := "") (s!"{·}\n- {·}")}"
   | .unknown => println! "failed to reach a conclusion"
   | .error e => println! "an error occurred\n{e}"
 
@@ -129,23 +143,13 @@ info: sat:
 - y := 5/11
 - z := 35/11
 -/
-#guard_msgs in #eval testSat
-
-def testUnsat : IO Unit := do
-  let idents := Syms.idents
-  match ← LinSolve.run idents Constraints.unsat with
-  | .sat values =>
-    println! "sat:\n- x := {values.x}\n- y := {values.y}\n- z := {values.z}"
-  | .unsat core =>
-    println! "unsat by{core.foldl (init := "") (s!"{·}\n- {·}")}"
-  | .unknown => println! "failed to reach a conclusion"
-  | .error e => println! "an error occurred\n{e}"
+#guard_msgs in #eval test Constraints.sat
 
 /--
 info: unsat by
 - c1
 - c4
 -/
-#guard_msgs in #eval testUnsat
+#guard_msgs in #eval test Constraints.unsat
 
 end Test1
