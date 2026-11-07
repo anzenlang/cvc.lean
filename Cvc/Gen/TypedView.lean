@@ -633,7 +633,7 @@ def genCtor (spec : OpSpec) (theory untyped part : Name) (head : Head)
       binders := binders.push (← `(bracketedBinder| ($(mkIdent arg.name) : $id_Cvc_Typed_Term $ty)))
       kidArgs := kidArgs.push (← `($id_Cvc_Typed_View_reindex $k))
   let ctor ← `(Parser.Command.ctor|
-    $(viewDoc spec.doc):docComment | $(mkIdent spec.id):ident $binders*)
+    $(viewDoc (viewCtorDoc spec nary)):docComment | $(mkIdent spec.id):ident $binders*)
   -- the alternative: the sort's head and the sort-erased constructor, then the conversion
   let at_ ← atHead head.name
   let holes : Array Term ← (List.replicate (1 + head.params.size) 0).toArray.mapM fun _ => `(_)
@@ -690,7 +690,9 @@ def elabGenTypedView : CommandElab
           ctors := ctors.push { name := spec.id, part := some (part, h) }
           kinds := kinds.push spec.kind
       if partCtors.isEmpty then continue
-      let doc := viewDoc s!"`{theoryName}`'s operators producing {head.wrapper}."
+      let produces := if h == `any then "whose result's sort is a type variable"
+        else s!"with a result of sort `{head.wrapper}`"
+      let doc := viewDoc s!"`{theoryName}`'s operators {produces}."
       elabCommand (← `($doc:docComment
         inductive $(mkIdent (`_root_ ++ part)) $(head.params)* where $partCtors*))
       let at_ ← liftMacroM (atHead h)
@@ -698,7 +700,9 @@ def elabGenTypedView : CommandElab
       let implicitTau ← if h == `any then
           pure #[← `(bracketedBinder| {$(mkIdent `τ) : $id_Cvc_Typ})]
         else pure #[]
+      let thDoc := viewDoc s!"An operator {produces}."
       thCtors := thCtors.push (← `(Parser.Command.ctor|
+        $thDoc:docComment
         | $(mkIdent h):ident $implicitTau* $(at_.fields)* (v : $partTy)
           : $(mkIdent theory) $(at_.index)))
     if thCtors.isEmpty then return
@@ -766,19 +770,29 @@ def elabTypedTermView : CommandElab
     -- the aggregate
     let tau := mkIdent `τ
     let term ← `($id_Cvc_Typed_Term ($id_Cvc_Typ_Denote $tau))
+    let valueDoc := viewDoc "A value: a literal, a constant array or an uninterpreted sort's value."
+    let symbolDoc := viewDoc "A declared constant, by its name."
+    let bvarDoc := viewDoc "A bound variable."
+    let otherDoc := viewDoc "A term no imported theory's view takes apart at its sort."
     let mut variants := #[
       ← `(Parser.Command.ctor|
+        $valueDoc:docComment
         | $(mkIdent `value):ident {$tau : $id_Cvc_Typ} (t : $term) : $aggId $tau),
       ← `(Parser.Command.ctor|
+        $symbolDoc:docComment
         | $(mkIdent `symbol):ident {$tau : $id_Cvc_Typ} (name : _root_.String) : $aggId $tau),
       ← `(Parser.Command.ctor|
+        $bvarDoc:docComment
         | $(mkIdent `bvar):ident {$tau : $id_Cvc_Typ}
             (x : $id_Cvc_Typed_BVar ($id_Cvc_Typ_Denote $tau)) : $aggId $tau)]
     for vw in views do
+      let theoryDoc := viewDoc s!"An operator of `{vw.theory}`, taken apart by that theory's view."
       variants := variants.push (← `(Parser.Command.ctor|
+        $theoryDoc:docComment
         | $(mkIdent (theoryVariant vw.theory)):ident {$tau : $id_Cvc_Typ}
             (v : $(mkIdent vw.view) $tau) : $aggId $tau))
     variants := variants.push (← `(Parser.Command.ctor|
+      $otherDoc:docComment
       | $(mkIdent `other):ident {$tau : $id_Cvc_Typ} (t : $term) : $aggId $tau))
     let doc := viewDoc "A term of any sort, taken apart one level."
     elabCommand (← `($doc:docComment inductive $aggId : $id_Cvc_Typ → Type where $variants*))
@@ -822,7 +836,8 @@ def elabTypedTermView : CommandElab
           | none => pure (#[], Syntax.mkApp (mkIdent ctorName) (named.map (⟨·.raw⟩)))
         -- no result type: with one, the binders' holes would be resolved before the body is seen
         elabCommand (← `(
-          @[match_pattern] abbrev $(mkIdent (agg ++ c.name)) $implicits* $binders* :=
+          @[match_pattern, inherit_doc $(mkIdent ctorName)]
+          abbrev $(mkIdent (agg ++ c.name)) $implicits* $binders* :=
             $variant $inner))
     -- the viewer: the kind, routed to its theory
     let t := mkIdent `t
@@ -866,8 +881,13 @@ end Cvc.TypedView
 
 namespace Cvc.Typed
 
-/-- Generates the typed view `V` of every imported theory, `def.typed_term_view` under
-`open Cvc.Typed`; see `Cvc.Gen.TypedView`. -/
+/-- Declares `V : Typ → Type`, a term of sort `τ` taken apart one level, over every theory imported.
+
+`V.of τ t` takes `t` apart; a match on the sort and the view together refines both
+(`| .int, .add kids` gives `kids : Kids Int`). Besides the operators, `V` has the leaves `.value`,
+`.symbol` and `.bvar`, and `.other` for a term no imported theory takes apart. Needs
+`variable [Ω]` in scope.
+-/
 scoped syntax "def.term_view " ident : command
 
 macro_rules

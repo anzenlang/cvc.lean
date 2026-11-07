@@ -26,8 +26,8 @@ structure.symbols MySymbols where
 ```
 
 and what is generated is the structure the `Symbols` class actually wants — parameterized by the
-`Wrap`, with every field wrapped in it — plus the `Idents`/`Terms`/`Values` aliases and the
-instance:
+`Wrap`, with every field wrapped in it — plus one alias per `Symbols.Sig` type (`Idents`, `Terms`,
+`Values`, …), the `idents` naming each symbol, and the instance:
 
 ```lean
 structure MySymbols (W : Symbols.Wrap) where
@@ -35,8 +35,8 @@ structure MySymbols (W : Symbols.Wrap) where
   count : W Int
 ```
 
-**A symbol's name is its field's name**, as a string. Nothing else is generated: `declare`,
-`getValues` and `findCex` are generic over the `Sig`, so the instance is the whole obligation.
+**A symbol's name is its field's name**, as a string. `declare`, `getValues` and `findCex` are
+generic over the `Sig`, so nothing beyond the instance is needed for them.
 
 This module holds what both layers share. Each layer declares its own `scoped` spelling of the
 command, so `open Cvc.Untyped` selects the sort-erased one exactly as it selects `smt!`.
@@ -145,10 +145,13 @@ def elabSymbols (root : Name) (extras : Array (Name × Bool))
     -- applied with `@`, which fills no default: without it, `Fun2At`'s optional `k'` would be fixed
     -- to its default `k + 1` here, rather than left in the alias's type for its users to fill
     let body ← if omega then `(@$sigName _ $id) else `(@$sigName $id)
-    cmds := cmds.push (← `(command| abbrev $(mkIdent (ns ++ name)) $[$args]* := $body))
+    cmds := cmds.push
+      (← `(command| @[inherit_doc $sigName] abbrev $(mkIdent (ns ++ name)) $[$args]* := $body))
   let identsId := mkIdent (ns ++ `idents)
   let IdentsId := mkIdent (ns ++ `Idents)
-  cmds := cmds.push (← `(command| def $identsId : $(IdentsId) := ⟨$identArgs,*⟩))
+  cmds := cmds.push (← `(command|
+    /-- The symbols' identifiers: each symbol is named after its field. -/
+    def $identsId : $(IdentsId) := ⟨$identArgs,*⟩))
   cmds := cmds.push (← `(command| instance : $(mkIdent (root ++ `Symbols)) $id where
     idents _ := $identsId
     mapM syms f := return ⟨$mapArgs,*⟩

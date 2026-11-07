@@ -106,6 +106,10 @@ def viewValueKinds : Array Name := #[`CONST_BOOLEAN, `CONST_INTEGER, `CONST_RATI
 def viewDoc (s : String) : TSyntax ``Lean.Parser.Command.docComment :=
   mkNode ``Lean.Parser.Command.docComment #[mkAtom "/--", mkAtom (s ++ " -/")]
 
+/-- A view constructor's docstring: its entry's, plus where the operands are when `nary`. -/
+def viewCtorDoc (spec : OpSpec) (nary : Bool) : String :=
+  if nary then spec.doc ++ "\n\n`kids` holds every operand, two or more." else spec.doc
+
 
 
 /-! ## A theory's sort-erased view -/
@@ -131,7 +135,7 @@ def genUntypedCtor (spec : OpSpec) (view : Name) : MacroM (Except String ViewCto
   binders := binders ++ (← kidIds.mapM fun k =>
     if nary then `(bracketedBinder| ($k : $viewKidsId)) else `(bracketedBinder| ($k : $viewTermId)))
   let ctor ← `(Lean.Parser.Command.ctor|
-    $(viewDoc spec.doc):docComment | $(mkIdent spec.id):ident $binders*)
+    $(viewDoc (viewCtorDoc spec nary)):docComment | $(mkIdent spec.id):ident $binders*)
   -- the viewer's alternative: the kids, matched against the arity, then the indices
   let t := mkIdent `viewed
   let app ← `($ctorId $idxIds* $kidIds*)
@@ -250,15 +254,24 @@ def elabUntypedTermView : CommandElab
           throwError m!"`{agg}`: `{c}` names an operator of `{vw.view}` and something of `{other}`"
         names := names.push (c, vw.view)
     -- the aggregate
+    let valueDoc := viewDoc "A value: a literal, a constant array or an uninterpreted sort's value."
+    let symbolDoc := viewDoc "A declared constant, by its name."
+    let bvarDoc := viewDoc "A bound variable."
+    let otherDoc := viewDoc "A term no imported theory's view takes apart."
     let mut variants := #[
-      ← `(Lean.Parser.Command.ctor| | $(mkIdent `value):ident (t : $viewTermId)),
-      ← `(Lean.Parser.Command.ctor| | $(mkIdent `symbol):ident (name : _root_.String)),
-      ← `(Lean.Parser.Command.ctor| | $(mkIdent `bvar):ident (x : $viewBVarId))]
+      ← `(Lean.Parser.Command.ctor|
+        $valueDoc:docComment | $(mkIdent `value):ident (t : $viewTermId)),
+      ← `(Lean.Parser.Command.ctor|
+        $symbolDoc:docComment | $(mkIdent `symbol):ident (name : _root_.String)),
+      ← `(Lean.Parser.Command.ctor|
+        $bvarDoc:docComment | $(mkIdent `bvar):ident (x : $viewBVarId))]
     for vw in views do
+      let theoryDoc := viewDoc s!"An operator of `{vw.theory}`, taken apart by that theory's view."
       variants := variants.push (← `(Lean.Parser.Command.ctor|
+        $theoryDoc:docComment
         | $(mkIdent (theoryVariant vw.theory)):ident (v : $(mkIdent vw.view))))
-    variants := variants.push
-      (← `(Lean.Parser.Command.ctor| | $(mkIdent `other):ident (t : $viewTermId)))
+    variants := variants.push (← `(Lean.Parser.Command.ctor|
+      $otherDoc:docComment | $(mkIdent `other):ident (t : $viewTermId)))
     let doc := viewDoc "A sort-erased term, taken apart one level."
     elabCommand (← `($doc:docComment inductive $aggId where $variants*))
     -- one abbreviation per operator, its binders read off the view's constructor
@@ -276,7 +289,8 @@ def elabUntypedTermView : CommandElab
           else `(bracketedBinder| {$(mkIdent n) : _})
         -- no result type: with one, the binders' holes would be resolved before the body is seen
         elabCommand (← `(
-          @[match_pattern] abbrev $(mkIdent (agg ++ c)) $binders* :=
+          @[match_pattern, inherit_doc $(mkIdent ctorName)]
+          abbrev $(mkIdent (agg ++ c)) $binders* :=
             $(mkIdent (agg ++ theoryVariant vw.theory))
               (@$(mkIdent ctorName) _ $(fields.map (mkIdent ·.1))*)))
     -- the viewer: the kind, routed to its owner
@@ -315,8 +329,12 @@ end
 
 namespace Untyped
 
-/-- Generates the sort-erased view `V` of every imported theory, `def.untyped_term_view` under
-`open Cvc.Untyped`; see `Cvc.Gen.View`. -/
+/-- Declares `V`, a sort-erased term taken apart one level, over every theory imported.
+
+`V.of t` takes `t` apart; a match on it names operators directly (`.add kids`, `.ite c a b`), the
+leaves `.value`, `.symbol` and `.bvar`, or `.other` for a term no imported theory takes apart. Needs
+`variable [Ω]` in scope.
+-/
 scoped syntax "def.term_view " ident : command
 
 macro_rules
