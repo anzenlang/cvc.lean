@@ -12,7 +12,8 @@ things it has decided not to do, which is [TODO.md](TODO.md).
 
 Found against **cvc5 1.3.2** (`git 86cecd8`, macOS arm64 static release, built 2025-12-12), the
 build vendored under `.lake/packages/cvc5/cvc5-macOS-arm64-static/`, reached through lean-cvc5
-`a3ffc29`.
+`a3ffc29`. lean-cvc5's latest revision, `d19a134` (2026-11-02), still downloads that release. The
+entries addressed to lean-cvc5 are stated against `d19a134`.
 
 ## Reproducing
 
@@ -374,7 +375,7 @@ presumably why lean-cvc5's own test suite, a library, has never shown it.
 `lean-toolchain`:
 
 ```
-leanprover/lean4:v4.34.0
+leanprover/lean4:v4.35.0
 ```
 
 `lakefile.toml`:
@@ -386,7 +387,7 @@ defaultTargets = ["repro"]
 [[require]]
 name = "cvc5"
 git = "https://github.com/abdoo8080/lean-cvc5"
-rev = "41e47796d4d15712e6064b064ca5d251a1283955"
+rev = "d19a134c237ec7f0cb86c2027062eedeb577a9a9"
 
 [[lean_exe]]
 name = "repro"
@@ -418,9 +419,10 @@ clang: error: linker command failed with exit code 1 (use -v to see invocation)
 ```
 
 That output is from GitHub Actions' `ubuntu-latest`, linking an executable of a project that
-depends on lean-cvc5 at that revision through cvc.lean, on Lean v4.35.0. The minimal project above
-was not run as such; its `Main.lean` typechecks against that revision, and the link it ends with is
-the same.
+depends on lean-cvc5 `41e4779` through cvc.lean, on Lean v4.35.0. `d19a134` differs from `41e4779`
+only in its Lean version: it downloads the same cvc5 release and links it the same way. The minimal
+project above was not run as such; its `Main.lean` typechecks against that `cvc5.lean`, and the link
+it ends with is the same.
 
 ### Cause
 
@@ -737,8 +739,8 @@ def main : IO Unit := do
 ```
 
 Run on macOS arm64, as `#eval main`, it prints `ok: ?BITVECTOR_TYPE`. On GitHub Actions'
-`windows-latest` (MSYS2's CLANG64, Lean v4.35.0, lean-cvc5 at that revision through cvc.lean), the
-same call for `BITVECTOR_SORT`, made by cvc.lean's tests, failed with
+`windows-latest` (MSYS2's CLANG64, Lean v4.35.0), the same call for `BITVECTOR_SORT`, made by
+cvc.lean's tests through lean-cvc5 `41e4779`, whose `ffi/ffi.cpp` is `d19a134`'s, failed with
 
 ```
 cannot construct abstract type for kind UNDEFINED_SORT_KIND
@@ -827,7 +829,7 @@ fails there for that reason, which is what keeps Windows out of cvc.lean's CI.
 
 ### Summary
 
-At lean-cvc5 `41e4779`, in `cvc5.lean` unless noted:
+At lean-cvc5 `d19a134`, in `cvc5.lean` unless noted:
 
 - `Term.isStringValue` carries `getIntegerValue`'s docstring: "Get the native integral value of an
   integral value." It should read "Determine if this term is a string value."
