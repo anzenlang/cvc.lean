@@ -154,6 +154,7 @@ enum_def% Float.RoundingMode ← cvc5.RoundingMode
   /-- To the nearest representable number, ties away from zero. -/
   | nearestTiesToAway ← ROUND_NEAREST_TIES_TO_AWAY
 
+/-- How a solver's `blockModel` blocks a model. -/
 enum_def% Model.BlockMode ← cvc5.BlockModelsMode
   /-- Block models based on the SAT skeleton. -/
   | literals ← LITERALS

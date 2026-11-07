@@ -48,7 +48,9 @@ def% regex := getRegExpSort
 def% roundingMode := getRoundingModeSort
 def% bitVec size := mkBitVectorSort
 def% float exp sig := mkFloatingPointSort
-def% finiteField size := mkFiniteFieldSort
+
+/-- The sort of the finite field with `size` elements, `size` being prime. -/
+def finiteField (size : Nat) : Env Srt := lift% mkFiniteFieldSort size
 
 end
 
@@ -246,7 +248,13 @@ is% isDatatypeTester := isDatatypeTester
 is% isDatatypeUpdater := isDatatypeUpdater
 is% isUninterpreted := isUninterpretedSort
 is% isUninterpretedSortConstructor := isUninterpretedSortConstructor
-is% isInstantiated := isInstantiated
+
+/-- Whether this sort instantiates a parametric datatype or an uninterpreted sort constructor.
+
+cvc5 also answers `true` for a datatype sort without parameters: a non-empty
+`getInstantiatedParameters` is the reliable test. See `Srt.instantiate`.
+-/
+def isInstantiated (srt : Srt) : Bool := S.isInstantiated srt.toUnsafe
 
 end testers
 
@@ -260,6 +268,8 @@ fails elsewhere, the `?`-suffixed one answers `none`.
 
 section accessors
 
+-- Accessors whose lean-cvc5 docstring is wrong for ours are written out by hand rather than
+-- through `get%`, which inherits it.
 scoped macro "get% " id:ident " : " ty:term " := " fn:ident : command =>
   let fnId := ``S |>.append fn.getId |> Lean.mkIdent
   let fnOptId := ``S |>.append (fn.getId.appendAfter "?") |> Lean.mkIdent
@@ -272,8 +282,20 @@ scoped macro "get% " id:ident " : " ty:term " := " fn:ident : command =>
 /-! ### Any sort -/
 
 get% getKind : cvc5.SortKind := getKind
-get% hasSymbol : Bool := hasSymbol
-get% getSymbol : String := getSymbol
+
+/-- Whether this sort has a symbol, a name; see `getSymbol`. -/
+def hasSymbol (srt : Srt) : Res Bool := S.hasSymbol srt.toUnsafe |>.mapError Error.ofUnsafe
+@[inherit_doc hasSymbol]
+def hasSymbol? (srt : Srt) : Option Bool := S.hasSymbol? srt.toUnsafe
+
+/-- The symbol of this sort, its name.
+
+It is the name given to `Srt.uninterpreted`, `Srt.uninterpretedConstructor` or
+`Srt.unresolvedDatatype`.
+-/
+def getSymbol (srt : Srt) : Res String := S.getSymbol srt.toUnsafe |>.mapError Error.ofUnsafe
+@[inherit_doc getSymbol]
+def getSymbol? (srt : Srt) : Option String := S.getSymbol? srt.toUnsafe
 
 /-! ### Sized and parameterized sorts -/
 
@@ -284,8 +306,18 @@ get% getFloatSignificandSize : UInt32 := getFloatingPointSignificandSize
 
 /-! ### Containers -/
 
-get% getArrayIndexSort : Srt := getArrayIndexSort
-get% getArrayElementSort : Srt := getArrayElementSort
+/-- The index sort of an array sort. -/
+def getArrayIndexSort (srt : Srt) : Res Srt :=
+  S.getArrayIndexSort srt.toUnsafe |>.mapError Error.ofUnsafe
+@[inherit_doc getArrayIndexSort]
+def getArrayIndexSort? (srt : Srt) : Option Srt := S.getArrayIndexSort? srt.toUnsafe
+
+/-- The element sort of an array sort. -/
+def getArrayElementSort (srt : Srt) : Res Srt :=
+  S.getArrayElementSort srt.toUnsafe |>.mapError Error.ofUnsafe
+@[inherit_doc getArrayElementSort]
+def getArrayElementSort? (srt : Srt) : Option Srt := S.getArrayElementSort? srt.toUnsafe
+
 get% getSetElementSort : Srt := getSetElementSort
 get% getBagElementSort : Srt := getBagElementSort
 get% getSeqElementSort : Srt := getSequenceElementSort
@@ -304,7 +336,16 @@ get% getFunctionCodomainSort : Srt := getFunctionCodomainSort
 get% getAbstractedKind : cvc5.SortKind := getAbstractedKind
 get% getUninterpretedSortConstructor : Srt := getUninterpretedSortConstructor
 get% getUninterpretedSortConstructorArity : UInt32 := getUninterpretedSortConstructorArity
-get% getInstantiatedParameters : Srts := getInstantiatedParameters
+
+/-- The sorts a parametric datatype or an uninterpreted sort constructor was instantiated with.
+
+See `Srt.instantiate`.
+-/
+def getInstantiatedParameters (srt : Srt) : Res Srts :=
+  S.getInstantiatedParameters srt.toUnsafe |>.mapError Error.ofUnsafe
+@[inherit_doc getInstantiatedParameters]
+def getInstantiatedParameters? (srt : Srt) : Option Srts :=
+  S.getInstantiatedParameters? srt.toUnsafe
 
 /-! ### Datatypes
 

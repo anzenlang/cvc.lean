@@ -27,6 +27,10 @@ namespace Cvc
 -- A doc comment in front of one documents the declared type. Without one the type inherits the
 -- underlying cvc5 type's docstring, which a downstream `module` only sees under `import all` of
 -- lean-cvc5's own module, so a type a user is meant to read about should carry its own.
+--
+-- The generated `toString` and `hash` carry docstrings of their own, lean-cvc5's being wrong for
+-- some types (a constructor's `toString` speaks of a datatype); `beq` and the order functions
+-- inherit lean-cvc5's.
 
 
 
@@ -96,7 +100,7 @@ def elab1 : CommandElabM Unit := do
   let toStringSubId := tg.subId.getId |>.append `toString |> mkIdent
   tg.namespaced do elaborate `(
     instance : ToString $tg.idTerm := inferInstanceAs (ToString $tg.subId)
-    @[inherit_doc $toStringSubId]
+    /-- The string cvc5 prints for this value. -/
     protected def $toStringId : $tg.idTerm → String := $toStringSubId
   )
 
@@ -111,7 +115,7 @@ def elab2 : CommandElabM Unit := do
     @[inherit_doc $beqSubId]
     protected def $beqId : $tg.idTerm → $tg.idTerm → Bool := $beqSubId
     instance : Hashable $tg.idTerm := inferInstanceAs (Hashable $tg.subId)
-    @[inherit_doc $hashSubId]
+    /-- cvc5's hash of this value. -/
     protected def $hashId : $tg.idTerm → UInt64 := $hashSubId
   )
 
