@@ -52,7 +52,7 @@ Cvc.lean exposes two API-s for terms: `Typed` and `Untyped`. The former provides
 
 > *NB:* cvc.lean enforces type-safety through definition irreducibility, which means you need to use Lean's `module` system to get any of its benefits.
 
-Terms can be constructed by calling constructor-functions, but cvc.lean also provides a syntax extension `smt! ...` that supports Lean-like syntax to create terms. This discussion below presents both, but the rest of this document will almost always rely on the syntax extension.
+Terms can be constructed by calling constructor-functions, but cvc.lean also provides a syntax extension `smt! ...` that supports Lean-like syntax to create terms. The discussion below presents both, but the rest of this document will almost always rely on the syntax extension.
 
 
 

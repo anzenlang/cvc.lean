@@ -72,7 +72,7 @@ A proof is indexed by the solver that produced it and by the _component_ it was 
   s.assert b
   s.assert (← smt! ¬ b)
   let proofs ← s.checkSat
-    (ifUnsat := do return ← s.getUnsatProof)
+    (ifUnsat := s.getUnsatProof)
   for p in proofs do
     for step in p do
       println! "{step.getRule} ⊢ {step.getResult}"
@@ -117,7 +117,7 @@ def describe {s : Solver} : s.ProofView pc → String
   s.assert b
   s.assert (← smt! ¬ b)
   let proofs ← s.checkSat
-    (ifUnsat := do return ← s.getUnsatProof)
+    (ifUnsat := s.getUnsatProof)
   for p in proofs do
     for step in p do println! describe step.view
 ```
@@ -157,7 +157,7 @@ A proof is a graph rather than a tree: cvc5 shares a sub-proof between the steps
 #eval Env.runIO do
   let s ← congruence
   let proofs ← s.checkSat
-    (ifUnsat := do return ← s.getUnsatProof)
+    (ifUnsat := s.getUnsatProof)
   for p in proofs do
     let clauses : Array (Term Bool) :=
       p.fold #[] (m := Id)
@@ -186,7 +186,7 @@ The fold runs in the caller's monad, and `break` ends a `for` loop over the step
 #eval Env.runIO do
   let s ← congruence
   let proofs ← s.checkSat
-    (ifUnsat := do return ← s.getUnsatProof)
+    (ifUnsat := s.getUnsatProof)
   for p in proofs do
     let rebuilt : Except String Nat :=
       p.foldUp fun q v => match v with
@@ -211,7 +211,7 @@ A `full` proof leaves no assumption open, its root scope discharging the asserti
 #eval Env.runIO do
   let s ← congruence
   let proofs ← s.checkSat
-    (ifUnsat := do return ← s.getUnsatProof)
+    (ifUnsat := s.getUnsatProof)
   for p in proofs do
     if let .scope outer _ := p.view then
       if let .scope refutation _ := outer.view then
@@ -229,8 +229,8 @@ The `theoryLemmas` component answers one proof per theory lemma, whose conclusio
 ```lean (name := ex_Proof_lemmas)
 #eval Env.runIO do
   let s ← congruence
-  let lemmas ← s.checkSat (ifUnsat := do
-    return ← s.getUnsatProof .theoryLemmas)
+  let lemmas ← s.checkSat (ifUnsat :=
+    s.getUnsatProof .theoryLemmas)
   for p in lemmas do
     println! "lemma : {p.getResult}"
     println! "steps : {p.size}"

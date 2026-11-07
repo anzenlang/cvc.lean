@@ -105,7 +105,7 @@ open Typed in #eval Env.runIO do
   println! "conj := {conj}"
 ```
 
-Another type-checking error on a ill-typed function application:
+Another type-checking error on an ill-typed function application:
 
 ```lean +error (name := terms_ex_typed_bad_2)
 open Typed in #eval Env.runIO do

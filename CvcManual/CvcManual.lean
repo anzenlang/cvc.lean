@@ -23,14 +23,14 @@ open CvcManual
 set_option pp.rawOnError true
 set_option verso.docstring.allowMissing true
 
-#doc (Manual) "Cvc.lean -- High-Level API for CVC5" =>
+#doc (Manual) "Cvc.lean -- High-Level API for cvc5" =>
 %%%
 authors := ["Adrien Champion"]
 shortTitle := "Cvc.lean user manual"
 %%%
 
 
-_Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on top of the [lean-cvc5 Lean library][lean-cvc5]. It adds a lot of quality of life features and strives to provide strong static guarantees. The following section of this manual present the library in details.
+_Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on top of the [lean-cvc5 Lean library][lean-cvc5]. It adds a lot of quality of life features and strives to provide strong static guarantees. The following sections of this manual present the library in detail.
 
 [The Overview section](overview) showcases various features of cvc.lean to give an overview for newcomers to survey quickly. The rest of this document goes over the technical details needed to understand and use cvc.lean properly.
 

@@ -109,7 +109,7 @@ As shown above `Solver.assert` adds a {lean}`Term Bool` assertion in the solver.
 
 # Check-sat and modal environments
 
-The _check-sat_ function is significantly more complex, to see why let us look a the _get-value_ function first.
+The _check-sat_ function is significantly more complex, to see why let us look at the _get-value_ function first.
 
 {decl Cvc.Typed.Solver.getValue}
 

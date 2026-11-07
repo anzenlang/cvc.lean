@@ -105,7 +105,7 @@ Notice that this function quantifies the {lean}`Ω`-instance {lean}`inst` for {l
 end var_code
 ```
 
-Now, to manipulate {lean}`Env` or virtually any type from the cvc.lean we need to have an {lean}`Ω`-instance in scope. We could have {lean}`[Ω]` as an argument of all our definitions, but it is often easier to have it as a variable.
+Now, to manipulate {lean}`Env` or virtually any type from cvc.lean we need to have an {lean}`Ω`-instance in scope. We could have {lean}`[Ω]` as an argument of all our definitions, but it is often easier to have it as a variable.
 
 ```lean
 variable [Ω]

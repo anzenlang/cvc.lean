@@ -34,7 +34,7 @@ namespace Section.Overview
 
 This section showcases various features of cvc.lean for new users to get an idea of what it can do. It is light on technical details which are provided in the rest of this manual. For now just know that cvc.lean has two APIs that differ in how `Term`s (and a few other types) are encoded and the static guarantees they provide:
 
-- `Cvc.Typed` strongly-types terms so that the cvc5-level sort of a term appears in its type, making ill-formed terms (and most solver queries) fail at compile-times. For instance:
+- `Cvc.Typed` strongly-types terms so that the cvc5-level sort of a term appears in its type, making ill-formed terms (and most solver queries) fail at compile time. For instance:
   - `Term Bool`, `Term String`, *etc.*
   - asserting a formula in a solver takes a `Term Bool`.
 
@@ -110,7 +110,7 @@ assertions:
 
 # Simple check-sat
 
-The result of a check-sat is either _sat_, _unsat_, or _unknown_. The `Solver.checkSat` function takes a optional continuation for each (`ifSat`, `ifUnsat`, `ifUnknown`); the defaults fail and report the result as unexpected.
+The result of a check-sat is either _sat_, _unsat_, or _unknown_. The `Solver.checkSat` function takes an optional continuation for each (`ifSat`, `ifUnsat`, `ifUnknown`); the defaults fail and report the result as unexpected.
 
 ```lean (name := intro_ex_checksat)
 #eval Env.runIO do
@@ -190,7 +190,7 @@ This example uses the `smt.grammar!` syntax extension for grammars, but they can
   s.addSygusConstraint (← smt! mab = a ∨ mab = b)
 
   s.checkSynth (ifSolved := do
-    println! "max := {(← s.getSynthSolution mx).erase}")
+    println! "max := {← s.getSynthSolution mx}")
 ```
 ```leanOutput intro_ex_synth
 max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))

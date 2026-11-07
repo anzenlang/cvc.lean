@@ -93,7 +93,7 @@ bv := (_ BitVec 8)
 f1 := (-> Int Bool Real)
 ```
 
-Some cvc5-sorts do not map nicely to builtin Lean types however, so cvc.lean has a few custom types with `ToTyp` instance.{margin}[In the following, `Float` refers to `Cvc.Float`, not the Lean builtin type for floating point numbers.] Here are a few examples:
+Some cvc5-sorts do not map nicely to builtin Lean types however, so cvc.lean has a few custom types with `ToTyp` instances.{margin}[In the following, `Float` refers to `Cvc.Float`, not the Lean builtin type for floating point numbers.] Here are a few examples:
 
 ```lean (name := sort_ex_Srt_of_2)
 #eval Env.runIO do
