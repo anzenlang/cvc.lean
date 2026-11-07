@@ -190,3 +190,23 @@ root: (< (+ x 7) 3)
   let some ⟨_, z⟩ ← z.left | println! "no sibling"
   println! "left of it: {z.relaxedFocus}"
   println! "root: {← z.root}"
+
+/-! A node no `Typ` describes, a quantifier's variable list here, is focused at sort `none`, and
+`replacePlain` replaces it, checking the sort at run time. -/
+
+/-- info:
+plain focus : ((_n Int))
+replaced    : (forall ((m Int)) (< 0 x))
+refused     : cannot replace `((_n Int))`, of sort `the type of bound variable lists`, by `x`, of sort `Int`
+-/
+#guard_msgs in #eval Env.runIO do
+  let x ← Term.mkSymbolAs Int "x"
+  let q ← smt! ∀ (_n : Int), 0 < x
+  let other ← smt! ∀ (m : Int), m < x
+  let some vars := other.getKids[0]? | println! "no variable list"
+  let ⟨_, z⟩ ← Zipper.ofTerm q
+  let some ⟨none, z⟩ ← z.down 0 | println! "no plain kid"
+  println! "plain focus : {z.relaxedFocus}"
+  println! "replaced    : {← (← z.replacePlain vars).root}"
+  try println! "refused     : {← (← z.replacePlain x.erase).root}"
+  catch e => println! "refused     : {e}"

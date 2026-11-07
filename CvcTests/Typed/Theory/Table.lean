@@ -98,6 +98,118 @@ cardinality three, which a set could not represent.
 
 
 
+/-! The rest of the bag operators: each builds the operator it restates, with its arguments in
+cvc5's order — the row before the table, the left operand first, the predicate before the table. -/
+
+section bagOps
+open Cvc.Typed (BVar BVars)
+
+/-- `fun r => tupLast r`: whether a row's second column holds. -/
+def lastHolds [Ω] : Env (Term (Tup [Int] Bool → Bool)) := do
+  let r ← BVar.mk (α := Tup [Int] Bool) "r"
+  BVars.lambda (BVars.push r []) (← tupLast r.toTerm)
+
+/-- `fun r r' => tupLast r = tupLast r'`: whether two rows agree on their second column. -/
+def sameLast [Ω] : Env (Term (Tup [Int] Bool → Tup [Int] Bool → Bool)) := do
+  let r ← BVar.mk (α := Tup [Int] Bool) "r"
+  let r' ← BVar.mk (α := Tup [Int] Bool) "r'"
+  let body ← equal (← tupLast r.toTerm) (← tupLast r'.toTerm)
+  BVars.lambda (BVars.push r' (BVars.push r [])) body
+
+/-- info:
+member    : (bag.member (tuple 1 true) A)
+subtable  : (bag.subbag A B)
+choose    : (bag.choose A)
+subtract  : (bag.difference_subtract A B)
+remove    : (bag.difference_remove A B)
+interMin  : (bag.inter_min A B)
+filter    : (bag.filter (lambda ((r (Tuple Int Bool))) ((_ tuple.select 1) r)) A)
+all       : (bag.all (lambda ((r (Tuple Int Bool))) ((_ tuple.select 1) r)) A)
+some      : (bag.some (lambda ((r (Tuple Int Bool))) ((_ tuple.select 1) r)) A)
+partition : (bag.partition (lambda ((r (Tuple Int Bool)) (|r'| (Tuple Int Bool))) (= ((_ tuple.select 1) r) ((_ tuple.select 1) |r'|))) A)
+toBag     : A
+ofBag     : M
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let a ← s.declareConstAs (Tab [Int] Bool) "A"
+  let b ← s.declareConstAs (Tab [Int] Bool) "B"
+  let bag ← s.declareConstAs (Cvc.Bag (Tup [Int] Bool)) "M"
+  let row ← mkTup (.cons (← mkInt 1) (.last (← mkTrue)))
+  println! "member    : {(← tableMember row a).erase}"
+  println! "subtable  : {(← tableSubtable a b).erase}"
+  println! "choose    : {(← tableChoose a).erase}"
+  println! "subtract  : {(← tableDifferenceSubtract a b).erase}"
+  println! "remove    : {(← tableDifferenceRemove a b).erase}"
+  println! "interMin  : {(← tableInterMin a b).erase}"
+  println! "filter    : {(← tableFilter (← lastHolds) a).erase}"
+  println! "all       : {(← tableAll (← lastHolds) a).erase}"
+  println! "some      : {(← tableSome (← lastHolds) a).erase}"
+  println! "partition : {(← tablePartition (← sameLast) a).erase}"
+  let asBag : Term (Cvc.Bag (Tup [Int] Bool)) := tableToBag a
+  println! "toBag     : {asBag.erase}"
+  let asTab : Term (Tab [Int] Bool) := tableOfBag bag
+  println! "ofBag     : {asTab.erase}"
+
+/-! Their semantics, over `A` holding three `(1, true)` and one `(2, false)`, and `B` one
+`(1, true)` and two `(3, true)`: subtracting counts copies, removing drops every copy of what `B`
+holds. -/
+
+/-- info:
+(1, true) in A − B   : 2
+(1, true) in A ∖ B   : 0
+(2, false) in A ∖ B  : 1
+(1, true) in A ∩ B   : 1
+card A ∩ B           : 1
+card filter last A   : 3
+card partition A     : 2
+(1, true) ∈ A        : true
+(3, true) ∈ A        : false
+B ⊆ A                : false
+2 × (1, true) ⊆ A    : true
+all last in A        : false
+all last in B        : true
+some last in A       : true
+choose of (2, false) : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let tuple (i : Int) (b : Bool) : Env (Term (Tup [Int] Bool)) := do
+    mkTup (.cons (← mkInt i) (.last (← mkBool b)))
+  let rows (i : Int) (b : Bool) (n : Int) : Env (Term (Tab [Int] Bool)) := do
+    tableMake (← tuple i b) (← mkInt n)
+  let a ← tableUnionDisjoint (← rows 1 true 3) (← rows 2 false 1)
+  let b ← tableUnionDisjoint (← rows 1 true 1) (← rows 3 true 2)
+  let counts : Array (String × Term Int) := #[
+    ("(1, true) in A − B", ← tableCount (← tuple 1 true) (← tableDifferenceSubtract a b)),
+    ("(1, true) in A ∖ B", ← tableCount (← tuple 1 true) (← tableDifferenceRemove a b)),
+    ("(2, false) in A ∖ B", ← tableCount (← tuple 2 false) (← tableDifferenceRemove a b)),
+    ("(1, true) in A ∩ B", ← tableCount (← tuple 1 true) (← tableInterMin a b)),
+    ("card A ∩ B", ← tableCard (← tableInterMin a b)),
+    ("card filter last A", ← tableCard (← tableFilter (← lastHolds) a)),
+    ("card partition A", ← bagCard (← tablePartition (← sameLast) a))
+  ]
+  let facts : Array (String × Term Bool) := #[
+    ("(1, true) ∈ A", ← tableMember (← tuple 1 true) a),
+    ("(3, true) ∈ A", ← tableMember (← tuple 3 true) a),
+    ("B ⊆ A", ← tableSubtable b a),
+    ("2 × (1, true) ⊆ A", ← tableSubtable (← rows 1 true 2) a),
+    ("all last in A", ← tableAll (← lastHolds) a),
+    ("all last in B", ← tableAll (← lastHolds) b),
+    ("some last in A", ← tableSome (← lastHolds) a),
+    ("choose of (2, false)", ← equal (← tableChoose (← rows 2 false 1)) (← tuple 2 false))
+  ]
+  s.checkSat (ifSat := do
+    for (label, count) in counts do
+      println! "{label.pushn ' ' (20 - label.length)} : {← s.getValue count}"
+    for (label, fact) in facts do
+      println! "{label.pushn ' ' (20 - label.length)} : {← s.getValue fact}")
+
+end bagOps
+
+
+
 /-! ## Aggregating
 
 `tableAggregate` folds each group into one value, so its answer is a `Bag gamma` — the accumulator's

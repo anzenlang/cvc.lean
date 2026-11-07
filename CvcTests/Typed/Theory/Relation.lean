@@ -148,6 +148,102 @@ singleton : (Set (Tuple Int Bool))
 
 
 
+/-! The rest of the set operators: each builds the operator it restates, with its arguments in
+cvc5's order — the left operand first, the predicate before the relation. -/
+
+section setOps
+open Cvc.Typed (BVar BVars)
+
+/-- `fun t => tupLast t`: whether a pair's second component holds. -/
+def lastHolds [Ω] : Env (Term (Tup [Int] Bool → Bool)) := do
+  let t ← BVar.mk (α := Tup [Int] Bool) "t"
+  BVars.lambda (BVars.push t []) (← tupLast t.toTerm)
+
+/-- `fun t => 0 < tupFst t`: whether a pair's first component is positive. -/
+def fstPositive [Ω] : Env (Term (Tup [Int] Bool → Bool)) := do
+  let t ← BVar.mk (α := Tup [Int] Bool) "t"
+  BVars.lambda (BVars.push t []) (← lt (← mkInt 0) (← tupFst t.toTerm))
+
+/-- info:
+minus       : (set.minus A B)
+complement  : (set.complement A)
+universe    : (as set.universe (Set (Tuple Int Bool)))
+isEmpty     : (set.is_empty A)
+isSingleton : (set.is_singleton A)
+filter      : (set.filter (lambda ((t (Tuple Int Bool))) ((_ tuple.select 1) t)) A)
+all         : (set.all (lambda ((t (Tuple Int Bool))) (< 0 ((_ tuple.select 0) t))) A)
+some        : (set.some (lambda ((t (Tuple Int Bool))) ((_ tuple.select 1) t)) A)
+toSet       : A
+ofSet       : S
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let a ← s.declareConstAs (Rel [Int] Bool) "A"
+  let b ← s.declareConstAs (Rel [Int] Bool) "B"
+  let set ← s.declareConstAs (Cvc.Set (Tup [Int] Bool)) "S"
+  println! "minus       : {(← relMinus a b).erase}"
+  println! "complement  : {(← relComplement a).erase}"
+  let univ : Term (Rel [Int] Bool) ← relUniverse
+  println! "universe    : {univ.erase}"
+  println! "isEmpty     : {(← relIsEmpty a).erase}"
+  println! "isSingleton : {(← relIsSingleton a).erase}"
+  println! "filter      : {(← relFilter (← lastHolds) a).erase}"
+  println! "all         : {(← relAll (← fstPositive) a).erase}"
+  println! "some        : {(← relSome (← lastHolds) a).erase}"
+  let asSet : Term (Cvc.Set (Tup [Int] Bool)) := relToSet a
+  println! "toSet       : {asSet.erase}"
+  let asRel : Term (Rel [Int] Bool) := relOfSet set
+  println! "ofSet       : {asRel.erase}"
+
+/-! Their semantics, over `A = {(1, true), (2, false)}` and `B = {(2, false)}`. The complement and
+the universe need cvc5's `sets-exp`. -/
+
+/-- info:
+A ∖ B singleton       : true
+(1, true) ∈ A ∖ B     : true
+B ∖ A empty           : true
+filter last A = A ∖ B : true
+all fst > 0 in A      : true
+all last in A         : false
+some last in A        : true
+some last in B        : false
+(3, true) ∈ ¬A        : true
+(1, true) ∈ ¬A        : false
+(3, true) ∈ universe  : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  s.setOption "sets-exp" "true"
+  let tuple (i : Int) (b : Bool) : Env (Term (Tup [Int] Bool)) := do
+    mkTup (.cons (← mkInt i) (.last (← mkBool b)))
+  let a ← relUnion (← relSingleton (← tuple 1 true)) (← relSingleton (← tuple 2 false))
+  let b ← relSingleton (← tuple 2 false)
+  let aMinusB ← relMinus a b
+  let facts : Array (String × Term Bool) := #[
+    ("A ∖ B singleton", ← relIsSingleton aMinusB),
+    ("(1, true) ∈ A ∖ B", ← relMember (← tuple 1 true) aMinusB),
+    ("B ∖ A empty", ← relIsEmpty (← relMinus b a)),
+    ("filter last A = A ∖ B", ← equal (← relFilter (← lastHolds) a) aMinusB),
+    ("all fst > 0 in A", ← relAll (← fstPositive) a),
+    ("all last in A", ← relAll (← lastHolds) a),
+    ("some last in A", ← relSome (← lastHolds) a),
+    ("some last in B", ← relSome (← lastHolds) b),
+    ("(3, true) ∈ ¬A", ← relMember (← tuple 3 true) (← relComplement a)),
+    ("(1, true) ∈ ¬A", ← relMember (← tuple 1 true) (← relComplement a)),
+    ("(3, true) ∈ universe", ← relMember (← tuple 3 true) (← relUniverse))
+  ]
+  s.checkSat (ifSat := do
+    for (label, fact) in facts do
+      println! "{label.pushn ' ' (21 - label.length)} : {← s.getValue fact}")
+
+/-- `transposed` reverses the components, the split-off last one included. -/
+example : transposed [Int, Bool] Rat = Rel [Rat, Bool] Int := rfl
+
+end setOps
+
+
+
 /-! ## Solving -/
 
 /-- info:

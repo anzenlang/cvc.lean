@@ -152,6 +152,157 @@ sat        : x = 1, y = 2
     catch _ => pure "caught"
   println! "unexpected : {outcome}"
 
+/-! `getUnsatAssumptions` answers the assumptions the refutation used, as formulas. -/
+
+/-- info: unsat assumptions : #[(< x 0)] -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-unsat-assumptions" "true"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  s.assert (← smt! 0 < x)
+  let assumptions := #[← smt! 0 < y, ← smt! x < 0, ← smt! y < 5]
+  let core : Terms Bool ← s.checkSat (assuming := assumptions) (ifUnsat := s.getUnsatAssumptions)
+  println! "unsat assumptions : {core}"
+
+/-! `defineConst` takes its sort from its body's index, and answers a constant at that index. -/
+
+/-- info:
+constant : c
+x        : 10
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let c : Term Int ← s.defineConst "c" (← smt! 2 + 3)
+  let x ← s.declareConstAs Int "x"
+  s.assert (← smt! x = c * 2)
+  println! "constant : {c}"
+  let vx : Int ← s.checkSat (ifSat := s.getValue x)
+  println! "x        : {vx}"
+
+
+
+/-! ## Models
+
+The sort-erased tests cover what these do; these pin that the typed forms take and answer terms at
+their index.
+-/
+
+/-! `blockModelValues` takes terms of one index; asking again until unsat enumerates their values,
+here read back as terms (`getValueTerms`) and as Lean values. -/
+
+/-- info:
+values : #[0, 1, 2], then unsat
+terms  : #[#[0, 0], #[1, 1], #[2, 2]]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  s.assert (← smt! 0 ≤ x ∧ x ≤ 2 ∧ x ≤ y ∧ y ≤ x + 1)
+  let mut values : Array Int := #[]
+  let mut terms : Array (Terms Int) := #[]
+  for _ in [0:4] do
+    let some (v, ts) ← s.checkSat? (ifSat := do
+        let v : Int ← s.getValue x
+        let ts ← s.getValueTerms #[x, y]
+        s.blockModelValues #[x]
+        return some (v, ts))
+      | break
+    values := values.push v
+    terms := terms.push ts
+  println! "values : {values}, then unsat"
+  println! "terms  : {terms}"
+
+/-- A Lean type denoting the uninterpreted sort `U`, which has to be declared before use. -/
+structure U
+
+instance : ToTyp U := ⟨.uninterpreted "U"⟩
+
+/-! `getModelDomainElements` takes the uninterpreted sort as an index, and answers terms of it. -/
+
+/-- info:
+domain : #[(as @U_0 U), (as @U_1 U)]
+a b    : #[(as @U_0 U), (as @U_1 U)]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let _ ← Srt.uninterpreted "U"
+  let a ← s.declareConstAs U "a"
+  let b ← s.declareConstAs U "b"
+  s.assert (← smt! a ≠ b)
+  s.checkSat (ifSat := do
+    let domain : Terms U ← s.getModelDomainElements U
+    println! "domain : {domain}"
+    println! "a b    : {← s.getValueTerms #[a, b]}")
+
+/-! Under `model-cores`, `isModelCoreSymbol` tells the essential constants from the others. -/
+
+/-- info: essential : x true, y false -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  s.setOption "model-cores" "simple"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  s.assert (← smt! x = 1 ∨ y = 2)
+  s.checkSat (ifSat := do
+    println! "essential : x {← s.isModelCoreSymbol x}, y {← s.isModelCoreSymbol y}")
+
+/-! The unchecked twins answer what the modal queries do: `getValue!` a Lean value, as
+`getValue` does. -/
+
+/-- info:
+sat    : 1 #[1, 2] 1 #[(as @U_0 U)]
+sat!   : 1 #[1, 2] 1 #[(as @U_0 U)]
+unsat  : #[(< x 0)] #[(and (< 0 x) (and (< x 2) (= y (+ x 1)))), (< x 0)]
+unsat! : #[(< x 0)] #[(and (< 0 x) (and (< x 2) (= y (+ x 1)))), (< x 0)]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  s.setOption "produce-unsat-cores" "true"
+  s.setOption "produce-unsat-assumptions" "true"
+  let _ ← Srt.uninterpreted "U"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  let _ ← s.declareConstAs U "a"
+  s.assert (← smt! 0 < x ∧ x < 2 ∧ y = x + 1)
+  let render (v : Int) (vs : Array Int) (t : Term Int) (dom : Terms U) : String :=
+    s!"{v} {vs} {t} {dom}"
+  let modal ← s.checkSat (ifSat := do
+    return render (← s.getValue x) (← s.getValues #[x, y]) (← s.getValueTerm x)
+      (← s.getModelDomainElements U))
+  println! "sat    : {modal}"
+  let unchecked := render (← s.getValue! x) (← s.getValues! #[x, y]) (← s.getValueTerm! x)
+    (← s.getModelDomainElements! U)
+  println! "sat!   : {unchecked}"
+  let neg ← smt! x < 0
+  let modal ← s.checkSat (assuming := #[neg])
+    (ifUnsat := do return s!"{← s.getUnsatAssumptions} {← s.getUnsatCore}")
+  println! "unsat  : {modal}"
+  println! "unsat! : {← s.getUnsatAssumptions!} {← s.getUnsatCore!}"
+
+/-! `getTimeoutCoreAssuming` takes formulas and answers the core as formulas. cvc5 answers unknown
+on this satisfiable quantified formula, and the assumption contradicting the assertions is the
+core. -/
+
+/-- info: unknown, then : unsat #[(< x 0)] -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-unsat-cores" "true"
+  let f ← s.declareFunAs (Int → Int) "f"
+  let x ← s.declareConstAs Int "x"
+  s.assert (← smt! ∀ (n : Int), n < f n)
+  s.assert (← smt! 0 < x)
+  let assumptions := #[← smt! x < 5, ← smt! x < 0]
+  let (res, core) ← s.checkSat (ifUnknown := fun _ => s.getTimeoutCoreAssuming assumptions)
+  let core : Terms Bool := core
+  println! "unknown, then : {res} {core}"
+
 
 
 /-! ## Interpolants
@@ -252,6 +403,26 @@ next   : (or (= y 1) (<= 1 y))
       | println! "exhausted"
     println! "next   : {next}"
 
+/-! `getNextAbduct` answers further abducts, as formulas. -/
+
+/-- info:
+abduct : (= y x)
+next   : (some (= y 1))
+next!  : (<= x y)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-abducts" "true"
+  s.setOption "incremental" "true"
+  let x ← s.declareConstAs Int "x"
+  let y ← s.declareConstAs Int "y"
+  s.assert (← smt! 0 < x)
+  println! "abduct : {← s.getAbduct! (← smt! 0 < x + y)}"
+  let next : Option (Term Bool) ← s.getNextAbduct
+  println! "next   : {next}"
+  let next : Term Bool ← s.getNextAbduct!
+  println! "next!  : {next}"
+
 
 /-! ## The signatures state the sorts -/
 
@@ -273,5 +444,27 @@ variable [Ω]
 
 /-- info: @Solver.getNextInterpolant : [inst : Ω] → Solver → Env (Option (Term Bool)) -/
 #guard_msgs in #check @Cvc.Typed.Solver.getNextInterpolant
+
+/-- info: @Solver.getUnsatAssumptions : [inst : Ω] → (s : Solver) → s.EnvUnsat (Terms Bool) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getUnsatAssumptions
+
+/-- info: @Solver.getTimeoutCoreAssuming : [inst : Ω] → (s : Solver) → Terms Bool → s.EnvUnknown (Result × Terms Bool) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getTimeoutCoreAssuming
+
+/-- info: @Solver.defineConst : [inst : Ω] →
+  Solver → {α : Type} → [ToTyp α] → String → Term α → optParam Bool false → Env (Term α) -/
+#guard_msgs in #check @Cvc.Typed.Solver.defineConst
+
+/-- info: @Solver.getModelDomainElements : [inst : Ω] → (s : Solver) → (α : Type) → [ToTyp α] → s.EnvSat (Terms α) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getModelDomainElements
+
+/-- info: @Solver.blockModelValues : [inst : Ω] → {α : Type} → (s : Solver) → Terms α → s.EnvSat Unit -/
+#guard_msgs in #check @Cvc.Typed.Solver.blockModelValues
+
+/-- info: @Solver.getValue! : [inst : Ω] → Solver → {α : Type} → [TermToValue α] → Term α → Env α -/
+#guard_msgs in #check @Cvc.Typed.Solver.getValue!
+
+/-- info: @Solver.getLearnedLiterals : [inst : Ω] → Solver → optParam LearnedLitType LearnedLitType.input → Env (Terms Bool) -/
+#guard_msgs in #check @Cvc.Typed.Solver.getLearnedLiterals
 
 end signatures

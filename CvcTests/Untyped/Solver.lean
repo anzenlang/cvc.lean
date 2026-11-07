@@ -10,10 +10,12 @@ module
 import Cvc.Untyped.Core.Solver
 import Cvc.Untyped.Theory.Arith
 import Cvc.Untyped.Theory.Fun
+import Cvc.Untyped.Theory.Quant
 
 meta import Cvc.Untyped.Core.Solver
 meta import Cvc.Untyped.Theory.Arith
 meta import Cvc.Untyped.Theory.Fun
+meta import Cvc.Untyped.Theory.Quant
 
 
 
@@ -48,6 +50,23 @@ names       : true
 
   let names ← s.getOptionNames
   println! "names       : {!names.isEmpty}"
+
+/-! `getInfo` answers SMT-LIB's `get-info` flags, rendered as cvc5 prints them. -/
+
+/-- info:
+name           : "cvc5"
+levels         : 0
+levels, 2 push : 2
+levels, 1 pop  : 1
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Cvc.Untyped.Solver.new
+  println! "name           : {← s.getInfo "name"}"
+  println! "levels         : {← s.getInfo "assertion-stack-levels"}"
+  s.push 2
+  println! "levels, 2 push : {← s.getInfo "assertion-stack-levels"}"
+  s.pop
+  println! "levels, 1 pop  : {← s.getInfo "assertion-stack-levels"}"
 
 
 
@@ -153,6 +172,302 @@ sat        : x = 1, y = 2
       pure "no error"
     catch _ => pure "caught"
   println! "unexpected : {outcome}"
+
+/-! `checkIsSat?` is the three-way answer: `.inl true` sat, `.inl false` unsat, `.inr` unknown. -/
+
+/-- info:
+x < 0         : inl true
+x < 0 ∧ 0 < x : inl false
+∀ n, n < f n  : inr Cvc.Unknown.Explanation.incomplete
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let f ← s.declareFun "f" #[int] int
+  let render : Solver.Result.Sat? → String
+    | .inl b => s!"inl {b}"
+    | .inr e => s!"inr {e}"
+  println! "x < 0         : {render (← s.checkIsSat? (assuming := #[← smt! x < 0]))}"
+  println! "x < 0 ∧ 0 < x : {render (← s.checkIsSat? (assuming := #[← smt! x < 0 ∧ 0 < x]))}"
+  -- satisfiable (`f n = n + 1`), but cvc5 does not find a model of a quantified formula here
+  s.assert (← smt! ∀ (n : Int), n < f n)
+  println! "∀ n, n < f n  : {render (← s.checkIsSat?)}"
+
+/-! `getUnsatAssumptions` answers the assumptions an unsat answer rests on, and only those: neither
+the assertions nor an assumption the refutation does not use. -/
+
+/-- info: unsat assumptions : #[(< x 0)] -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-unsat-assumptions" "true"
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let y ← s.declareConst "y" int
+  s.assert (← smt! 0 < x)
+  let assumptions := #[← smt! 0 < y, ← smt! x < 0, ← smt! y < 5]
+  let core ← s.checkSat (assuming := assumptions) (ifUnsat := s.getUnsatAssumptions)
+  println! "unsat assumptions : {core}"
+
+/-! `defineConst` names a term: the constant is asserted equal to its body. -/
+
+/-- info:
+constant   : c
+assertions : #[(= c (+ 2 3)), (= x (* c 2))]
+x          : 10
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let int ← Srt.int
+  let c ← s.defineConst "c" int (← smt! 2 + 3)
+  let x ← s.declareConst "x" int
+  s.assert (← smt! x = c * 2)
+  println! "constant   : {c}"
+  println! "assertions : {← s.getAssertions}"
+  println! "x          : {← s.checkSat (ifSat := s.getValue x)}"
+
+
+
+/-! ## Models
+
+What can be asked where the answer was sat, beyond `getValue`.
+-/
+
+/-! `getValuesAs` converts every value, `getValueAs` one value of any term, not only a constant. -/
+
+/-- info:
+values : #[1, 2]
+x + y  : 3
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let y ← s.declareConst "y" int
+  s.assert (← smt! x = 1 ∧ y = 2)
+  let sum ← smt! x + y
+  s.checkSat (ifSat := do
+    println! "values : {← s.getValuesAs Int #[x, y]}"
+    println! "x + y  : {← s.getValueAs Int sum}")
+
+/-! `blockModelValues` makes the next check find other values for the terms given, so asking again
+until unsat enumerates them. -/
+
+/-- info: values of x : #[0, 1, 2], then unsat -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let x ← s.declareConst "x" (← Srt.int)
+  s.assert (← smt! 0 ≤ x ∧ x ≤ 2)
+  let mut seen := #[]
+  for _ in [0:4] do
+    let some v ← s.checkSat? (ifSat := do
+        let v ← s.getValueAs Int x
+        s.blockModelValues #[x]
+        return some v)
+      | break
+    seen := seen.push v
+  println! "values of x : {seen}, then unsat"
+
+/-! `blockModel .values` blocks the values of every free constant, so `a ∨ b` has three models.
+`blockModel .literals` blocks the literals that made the assertions true, so a model where `a`
+holds excludes every other model where it does, and only two come out. -/
+
+/-- info:
+values   : #[#[true, false], #[true, true], #[false, true]]
+literals : #[#[true, false], #[false, true]]
+-/
+#guard_msgs in #eval Env.runIO do
+  let models (mode : Model.BlockMode) : Env (Array (Array Bool)) := do
+    let s ← Solver.new
+    s.setOption "produce-models" "true"
+    let a ← s.declareConst "a" (← Srt.bool)
+    let b ← s.declareConst "b" (← Srt.bool)
+    s.assert (← smt! a ∨ b)
+    let mut models := #[]
+    for _ in [0:4] do
+      let some m ← s.checkSat? (ifSat := do
+          let m ← s.getValuesAs Bool #[a, b]
+          s.blockModel mode
+          return some m)
+        | break
+      models := models.push m
+    return models
+  println! "values   : {← models .values}"
+  println! "literals : {← models .literals}"
+
+/-! `getModelDomainElements` answers the finite interpretation the model gives an uninterpreted
+sort, which every constant of that sort takes its value in. -/
+
+/-- info:
+domain : #[(as @U_0 U), (as @U_1 U), (as @U_2 U)]
+a b c  : #[(as @U_0 U), (as @U_1 U), (as @U_2 U)]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let u ← Srt.uninterpreted "U"
+  let a ← s.declareConst "a" u
+  let b ← s.declareConst "b" u
+  let c ← s.declareConst "c" u
+  s.assert (← Term.distinctN #[a, b, c])
+  s.checkSat (ifSat := do
+    println! "domain : {← s.getModelDomainElements u}"
+    println! "a b c  : {← s.getValues #[a, b, c]}")
+
+/-! Under `model-cores`, `isModelCoreSymbol` says which constants the model needs: `x = 1` alone
+satisfies `x = 1 ∨ y = 2`, so `y` is not essential, and `getModelAsString` leaves it out. Without
+the option every constant is essential. -/
+
+/-- info:
+model-cores simple:
+  values     : #[1, 0]
+  essential  : x true, y false
+  model      : (
+(define-fun x () Int 1)
+)
+no model cores:
+  essential  : x true, y true
+  model      : (
+(define-fun x () Int 1)
+(define-fun y () Int 0)
+)
+-/
+#guard_msgs in #eval Env.runIO do
+  let run (cores : Bool) : Env Unit := do
+    let s ← Solver.new
+    s.setOption "produce-models" "true"
+    if cores then s.setOption "model-cores" "simple"
+    let x ← s.declareConst "x" (← Srt.int)
+    let y ← s.declareConst "y" (← Srt.int)
+    s.assert (← smt! x = 1 ∨ y = 2)
+    s.checkSat (ifSat := do
+      if cores then println! "  values     : {← s.getValuesAs Int #[x, y]}"
+      println! "  essential  : x {← s.isModelCoreSymbol x}, y {← s.isModelCoreSymbol y}"
+      println! "  model      : {(← s.getModelAsString #[] #[x, y]).trimAsciiEnd}")
+  println! "model-cores simple:"
+  run true
+  println! "no model cores:"
+  run false
+
+
+
+/-! ## Learned literals and instantiations -/
+
+/-! `getLearnedLiterals` answers the literals the solver found to hold globally, by kind: here `x`
+cannot be below 3, so `y` must be negative. -/
+
+/-- info:
+input      : #[(not (>= y 0)), (>= x 3)]
+preprocess : #[(>= x 6)]
+solved     : #[]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-learned-literals" "true"
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let y ← s.declareConst "y" int
+  s.assert (← smt! 5 < x ∧ (x < 3 ∨ y < 0))
+  let _ ← s.checkIsSat
+  println! "input      : {← s.getLearnedLiterals}"
+  println! "preprocess : {← s.getLearnedLiterals .preprocess}"
+  println! "solved     : {← s.getLearnedLiterals .preprocessSolved}"
+
+/-! `getInstantiations` prints the instances of each quantified formula the refutation used. -/
+
+/-- info:
+sat            : false
+instantiations : (instantiations (forall ((n Int)) (>= (f n) 1))
+  ( 3 )
+)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let int ← Srt.int
+  let f ← s.declareFun "f" #[int] int
+  s.assert (← smt! ∀ (n : Int), 0 < f n)
+  s.assert (← smt! f 3 < 0)
+  println! "sat            : {← s.checkIsSat}"
+  println! "instantiations : {← s.getInstantiations}"
+
+
+
+/-! ## Timeout cores
+
+`getTimeoutCoreAssuming` is only reachable where the answer was unknown, here because cvc5 finds
+no model of a satisfiable quantified formula. It checks again under the assumptions given: with
+one contradicting the assertions the answer is unsat, and the core is that assumption alone.
+-/
+
+/-- info:
+unknown, then : unsat #[(< x 0)]
+unchecked     : unsat #[(< x 0)]
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-unsat-cores" "true"
+  let int ← Srt.int
+  let f ← s.declareFun "f" #[int] int
+  let x ← s.declareConst "x" int
+  s.assert (← smt! ∀ (n : Int), n < f n)
+  s.assert (← smt! 0 < x)
+  let assumptions := #[← smt! x < 5, ← smt! x < 0]
+  let (res, core) ← s.checkSat (ifUnknown := fun _ => s.getTimeoutCoreAssuming assumptions)
+  println! "unknown, then : {res} {core}"
+  -- the unchecked twin answers the same
+  let (res, core) ← s.getTimeoutCoreAssuming! assumptions
+  println! "unchecked     : {res} {core}"
+
+
+
+/-! ## Unchecked queries
+
+Each modal query has a `!` twin in `Env`, which answers what the modal one would where the answer
+allows it. Where it does not, cvc5 still refuses some of them.
+-/
+
+/-- info:
+sat    : 1 #[1] 1 #[1] #[(as @U_0 U)] true (
+(define-fun x () Int 1)
+)
+sat!   : 1 #[1] 1 #[1] #[(as @U_0 U)] true (
+(define-fun x () Int 1)
+)
+unsat  : #[(and (< 0 x) (< x 2)), (< x 0)] #[(< x 0)]
+unsat! : #[(and (< 0 x) (< x 2)), (< x 0)] #[(< x 0)]
+value after unsat : [internal] cannot get value unless after a SAT or UNKNOWN response.
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  s.setOption "produce-unsat-cores" "true"
+  s.setOption "produce-unsat-assumptions" "true"
+  let u ← Srt.uninterpreted "U"
+  let x ← s.declareConst "x" (← Srt.int)
+  let _ ← s.declareConst "a" u
+  s.assert (← smt! 0 < x ∧ x < 2)
+  let render (v : Term) (vs : Terms) (n : Int) (ns : Array Int) (dom : Terms) (core : Bool)
+      (model : String) : String :=
+    s!"{v} {vs} {n} {ns} {dom} {core} {model.trimAsciiEnd}"
+  let modal ← s.checkSat (ifSat := do
+    return render (← s.getValue x) (← s.getValues #[x]) (← s.getValueAs Int x)
+      (← s.getValuesAs Int #[x]) (← s.getModelDomainElements u) (← s.isModelCoreSymbol x)
+      (← s.getModelAsString #[] #[x]))
+  println! "sat    : {modal}"
+  let unchecked := render (← s.getValue! x) (← s.getValues! #[x]) (← s.getValueAs! Int x)
+    (← s.getValuesAs! Int #[x]) (← s.getModelDomainElements! u) (← s.isModelCoreSymbol! x)
+    (← s.getModelAsString! #[] #[x])
+  println! "sat!   : {unchecked}"
+  let neg ← smt! x < 0
+  let modal ← s.checkSat (assuming := #[neg])
+    (ifUnsat := do return s!"{← s.getUnsatCore} {← s.getUnsatAssumptions}")
+  println! "unsat  : {modal}"
+  println! "unsat! : {← s.getUnsatCore!} {← s.getUnsatAssumptions!}"
+  try println! "value after unsat : {← s.getValue! x}"
+  catch e => println! "value after unsat : {e}"
 
 
 
@@ -484,3 +799,30 @@ A ∧ B → C   : true
   let b ← s.getAbduct! conj
   println! "abduct!     : {b}"
   println! "A ∧ B → C   : {← entails #[hyp, b] conj}"
+
+/-! `getNextAbduct` enumerates further abducts, each different and each an abduct. It needs
+`incremental`. -/
+
+/-- info:
+abduct : (= y x), A ∧ B → C: true
+next   : (= y 1), A ∧ B → C: true
+next   : (<= x y), A ∧ B → C: true
+next!  : (= y (- x 1)), A ∧ B → C: true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-abducts" "true"
+  s.setOption "incremental" "true"
+  let int ← Srt.int
+  let x ← s.declareConst "x" int
+  let y ← s.declareConst "y" int
+  let hyp ← smt! 0 < x
+  s.assert hyp
+  let conj ← smt! 0 < x + y
+  let report (b : Term) : Env String := return s!"{b}, A ∧ B → C: {← entails #[hyp, b] conj}"
+  println! "abduct : {← report (← s.getAbduct! conj)}"
+  for _ in [0:2] do
+    let some b ← s.getNextAbduct
+      | println! "exhausted"
+    println! "next   : {← report b}"
+  println! "next!  : {← report (← s.getNextAbduct!)}"

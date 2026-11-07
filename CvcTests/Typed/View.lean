@@ -255,6 +255,38 @@ it is read off to a `Term (Record …)`, whose fields `recordFields?` then reads
 
 
 
+/-! ## What a hand-written view is built from
+
+`View.typOf?` reads a term's sort as a `Typ`, `none` where no `Typ` describes it — a quantifier's
+variable list, for instance. `View.reindex` puts an index on a sort-erased term without checking
+it, the term itself unchanged, and `View.proof?` keeps a proof of a fact that holds.
+-/
+
+/-- info:
+x + 1     : (some Int)
+x < 1     : (some Bool)
+singleton : (some (Set Int))
+variables : none
+reindexed : (+ x 1), unchanged true
+2 ≤ 3     : true
+3 ≤ 2     : false
+-/
+#guard_msgs in #eval Env.runIO do
+  let x ← Term.mkSymbolAs Int "x"
+  let sum ← smt! x + 1
+  println! "x + 1     : {← View.typOf? sum.erase}"
+  println! "x < 1     : {← View.typOf? (← smt! x < 1).erase}"
+  println! "singleton : {← View.typOf? (← Term.setSingleton x).erase}"
+  let q ← smt! ∀ (n : Int), n < x
+  let some vars := q.getKids[0]? | println! "no variable list"
+  println! "variables : {← View.typOf? vars}"
+  let reindexed : Term Int := View.reindex sum.erase
+  println! "reindexed : {reindexed}, unchanged {reindexed.erase == sum.erase}"
+  println! "2 ≤ 3     : {(View.proof? (2 ≤ 3)).isSome}"
+  println! "3 ≤ 2     : {(View.proof? (3 ≤ 2)).isSome}"
+
+
+
 /-! ## Kind ownership
 
 A kind is taken apart by one view only. `def.term_view` refuses to route a kind to two, naming both,

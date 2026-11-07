@@ -127,6 +127,30 @@ model    : 7
   let xFst ← fst.get x
   s.checkSat (ifSat := do println! "model    : {← s.getValue xFst}")
 
+/-! `Field.update` replaces one field and keeps the others, which a model shows: `q` is `p` with
+`fst` replaced, so it keeps `p`'s `snd`. -/
+
+/-- info:
+q.fst : 9
+q.snd : true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let _ ← declarePair s
+  let mkC ← Datatype.ctor Pair "mk"
+  let fst ← mkC.field Int "fst"
+  let snd ← mkC.field Bool "snd"
+  let p ← s.declareConstAs Pair "p"
+  s.assert (← Term.equal (← fst.get p) (← Term.mkInt 3))
+  s.assert (← snd.get p)
+  let q : Term Pair ← fst.update p (← Term.mkInt 9)
+  let qFst ← fst.get q
+  let qSnd ← snd.get q
+  s.checkSat (ifSat := do
+    println! "q.fst : {← s.getValue qFst}"
+    println! "q.snd : {← s.getValue qSnd}")
+
 
 
 /-! ## What the lookups check

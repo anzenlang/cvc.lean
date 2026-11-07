@@ -242,6 +242,54 @@ algebraic: false
   println! "32-bit   : {← i.getInt32Value} / {← i.getUInt32Value}"
   println! "64-bit   : {← i.getInt64Value} / {← i.getUInt64Value}"
 
+/-! The machine-width views stop exactly at their type's bounds, so the predicate says when a reader
+would refuse a value rather than wrap it around. -/
+
+/-- info:
+2^63 - 1 : int64 true, uint64 true → 9223372036854775807 / 9223372036854775807
+2^63     : int64 false, uint64 true → 9223372036854775808
+2^64 - 1 : uint64 true → 18446744073709551615
+2^64     : uint64 false
+-2^63    : int64 true, uint64 false → -9223372036854775808
+-/
+#guard_msgs in #eval Env.runIO do
+  let i63 ← Term.mkInt (2 ^ 63 - 1)
+  println! "2^63 - 1 : int64 {i63.isInt64Value}, uint64 {i63.isUInt64Value} → \
+{← i63.getInt64Value} / {← i63.getUInt64Value}"
+  let p63 ← Term.mkInt (2 ^ 63)
+  println! "2^63     : int64 {p63.isInt64Value}, uint64 {p63.isUInt64Value} → \
+{← p63.getUInt64Value}"
+  let u64 ← Term.mkInt (2 ^ 64 - 1)
+  println! "2^64 - 1 : uint64 {u64.isUInt64Value} → {← u64.getUInt64Value}"
+  let p64 ← Term.mkInt (2 ^ 64)
+  println! "2^64     : uint64 {p64.isUInt64Value}"
+  let n63 ← Term.mkInt (-2 ^ 63)
+  println! "-2^63    : int64 {n63.isInt64Value}, uint64 {n63.isUInt64Value} → \
+{← n63.getInt64Value}"
+
+/-! A real reads back as a string, a `Rat`, or a 64-bit numerator and denominator; each `?` form
+answers `none` on anything that is not a real value. cvc5 counts an integer value as a real one. -/
+
+/-- info:
+-7/2     : string -7/2, rat (some -7/2), real64 true → (-7, 2)
+3        : string 3/1, rat (some 3)
+int 3    : real true, rat (some 3)
+symbol   : real false, rat none, string none
+2^64 / 3 : real64 false
+-/
+#guard_msgs in #eval Env.runIO do
+  let r ← Term.mkReal (-7/2 : Rat)
+  println! "-7/2     : string {← r.getRealValue}, rat {r.getRatValue?}, real64 {r.isReal64Value} \
+→ {← r.getReal64Value}"
+  let three ← Term.mkReal (3 : Rat)
+  println! "3        : string {← three.getRealValue}, rat {three.getRatValue?}"
+  let i ← Term.mkInt 3
+  println! "int 3    : real {i.isRealValue}, rat {i.getRatValue?}"
+  let x ← Term.mkSymbol (← Srt.real) "x"
+  println! "symbol   : real {x.isRealValue}, rat {x.getRatValue?}, string {x.getRealValue?}"
+  let big ← Term.mkReal ((2 ^ 64 : Int) / 3 : Rat)
+  println! "2^64 / 3 : real64 {big.isReal64Value}"
+
 -- `isSetValue` says *value*, not "set-sorted": a built insert spine is a set-sorted term but not a
 -- canonical constant, which is the same reason `getSetValue` only works on a model's answer
 /-- info:
@@ -289,6 +337,32 @@ negZero {posInf.isFloatNegZero}"
 
   let (exp, sig, _) ← posInf.getFloatComponents
   println! "sizes    : {exp} / {sig}"
+
+/-! Each special value satisfies its own predicate and no other, and `getFloatComponents?` reads the
+sizes and bit pattern of a float value, `none` of anything else. -/
+
+/-- info:
++oo : nan false, +oo true, -oo false, +0 false, -0 false
+-oo : nan false, +oo false, -oo true, +0 false, -0 false
++0  : nan false, +oo false, -oo false, +0 true, -0 false
+-0  : nan false, +oo false, -oo false, +0 false, -0 true
+NaN : nan true, +oo false, -oo false, +0 false, -0 false
+-oo components : (some (8, (24, #b11111111100000000000000000000000)))
+int components : none
+-/
+#guard_msgs in #eval Env.runIO do
+  let classify (name : String) (v : Cvc.Float 8 24) : Env Unit := do
+    let t ← Term.mkValueAs (Cvc.Float 8 24) v
+    println! "{name} : nan {t.isFloatNaN}, +oo {t.isFloatPosInf}, -oo {t.isFloatNegInf}, \
++0 {t.isFloatPosZero}, -0 {t.isFloatNegZero}"
+  classify "+oo" .posInf
+  classify "-oo" .negInf
+  classify "+0 " .posZero
+  classify "-0 " .negZero
+  classify "NaN" .nan
+  let negInf ← Term.mkValueAs (Cvc.Float 8 24) .negInf
+  println! "-oo components : {negInf.getFloatComponents?}"
+  println! "int components : {(← Term.mkInt 1).getFloatComponents?}"
 
 
 

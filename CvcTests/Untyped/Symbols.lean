@@ -221,3 +221,57 @@ example (s : Counter.TermsAt 0) : Env Term := smt! s.count + 1
   println! "{at0.count.get} {at2.count.get}"
 
 end AtStep
+
+
+
+/-! ## Declaring in a solver, and reading values as terms
+
+`declareSymbolsAt` (`declareAtIn`) declares a step's symbols in a solver; not fresh, as by default,
+declaring a step again answers the very same symbols, where fresh ones are new constants that print
+the same. `declareSymbols` makes constants of the scope, `Solver.declareSymbols` declares them in a
+solver, and `getSymbolValueTerms` and `getValueTerms` read a model's values back as terms.
+-/
+
+namespace InSolver
+
+structure.symbols Counter where
+  counting : Bool
+  count : Int
+
+/-- info:
+step 1          : counting__@__1 count__@__1
+again, not fresh: same true
+again, fresh    : same false, count__@__1
+values          : counting true, count 3
+step 1 values   : counting false, count 4
+scope constants : counting count
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let at1 ← s.declareSymbolsAt 1 Counter.idents
+  println! "step 1          : {at1.counting.get} {at1.count.get}"
+  let again ← Counter.idents.declareAtIn 1 s
+  println! "again, not fresh: same {again.count.get == at1.count.get}"
+  let fresh ← Counter.idents.declareAtIn 1 s (fresh := true)
+  println! "again, fresh    : same {fresh.count.get == at1.count.get}, {fresh.count.get}"
+  let syms ← s.declareSymbols Counter.idents
+  s.assert (← smt! syms.counting ∧ syms.count = 3)
+  s.assert (← smt! ¬ at1.counting ∧ at1.count = syms.count + 1)
+  s.checkSat (ifSat := do
+    let v ← s.getSymbolValueTerms syms
+    println! "values          : counting {v.counting}, count {v.count}"
+    let v1 ← at1.getValueTerms s
+    println! "step 1 values   : counting {v1.counting.get}, count {v1.count.get}")
+  let consts ← declareSymbols Counter.idents
+  println! "scope constants : {consts.counting} {consts.count}"
+
+/-! `declareBVars` makes one bound variable per field, named after it, which a lambda binds. -/
+
+/-- info: (lambda ((counting Bool) (count Int)) (ite counting (+ count 1) count)) -/
+#guard_msgs in #eval Env.runIO do
+  let b ← Counter.idents.declareBVars
+  let body ← smt! if b.counting then b.count + 1 else b.count
+  println! ← BVars.lambda #[b.counting, b.count] body
+
+end InSolver

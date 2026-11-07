@@ -199,6 +199,12 @@ example : Bool := r.isReal64Value
 example : Bool := bv.isBitVecValue
 example : Res Cvc.Float.RoundingMode := rm.getRoundingModeValue
 example : Bool := f.isFloatNaN
+example : Bool := i.isUInt64Value
+example : Res (Int64 × UInt64) := r.getReal64Value
+example : Res String := r.getRealValue
+example : Option Rat := r.getRatValue?
+example : Bool := f.isFloatNegInf
+example : Bool := f.isFloatPosZero
 
 /-- info: @Term.isInt32Value : [inst : Ω] → Term Int → Bool -/
 #guard_msgs in #check @Cvc.Typed.Term.isInt32Value

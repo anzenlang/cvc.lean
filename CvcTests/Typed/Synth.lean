@@ -188,3 +188,110 @@ next! : cvc5 found no further term of interest
   let g ← g.addRules start #[← Term.mkBool true]
   let _ ← s.synthFun "f" g
   println! "any : {← s.findAnySynth! .enum}"
+
+
+
+/-! ## Further solutions
+
+`checkSynthNext` asks for another solution where one was found; each is at the function's index.
+-/
+
+/-- info:
+first : (lambda ((x Int)) (+ 1 x))
+next  : (lambda ((x Int)) (+ (+ 1 x) 1))
+raw   : (SOLUTION)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let x ← BVar.mk (α := Int) "x"
+  let f ← s.synthAnyFun' "f" (BVars.push x []) Int
+  let a ← s.declareSygusVar Int "a"
+  s.addSygusConstraint (← smt! a < f a)
+  s.checkSynth (ifSolved := do
+    let first : Term (Int → Int) ← s.getSynthSolution f
+    println! "first : {first}"
+    s.checkSynthNext (ifSolved := do println! "next  : {← s.getSynthSolution f}"))
+  let r ← s.checkSynthNextResult
+  println! "raw   : {r}"
+
+
+
+/-! ## Several functions at once
+
+`getSynthSolutions` takes functions of one signature and answers their solutions at it.
+-/
+
+/-- info: solutions : #[(lambda ((x Int)) (+ (+ 2 x) x)), (lambda ((x Int)) (+ 1 x))] -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let x ← BVar.mk (α := Int) "x"
+  let f ← s.synthAnyFun' "f" (BVars.push x []) Int
+  let g ← s.synthAnyFun' "g" (BVars.push x []) Int
+  let a ← s.declareSygusVar Int "a"
+  s.addSygusConstraint (← smt! f a = a + 1)
+  s.addSygusConstraint (← smt! g a = f a + f a)
+  s.checkSynth (ifSolved := do
+    let sols : Terms (Int → Int) ← s.getSynthSolutions #[g, f]
+    println! "solutions : {sols}")
+
+
+
+/-! ## Invariants
+
+`addSygusInvConstraint` takes four functions whose indices are unrelated, a state being any number
+of variables; cvc5 checks that their signatures agree, and a precondition over two states is
+refused.
+-/
+
+/-- info:
+two-state pre : [internal] expected inv and pre to have the same sort
+invariant     : (lambda ((x Int)) (<= x 10))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let x ← BVar.mk (α := Int) "x"
+  let x' ← BVar.mk (α := Int) "x'"
+  let state := BVars.push x []
+  let inv ← s.synthAnyFun' "inv" state Bool
+  let pre ← s.defineFun "pre" state (← smt! x = 0)
+  let trans ← s.defineFun "trans" (BVars.push x' state) (← smt! x < 10 ∧ x' = x + 1)
+  let post ← s.defineFun "post" state (← smt! x ≤ 10)
+  try s.addSygusInvConstraint inv trans trans post; println! "two-state pre : accepted"
+  catch e => println! "two-state pre : {e}"
+  s.addSygusInvConstraint inv pre trans post
+  s.checkSynth (ifSolved := do println! "invariant     : {← s.getSynthSolution inv}")
+
+
+
+/-! ## Symbols as sygus variables
+
+`declareSygusIn` declares a symbol structure's fields as sygus variables, each at its field's index.
+-/
+
+/-- The two inputs of a function to synthesize. -/
+structure.symbols Inputs where
+  lft : Int
+  rgt : Int
+
+/-- info:
+variables : lft rgt
+at step 2 : lft__@__2 rgt__@__2
+solution  : (lambda ((x Int) (y Int)) (+ y x))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let ids : Inputs.Idents := Symbols.Sig.idents ()
+  let i ← ids.declareSygusIn s
+  let lft : Term Int := i.lft
+  println! "variables : {lft} {i.rgt}"
+  let i2 ← ids.declareSygusAtIn 2 s
+  println! "at step 2 : {i2.lft.get} {i2.rgt.get}"
+  let x ← BVar.mk (α := Int) "x"
+  let y ← BVar.mk (α := Int) "y"
+  let f ← s.synthAnyFun' "f" (BVars.push y (BVars.push x [])) Int
+  s.addSygusConstraint (← smt! f i.lft i.rgt = i.lft + i.rgt)
+  s.checkSynth (ifSolved := do println! "solution  : {← s.getSynthSolution f}")

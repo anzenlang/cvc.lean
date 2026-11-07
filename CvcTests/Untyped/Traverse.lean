@@ -175,3 +175,25 @@ root: (< (+ x 7) 3)
   let some z := z.left | println! "no sibling"
   println! "left of it: {z.focus}"
   println! "root: {← z.root}"
+
+/-! `replace` refuses a replacement of another sort, and `replaceUnchecked` skips that check, so the
+ill-sorted term is only noticed when the parent is rebuilt. -/
+
+/-- info:
+replace          : cannot replace `x`, of sort `Int`, by `true`, of sort `Bool`
+replaceUnchecked : [internal] expecting an arithmetic subterm
+-/
+#guard_msgs in #eval Env.runIO do
+  let int ← Srt.int
+  let x ← Term.mkSymbol int "x"
+  let t ← smt! x + 1 < 3
+  let some z := (ZipperOf.ofTermErased t).down 0 | println! "no kid"
+  let some z := z.down 0 | println! "no kid"
+  let tru ← Term.mkBool true
+  try
+    let z ← z.replace tru
+    println! "replace          : {← z.root}"
+  catch e => println! "replace          : {e}"
+  try
+    println! "replaceUnchecked : {← (z.replaceUnchecked tru).root}"
+  catch e => println! "replaceUnchecked : {e}"

@@ -257,3 +257,155 @@ without one    : [internal] No grammar available in call to find-synth. Either p
   let _ ← s.synthFun "f" #[] (← Srt.bool)
   try println! "without one    : {← s.findSynth .enum}"
   catch e => println! "without one    : {e}"
+
+
+
+/-! ## Further solutions
+
+`checkSynthNext` asks for another solution where one was found, and runs the branch matching the
+answer, so it nests: each solution here differs from the ones before, and each satisfies `a < f a`.
+`checkSynthNextResult` is the raw form.
+-/
+
+/-- info:
+first : (lambda ((x Int)) (+ 1 x))
+next  : (lambda ((x Int)) (+ (+ 1 x) 1))
+next  : (lambda ((x Int)) (+ (+ (+ 1 1) 1) x))
+raw   : (SOLUTION), hasSolution: true
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let x ← BVar.mk int "x"
+  let f ← s.synthFun "f" #[x] int
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! a < f a)
+  s.checkSynth (ifSolved := do
+    println! "first : {← s.getSynthSolution f}"
+    s.checkSynthNext (ifSolved := do
+      println! "next  : {← s.getSynthSolution f}"
+      s.checkSynthNext (ifSolved := do
+        println! "next  : {← s.getSynthSolution f}")))
+  let r ← s.checkSynthNextResult
+  println! "raw   : {r}, hasSolution: {r.hasSolution}"
+
+
+
+/-! ## Several functions at once
+
+`getSynthSolutions` answers one solution per function, in the order asked, and the solutions agree
+with each other: `g` is stated in terms of `f`.
+-/
+
+/-- info: solutions : #[(lambda ((x Int)) (+ (+ 2 x) x)), (lambda ((x Int)) (+ 1 x))] -/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let x ← BVar.mk int "x"
+  let f ← s.synthFun "f" #[x] int
+  let g ← s.synthFun "g" #[x] int
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 1)
+  s.addSygusConstraint (← smt! g a = f a + f a)
+  s.checkSynth (ifSolved := do println! "solutions : {← s.getSynthSolutions #[g, f]}")
+
+
+
+/-! ## Invariants
+
+`addSygusInvConstraint` asks for an inductive invariant of a transition system given as defined
+functions: a counter starting at `0` and incremented while below `10` never exceeds `10`, and with
+`post` weakened to `x ≤ 5` no invariant exists, since the counter reaches `10`.
+-/
+
+/-- info:
+post x ≤ 10 : (lambda ((x Int)) (<= x 10))
+post x ≤ 5  : no invariant
+-/
+#guard_msgs in #eval Env.runIO do
+  let report (bound : Int) : Env Unit := do
+    let s ← Solver.new
+    s.setOption "sygus" "true"
+    let int ← Srt.int
+    let bool ← Srt.bool
+    let x ← BVar.mk int "x"
+    let x' ← BVar.mk int "x'"
+    let inv ← s.synthFun "inv" #[x] bool
+    let pre ← s.defineFun "pre" #[x] bool (← smt! x = 0)
+    let trans ← s.defineFun "trans" #[x, x'] bool (← smt! x < 10 ∧ x' = x + 1)
+    let post ← s.defineFun "post" #[x] bool (← smt! x ≤ ![Term.mkInt bound])
+    s.addSygusInvConstraint inv pre trans post
+    let label := s!"post x ≤ {bound}".pushn ' ' (2 - (toString bound).length)
+    s.checkSynth (ifSolved := do println! "{label} : {← s.getSynthSolution inv}")
+      (ifUnsolvable := println! "{label} : no invariant")
+  report 10
+  report 5
+
+
+
+/-! ## Giving up
+
+A grammar of sums of `x` cannot express `a + 1`, and cvc5 cannot show it, so it searches until the
+time limit and answers unknown. `checkSynth?` defaults only its solved and unsolvable branches, so
+it fails there.
+-/
+
+/-- info:
+isSolved?  : none
+checkSynth : unknown branch
+checkSynth?: unexpected `unknown` synthesis result
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  s.setOption "tlimit-per" "100"
+  let int ← Srt.int
+  let x ← BVar.mk int "x"
+  let start ← NT.mk int "start"
+  let g ← s.mkGrammar #[x] start
+  let g ← g.addRule start x.toTerm
+  let g ← g.addRule start (← Term.add start.toTerm start.toTerm)
+  let f ← s.synthFun "f" #[x] int g
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 1)
+  println! "isSolved?  : {← (← s.checkSynthResult).isSolved?}"
+  s.checkSynth (ifUnknown := println! "checkSynth : unknown branch")
+  try
+    let _ ← s.checkSynth? (ifSolved := return some "solved")
+    println! "checkSynth?: no error"
+  catch e => println! "checkSynth?: {e}"
+
+
+
+/-! ## Symbols as sygus variables
+
+`declareSygusIn` declares a symbol structure's fields as the variables a specification quantifies
+over, and `declareSygusAtIn` names them for a step.
+-/
+
+/-- The two inputs of a function to synthesize. -/
+structure.symbols Inputs where
+  lft : Int
+  rgt : Int
+
+/-- info:
+variables : lft rgt
+at step 2 : lft__@__2 rgt__@__2
+solution  : (lambda ((x Int) (y Int)) (+ y x))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let ids : Inputs.Idents := Symbols.Sig.idents ()
+  let i ← ids.declareSygusIn s
+  println! "variables : {i.lft} {i.rgt}"
+  let i2 ← ids.declareSygusAtIn 2 s
+  println! "at step 2 : {i2.lft.get} {i2.rgt.get}"
+  let x ← BVar.mk int "x"
+  let y ← BVar.mk int "y"
+  let f ← s.synthFun "f" #[x, y] int
+  s.addSygusConstraint (← smt! f i.lft i.rgt = i.lft + i.rgt)
+  s.checkSynth (ifSolved := do println! "solution  : {← s.getSynthSolution f}")

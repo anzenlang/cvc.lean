@@ -2303,6 +2303,9 @@ tree moved out of `Cvc/` to the root: `CvcTests/Untyped/Theory/Set.lean` still o
   denoting their own types. `CvcTests/View.lean` — the two `View` modules alone, with no theory.
 - `CvcTests/{Untyped,Typed}/Traverse.lean` — folds, walks (bottom-up, top-down with revisit, `stop`,
   a refused replacement) and the zipper by hand; typed, a wrong-sort replacement as an error.
+- `CvcTests/{Untyped,Typed}/Extra/Sys.lean` — transition systems by hand: a counter unrolled with
+  `initAt`/`nextAt`, its run pinned by the constraints and read back through the counterexample
+  accessors (`getCex`, `getTermCex`, `getValueTerms`) in step order.
 
 ## What is left
 

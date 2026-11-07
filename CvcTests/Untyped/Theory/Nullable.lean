@@ -134,6 +134,24 @@ rejected   : expected a nullable value, got `x`
     pure s!"{v}"}"
 
 
+/-! `mkNullableValue` and `getNullableValue` are those conversions under their own names, the
+element type the caller's to give; a term that is no nullable value is refused. -/
+
+/-- info:
+string  : (nullable.some "a""b\u{e9}") → (some a"bé)
+nested  : (some (some 3))
+not one : expected a nullable value, got `3`
+-/
+#guard_msgs in #eval Env.runIO do
+  let str ← Term.mkNullableValue (some "a\"bé")
+  let back : Option String ← Term.getNullableValue str
+  println! "string  : {str} → {back}"
+  let nested ← Term.mkNullableValue (some (some (3 : Int)))
+  println! "nested  : {← Term.getNullableValue (α := Option Int) nested}"
+  let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"
+  println! "not one : {← caught do
+    return s!"{← Term.getNullableValue (α := Int) (← Term.mkInt 3)}"}"
+
 
 /-! ## Through a model -/
 

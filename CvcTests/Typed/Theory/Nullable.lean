@@ -113,6 +113,26 @@ of Bool : (nullable.some true) → (some true)
   println! "of Bool : {← roundTrip Bool (some true)}"
 
 
+/-! `mkNullableValue` and `getNullableValue` are those conversions under their own names, the
+index carried from the value to the term and back. -/
+
+/-- info:
+string : (nullable.some "a""b\u{e9}") → (some a"bé)
+model  : (some -1)
+-/
+#guard_msgs in #eval Env.runIO do
+  let str : Term (Option String) ← mkNullableValue (some "a\"bé")
+  let back : Option String ← getNullableValue str
+  println! "string : {str.erase} → {back}"
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let x ← s.declareConstAs (Option Int) "x"
+  s.assert (← nullableIsSome x)
+  s.assert (← lt (← nullableVal x) (← mkInt 0))
+  s.assert (← lt (← mkInt (-2)) (← nullableVal x))
+  let v ← s.checkSat (ifSat := s.getValueTerm x)
+  println! "model  : {← getNullableValue v}"
+
 
 /-! ## Through a model
 

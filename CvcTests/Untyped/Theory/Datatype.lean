@@ -161,6 +161,113 @@ is nil : ((_ is nil) (cons 1 (cons 2 nil)))
 
 
 
+/-! ## Updating a field
+
+`Selector.applyUpdate` replaces one field and keeps the others, which a model shows: `q` is `p` with
+`fst` replaced, so its `snd` is `p`'s. Updating a field of a value built by another constructor
+leaves the value as it is.
+-/
+
+/-- info:
+q         : (mk 9 true)
+nil       : nil
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "produce-models" "true"
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
+  let mk ← mk.addSelector "fst" (← Srt.int)
+  let mk ← mk.addSelector "snd" (← Srt.bool)
+  let pair ← s.declareDatatype "Pair" #[mk]
+  let ctor ← (← pair.getDatatype).getCtorNamed "mk"
+  let fst ← ctor.getSelector "fst"
+  let snd ← ctor.getSelector "snd"
+  let p ← s.declareConst "p" pair
+  s.assert (← Term.equal (← fst.apply p) (← Term.mkInt 3))
+  s.assert (← snd.apply p)
+  let q ← fst.applyUpdate p (← Term.mkInt 9)
+
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
+  let cons ← (← cons.addSelector "head" (← Srt.int)).addSelectorSelf "tail"
+  let lst ← s.declareDatatype "Lst" #[nil, cons]
+  let dt ← lst.getDatatype
+  let nilT ← (← dt.getCtorNamed "nil").apply
+  let head ← (← dt.getCtorNamed "cons").getSelector "head"
+  let updatedNil ← head.applyUpdate nilT (← Term.mkInt 1)
+
+  s.checkSat (ifSat := do
+    println! "q         : {← s.getValue q}"
+    println! "nil       : {← s.getValue updatedNil}")
+
+
+
+/-! ## Constructors by index
+
+`getCtorAt?` answers `none` past the last constructor, and `getCtor` fails there, naming the
+datatype.
+-/
+
+/-- info:
+getCtor 1   : cons
+getCtorAt? 0: (some nil)
+getCtorAt? 2: none
+getCtor 2   : cannot retrieve constructor 2
+Lst only has 2 constructor(s)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  let nil ← Cvc.Datatype.Ctor.Decl.mk "nil"
+  let cons ← Cvc.Datatype.Ctor.Decl.mk "cons"
+  let cons ← (← cons.addSelector "head" (← Srt.int)).addSelectorSelf "tail"
+  let dt ← (← s.declareDatatype "Lst" #[nil, cons]).getDatatype
+  println! "getCtor 1   : {← (← dt.getCtor 1).getName}"
+  println! "getCtorAt? 0: {← (dt.getCtorAt? 0).mapM (·.getName)}"
+  println! "getCtorAt? 2: {← (dt.getCtorAt? 2).mapM (·.getName)}"
+  try println! "getCtor 2   : {← (← dt.getCtor 2).getName}"
+  catch e => println! "getCtor 2   : {e}"
+
+
+
+/-! ## Parametric datatypes
+
+A datatype declared over sort parameters is resolved by declaring it, answers its parameters, and
+its constructor is applied through the term instantiated at one instance of it.
+-/
+
+/-- info:
+resolved     : false, then true
+parametric   : true
+parameters   : #[T]
+instantiated : (Box Int)
+value        : ((as box (Box Int)) 5) : (Box Int)
+plain params : [internal] expected parametric datatype
+-/
+#guard_msgs in #eval Env.runIO do
+  let t ← Srt.param "T"
+  let box ← Cvc.Datatype.Ctor.Decl.mk "box"
+  let box ← box.addSelector "val" t
+  let decl ← Cvc.Datatype.Decl.mk "Box" #[t]
+  let decl ← decl.addCtor box
+  let before ← decl.isResolved
+  let boxSrt ← Srt.datatype decl
+  println! "resolved     : {before}, then {← decl.isResolved}"
+  let dt ← boxSrt.getDatatype
+  println! "parametric   : {dt.isParametric}"
+  println! "parameters   : {← dt.getParameters}"
+  let boxInt ← liftM <| boxSrt.instantiate #[← Srt.int]
+  println! "instantiated : {boxInt}"
+  let ctor ← dt.getCtorNamed "box"
+  let v ← Term.applyCtor (← ctor.getInstantiatedTerm boxInt) #[← Term.mkInt 5]
+  println! "value        : {v} : {← v.getSort}"
+  let s ← Solver.new
+  let mk ← Cvc.Datatype.Ctor.Decl.mk "mk"
+  let plain ← (← s.declareDatatype "Plain" #[mk]).getDatatype
+  try println! "plain params : {← plain.getParameters}"
+  catch e => println! "plain params : {e}"
+
+
+
 /-! ## Mutual recursion
 
 Members of a group refer to each other by name through `addSelectorUnresolved`, and the names are
