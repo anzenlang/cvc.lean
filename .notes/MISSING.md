@@ -21,7 +21,7 @@ scripts at the end.
 | [Odds and ends](#odds-and-ends) | 5 functions + 1 kind | — |
 | [Statistics](#not-bound-by-lean-cvc5-either) | — | lean-cvc5 does not bind it |
 
-Coverage as measured: **282 of 297 term kinds** referenced (`WITNESS` only by the comment
+Coverage as measured: **280 of 297 term kinds** referenced (`WITNESS` only by the comment
 explaining its exclusion), and by namespace —
 `Sort` 65/65, `TermManager` 66/72, `Term` 60/76, `Solver` 63/72, every `Datatype*` type complete,
 `Grammar` 4/4, `Proof` 5/5, `Result` 4/4, `SynthResult` 3/3, `Op` 4/4, `InputParser` 2/11,
@@ -178,6 +178,11 @@ Statistics, option info, driver options, plugins. Nothing to wrap until lean-cvc
 - **Skolems** — `TermManager.mkSkolem`, `getNumIndicesForSkolemId`, `Term.isSkolem`,
   `getSkolemId`, `getSkolemIndices`, kinds `SKOLEM` and `SKOLEM_ADD_TO_POOL`. Internal API.
 - **`WITNESS`** — asserting a term containing one aborts the process rather than throwing.
+- **`BITVECTOR_BIT`, `BITVECTOR_FROM_BOOLS`** — cvc5 documents both as kinds that may not be
+  created through its API nor appear in assertions; asserting a `BITVECTOR_FROM_BOOLS` term aborted
+  the process. They were wrapped (`bvBit`, `bvFromBool`/`bvFromBools`) and removed.
+- **`BITVECTOR_TO_NAT`** — deprecated by cvc5 in favour of `BITVECTOR_UBV_TO_INT`, which
+  `bvUbvToInt` wraps.
 - **Null-pointer checks** — every `isNull`. See the "null means two unrelated things in cvc5"
   section of `CLAUDE.md`. An absent `isNull` is the policy, not a gap.
 
@@ -191,6 +196,8 @@ Statistics, option info, driver options, plugins. Nothing to wrap until lean-cvc
   convenience methods, covered by the generated `and`/`or`/… operators.
 - Kinds `CONST_ROUNDINGMODE`, `CONST_FINITE_FIELD`, `VARIABLE` — covered by the hand-written
   `mkRoundingMode`, `mkFiniteFieldElem` and `mkBVar`, which never name the kind.
+- Kind `NULLABLE_LIFT` — covered by the generated `<id>?` lifts, which build through
+  `mkNullableLift` and never name the kind.
 - `Term.getNumChildrenInternal`, `Term.isCardinalityConstraintInternal` — internal.
 - 23 of the enum variants a `Kind.lean` scan turns up are `SortKind`, not term kinds, and four
   more (`INTERNAL_KIND`, `LAST_KIND`, `UNDEFINED_KIND`, `NULL_TERM`) are sentinels.

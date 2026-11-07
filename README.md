@@ -38,7 +38,8 @@ prints `x := 4, y := 6`.
 
 # Using cvc.lean
 
-cvc.lean is not on Reservoir yet: depend on its repository at a [release][releases] tag.
+cvc.lean is not on Reservoir yet: depend on its repository at one of its [releases][releases], in
+place of `vX.Y.Z` below.
 
 ```toml
 [[require]]
