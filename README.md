@@ -21,12 +21,13 @@ public def main : IO Unit := Env.runIO do
   solver.setOpt .smt_produceModels true
   let x ← Term.mkSymbolAs Int "x"
   let y ← Term.mkSymbolAs Int "y"
-  solver.assert (← smt! 0 < x ∧ x < y ∧ x + y = 10)
-  solver.checkSat (ifSat := do
-    println! "x = {← solver.getValue x}, y = {← solver.getValue y}")
+  smt! 0 < x ∧ x < y ∧ x + y = 10 >>= solver.assert
+  let (xVal, yVal) ← solver.checkSat
+    (ifSat := return (← solver.getValue x, ← solver.getValue y))
+  println! "x := {xVal}, y := {yVal}"
 ```
 
-prints `x = 4, y = 6`.
+prints `x := 4, y := 6`.
 
 
 # Documentation
@@ -52,7 +53,9 @@ or, in a `lakefile.lean`,
 require cvc from git "https://github.com/anzenlang/cvc.lean" @ "vX.Y.Z"
 ```
 
-then run `lake update cvc`.
+then run `lake update cvc` to record the dependency in your project's `lake-manifest.json`. This is
+needed once when you add cvc.lean, and again when you move to another of its releases; in between,
+`lake build` is all it takes.
 
 - **Lean version.** Each release follows one Lean version, the one in its `lean-toolchain`, and
   your project's `lean-toolchain` must name the same. cvc.lean moves to a new Lean version once
@@ -63,7 +66,7 @@ then run `lake update cvc`.
   platform, which the build fetches with the library: no C or C++ compiler is needed. Depending on
   a commit rather than a release tag works too, but lean-cvc5 then fetches its own files.
 - **Write modules.** The typed API's guarantees rely on Lean's module system: a file using it
-  should start with `module`, or its static checks do not apply.
+  should start with `module`, otherwise some of its static checks will not be enforced.
 
 
 # Building from source
