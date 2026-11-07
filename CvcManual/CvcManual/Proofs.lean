@@ -67,7 +67,7 @@ A proof is indexed by the solver that produced it and by the _component_ it was 
 ```lean (name := ex_Proof_walk)
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "produce-proofs" "true"
+  s.setOpt .smt_produceProofs true
   let b ← Term.mkSymbolAs Bool "b"
   s.assert b
   s.assert (← smt! ¬ b)
@@ -112,7 +112,7 @@ def describe {s : Solver} : s.ProofView pc → String
 
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "produce-proofs" "true"
+  s.setOpt .smt_produceProofs true
   let b ← Term.mkSymbolAs Bool "b"
   s.assert b
   s.assert (← smt! ¬ b)
@@ -136,7 +136,7 @@ The examples below refute `x ≥ 1`, `x ≤ 1` and `f x ≠ f 1`: arithmetic dec
 ```lean
 def congruence : Env Solver := do
   let s ← Solver.new
-  s.setOption "produce-proofs" "true"
+  s.setOpt .smt_produceProofs true
   let f ← Term.mkSymbolAs (Int → Int) "f"
   let x ← Term.mkSymbolAs Int "x"
   (smt! x ≥ 1) >>= s.assert

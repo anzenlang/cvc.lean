@@ -62,7 +62,7 @@ Think of it as a *"cvc5 world"* which we need to do anything, in particular to w
 def setup : Env (Solver × Term Bool × Term Int) := do
   -- all solvers share the same environment
   let solver ← Solver.new
-  solver.setOption "produce-models" "true"
+  solver.setOpt .smt_produceModels true
 
   -- declare a symbol in the environment, type is inferred
   let b1 ← Term.mkSymbol "b1"
@@ -83,7 +83,8 @@ def setup : Env (Solver × Term Bool × Term Int) := do
     let conj ← b1.and i1_pos
     (← b1.not).or conj
 
-  -- terms are perfectly shared, both formulas are the same
+  -- cvc5 builds each distinct term once:
+  -- both formulas are the very same term
   if formula != formula_by_hand then
     panic! "not perfectly shared 🙀"
 
@@ -91,6 +92,8 @@ def setup : Env (Solver × Term Bool × Term Int) := do
 
   return (solver, b1, i1)
 ```
+
+`smt!` writes terms in a syntax close to Lean's own; {ref "smt"}[the `smt!` reference] lists what it accepts.
 
 Use {lean}`Env.runIO` to run {lean}`Env` code in {lean}`IO`.
 
@@ -175,7 +178,7 @@ This example uses the `smt.grammar!` syntax extension for grammars, but they can
 ```lean (name := intro_ex_synth)
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "sygus" "true"
+  s.setOpt .sygus_sygus true
 
   let g ← smt.grammar! s (x y : Int) where
     start : Int  := x | y | if cnd then start else start
@@ -198,6 +201,8 @@ max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
 
 # Quantifier elimination
 
+`Solver.qe` turns a quantified formula into an equivalent one without quantifiers, here a constraint on `y` alone.
+
 ```lean (name := intro_ex_qe)
 #eval Env.runIO do
   let solver ← Solver.new
@@ -212,10 +217,12 @@ elim := (and (>= y 0) (not (>= y 2)))
 
 # Interpolation: free and constrained by a grammar
 
+An interpolant of the assertions and of a goal they imply is a formula over their shared symbols, implied by the assertions and implying the goal. A grammar can restrict its shape.
+
 ```lean (name := intro_ex_interpolation)
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "produce-interpolants" "true"
+  s.setOpt .smt_produceInterpolants true
 
   let x ← Term.mkSymbolAs Int "x"
   let y ← Term.mkSymbolAs Int "y"
@@ -246,10 +253,12 @@ constrained : (and (= (mod y 2) 1) (= (mod y 3) 0))
 
 # String/regex
 
+Strings come with the usual operations, and `regex!` writes regular expressions in the usual notation.
+
 ```lean (name := intro_ex_theories)
 #eval Env.runIO do
   let solver ← Solver.new
-  solver.setOption "produce-models" "true"
+  solver.setOpt .smt_produceModels true
   let zero ← smt! 0
   let someString ← smt! "cvc.lean"
   let s1 ← Term.mkSymbol "s1"
@@ -288,7 +297,7 @@ A bit-vector's width is part of its type, `Term (BitVec 8)`, and its model value
 ```lean (name := intro_ex_bitvec)
 #eval Env.runIO do
   let solver ← Solver.new
-  solver.setOption "produce-models" "true"
+  solver.setOpt .smt_produceModels true
   let x ← Term.mkSymbolAs (BitVec 8) "x"
   let one ← Term.mkBitVec 8 1
   let zero ← Term.mkBitVec 8 0
@@ -341,7 +350,7 @@ def double (rm : Float.RoundingMode) (r : Rat)
 
 #eval Env.runIO do
   let solver ← Solver.new
-  solver.setOption "produce-models" "true"
+  solver.setOpt .smt_produceModels true
   let rne := Float.RoundingMode.nearestTiesToEven
 
   -- the classic
@@ -382,7 +391,7 @@ abbrev IntArray := TotalMap Int Int
 
 #eval Env.runIO do
   let solver ← Solver.new
-  solver.setOption "produce-models" "true"
+  solver.setOpt .smt_produceModels true
   solver.setOption "arrays-exp" "true"
   let a ← Term.mkSymbolAs IntArray "a"
   let zero ← Term.mkInt 0
@@ -428,8 +437,8 @@ def withHeap
 : Env Unit := do
   let s ← Solver.new
   s.setLogic Logic.all.qf
-  s.setOption "incremental" "false"
-  s.setOption "produce-models" "true"
+  s.setOpt .base_incremental false
+  s.setOpt .smt_produceModels true
   query s (← s.declareSepHeap Int Int)
 
 #eval Env.runIO do
@@ -480,12 +489,7 @@ Take a company whose staff, `(employee, project)`, is sharded between a `paris` 
 ```lean (name := intro_ex_rel)
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "produce-models" "true"
-  -- relations have no Lean value type: print the model term
-  let valueOf {α : Type} (t : Term α) := do
-    let v ← Untyped.Solver.getValue s t.erase
-    return toString v
-
+  s.setOpt .smt_produceModels true
   let paris ←
     Term.mkSymbolAs (Rel [String] String) "paris"
   let berlin ←
@@ -510,10 +514,11 @@ Take a company whose staff, `(employee, project)`, is sharded between a `paris` 
     Term.relInter (← query paris) (← query berlin)
   let differ ← smt! ¬ (both = bothPerShard)
   s.checkSat (assuming := #[differ]) (ifSat := do
+    -- relations have no Lean values: print terms
     println! "∩ does not, counterexample:"
-    println! "  paris   = {← valueOf paris}"
-    println! "  berlin  = {← valueOf berlin}"
-    println! "  budgets = {← valueOf budgets}")
+    println! "  paris   = {← s.getValueTerm paris}"
+    println! "  berlin  = {← s.getValueTerm berlin}"
+    println! "  budgets = {← s.getValueTerm budgets}")
 ```
 ```leanOutput intro_ex_rel
 ∪ pushes through the join
@@ -530,12 +535,7 @@ Tables count rows, so the same question about SQL's `UNION ALL` (`tableUnionDisj
 ```lean (name := intro_ex_tab)
 #eval Env.runIO do
   let s ← Solver.new
-  s.setOption "produce-models" "true"
-  -- relations have no Lean value type: print the model term
-  let valueOf {α : Type} (t : Term α) := do
-    let v ← Untyped.Solver.getValue s t.erase
-    return toString v
-
+  s.setOpt .smt_produceModels true
   let paris ←
     Term.mkSymbolAs (Tab [String] String) "paris"
   let berlin ←
@@ -558,10 +558,11 @@ Tables count rows, so the same question about SQL's `UNION ALL` (`tableUnionDisj
   let dedup ← Term.tableUnionMax paris berlin >>= query
   let differ ← smt! ¬ (all = dedup)
   s.checkSat (assuming := #[differ]) (ifSat := do
+    -- tables have no Lean values: print terms
     println! "UNION ≠ UNION ALL, counterexample:"
-    println! "  paris   = {← valueOf paris}"
-    println! "  berlin  = {← valueOf berlin}"
-    println! "  budgets = {← valueOf budgets}")
+    println! "  paris   = {← s.getValueTerm paris}"
+    println! "  berlin  = {← s.getValueTerm berlin}"
+    println! "  budgets = {← s.getValueTerm budgets}")
 ```
 ```leanOutput intro_ex_tab
 UNION ALL pushes through the join

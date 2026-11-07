@@ -52,7 +52,7 @@ Cvc.lean exposes two API-s for terms: `Typed` and `Untyped`. The former provides
 
 > *NB:* cvc.lean enforces type-safety through definition irreducibility, which means you need to use Lean's `module` system to get any of its benefits.
 
-Terms can be constructed by calling constructor-functions, but cvc.lean also provides a syntax extension `smt! ...` that supports Lean-like syntax to create terms. The discussion below presents both, but the rest of this document will almost always rely on the syntax extension.
+Terms can be constructed by calling constructor-functions, but cvc.lean also provides a syntax extension `smt! ...` that supports Lean-like syntax to create terms, {ref "smt"}[described in its own section]. The discussion below presents both, but the rest of this document will almost always rely on the syntax extension.
 
 
 
@@ -328,8 +328,8 @@ Here is an example of building quantified terms by hand, `smt!` version below.
 ```lean (name := ex_BoundVars_quant1)
 #eval Env.runIO do
   let n ← Term.mkSymbolAs Int "n"
-  let i ← Term.mkBVar "i"
-  let j ← Term.mkBVar "j"
+  let i ← BVar.mk "i"
+  let j ← BVar.mk "j"
   let bVars_j := BVars.empty.push j
   let all_le ← Term.mkForall bVars_j (← smt! n < j → i < j)
   let bVars_i := BVars.empty.push i
