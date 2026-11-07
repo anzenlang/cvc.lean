@@ -24,7 +24,12 @@ Converting an element to a term and back is done by `Cvc.Untyped.Theory.FiniteFi
 -/
 namespace Cvc public section variable [Ω]
 
-/-- An element of a finite field of size `size`. -/
+/-- An element of a finite field of size `size`, held as an integer representing it.
+
+Any integer congruent to it modulo `size` represents the same element, but equality, order and
+hashing compare the integers: `⟨6⟩ : FiniteField 7` and `⟨-1⟩` are the same element yet not equal.
+Values read from cvc5 come in its symmetric representation, `6` reading back as `-1`.
+-/
 structure FiniteField (size : Nat) where
   /-- Element representation. -/
   repr : Int

@@ -92,9 +92,10 @@ polynomial it is a root of, together with an interval isolating that root.
 @[inherit_doc T.isRealAlgebraicNumber]
 def isRealAlgebraicNumber (term : Term) : Bool := T.isRealAlgebraicNumber term.toUnsafe
 
-@[inherit_doc T.getRealAlgebraicNumberDefiningPolynomial]
-def getRealAlgebraicNumberPolynomial (term : Term) (v : Term) : Env Term :=
-  T.getRealAlgebraicNumberDefiningPolynomial term.toUnsafe v.toUnsafe |>.mapError Error.ofUnsafe
+/-- The polynomial a real algebraic number is a root of, written in the bound variable `v`. -/
+def getRealAlgebraicNumberPolynomial (term : Term) (v : BVar) : Env Term :=
+  T.getRealAlgebraicNumberDefiningPolynomial term.toUnsafe v.toTerm.toUnsafe
+    |>.mapError Error.ofUnsafe
 
 @[inherit_doc T.getRealAlgebraicNumberLowerBound]
 def getRealAlgebraicNumberLowerBound (term : Term) : Env Term :=
@@ -120,9 +121,18 @@ def getRealValue (term : Term) : Res String :=
   T.getRealValue term.toUnsafe |>.mapError Error.ofUnsafe
 @[inherit_doc getRealValue]
 def getRealValue? (term : Term) : Option String := T.getRealValue? term.toUnsafe
-/-- The real a term denotes as a `Rat`, failing if it denotes none. -/
+/-- The real a term denotes as a `Rat`, failing if it denotes none.
+
+An irrational model value, which nonlinear real arithmetic can produce, is no `Rat`: read it as a
+term instead, and take it apart with the `getRealAlgebraicNumber…` functions.
+-/
 def getRatValue (term : Term) : Res Rat :=
-  T.getRationalValue term.toUnsafe |>.mapError Error.ofUnsafe
+  if term.isRealAlgebraicNumber then
+    throwUser s!"`{term}` is an irrational real, a root of a polynomial isolated in an interval, \
+      which a `Rat` cannot hold: read it as a term (`Solver.getValueTerm`) and take it apart with \
+      `getRealAlgebraicNumberPolynomial`, `getRealAlgebraicNumberLowerBound` and \
+      `getRealAlgebraicNumberUpperBound`"
+  else T.getRationalValue term.toUnsafe |>.mapError Error.ofUnsafe
 @[inherit_doc getRatValue]
 def getRatValue? (term : Term) : Option Rat := T.getRationalValue? term.toUnsafe
 

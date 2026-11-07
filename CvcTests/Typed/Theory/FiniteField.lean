@@ -35,3 +35,20 @@ bitsum: (ff.bitsum a b)
   println! "mul   : {← ffMul a b}"
   println! "neg   : {← ffNeg a}"
   println! "bitsum: {← ffBitsum a b}"
+
+/-! An element comes back as the same element of the field, in cvc5's symmetric representation
+rather than as the integer it was built from.
+-/
+
+/-- info:
+0 → 0 : same element
+4 → -3 : same element
+6 → -1 : same element
+7 → 0 : same element
+10 → 3 : same element
+-4 → 3 : same element
+-/
+#guard_msgs in #eval Env.runIO do
+  for i in [0, 4, 6, 7, 10, -4] do
+    let back : Cvc.FiniteField 7 ← extractValue (← mkValue (⟨i⟩ : Cvc.FiniteField 7))
+    println! "{i} → {back} : {if (back.repr - i) % 7 == 0 then "same element" else "DIFFERENT"}"

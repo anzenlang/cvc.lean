@@ -102,3 +102,16 @@ come last and is hard to justify before the rest has been used on something real
 The use case that would justify the whole thing is **query equivalence** — assert the schema
 constraints, build two queries, assert they differ, expect `unsat`. Worth writing that test first,
 since it exercises projection, join, restriction and the set operators at once.
+
+## Finite-field elements with a canonical representative
+
+`Cvc.FiniteField size` holds any integer as an element's representative, and its derived
+`DecidableEq`, `Ord` and `Hashable` compare those integers. cvc5 reads an element back in its
+symmetric representation (`6 : GF(7)` comes back as `-1`), so a value converted to a term and back
+is the same field element but not always an equal Lean value; a hand-built `⟨10⟩` differs from the
+`⟨3⟩` it denotes in the same way. Today this is documented on the type, and the tests check round
+trips up to congruence.
+
+The fix worked out: a private constructor, with `FiniteField.ofInt`, `OfNat` and `IntCast` reducing
+modulo `size` into `[0, size)`, and reading normalising to the same range. Structural equality is
+then equality in the field, at the cost of the `⟨i⟩` syntax and of the representative cvc5 prints.

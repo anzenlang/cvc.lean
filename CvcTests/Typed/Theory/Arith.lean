@@ -9,9 +9,11 @@ module
 
 import Cvc.Typed.Theory.Arith
 import Cvc.Typed.Core.Bool
+import Cvc.Typed.Core.Solver
 
 public meta import Cvc.Typed.Theory.Arith
 public meta import Cvc.Typed.Core.Bool
+public meta import Cvc.Typed.Core.Solver
 
 
 
@@ -247,3 +249,30 @@ mulN' [] (Rat) : 1.0 : Real
   println! "addN' [] (Int) : {zi} : {← zi.getSort}"
   println! "addN' [] (Rat) : {zr} : {← zr.getSort}"
   println! "mulN' [] (Rat) : {or} : {← or.getSort}"
+
+/-! An irrational model value, which nonlinear real arithmetic can produce, is no `Rat`: reading one
+fails with an error saying so, and the term it is read as instead gives its polynomial and bounds.
+-/
+
+/-- info:
+as a Rat: `(_ real_algebraic_number <1*x^2 + (-2), (5/4, 3/2)>)` is an irrational real, a root of a polynomial isolated in an interval, which a `Rat` cannot hold: read it as a term (`Solver.getValueTerm`) and take it apart with `getRealAlgebraicNumberPolynomial`, `getRealAlgebraicNumberLowerBound` and `getRealAlgebraicNumberUpperBound`
+algebraic : true
+polynomial: (+ (+ 0.0 (* (- 2.0) 1.0)) (* 1.0 (* (* 1.0 v) v)))
+bounds    : (/ 5 4), (/ 3 2)
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Cvc.Typed.Solver.new
+  s.setOpt .smt_produceModels true
+  s.setLogic .qf_nra
+  let x ← Cvc.Typed.Term.mkSymbolAs Rat "x"
+  s.assert (← smtT! x * x = 2.0 ∧ x > 0.0)
+  try
+    let r ← s.checkSat (ifSat := s.getValue x)
+    println! "unexpected: {r}"
+  catch e => println! "as a Rat: {e}"
+  let t ← s.checkSat (ifSat := s.getValueTerm x)
+  let v ← Cvc.Typed.BVar.mk (α := Rat) "v"
+  println! "algebraic : {isRealAlgebraicNumber t}"
+  println! "polynomial: {← getRealAlgebraicNumberPolynomial t v}"
+  println! "bounds    : {← getRealAlgebraicNumberLowerBound t}, \
+    {← getRealAlgebraicNumberUpperBound t}"

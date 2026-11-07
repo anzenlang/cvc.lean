@@ -84,8 +84,8 @@ polynomial it is a root of, together with an interval isolating that root.
 def isRealAlgebraicNumber (term : Term Rat) : Bool := T.isRealAlgebraicNumber term
 
 @[inherit_doc T.getRealAlgebraicNumberPolynomial]
-def getRealAlgebraicNumberPolynomial (term : Term Rat) (v : Term Rat) : Env (Term Rat) :=
-  T.getRealAlgebraicNumberPolynomial term v
+def getRealAlgebraicNumberPolynomial (term : Term Rat) (v : BVar Rat) : Env (Term Rat) :=
+  T.getRealAlgebraicNumberPolynomial term v.toUntyped
 
 @[inherit_doc T.getRealAlgebraicNumberLowerBound]
 def getRealAlgebraicNumberLowerBound (term : Term Rat) : Env (Term Rat) :=
