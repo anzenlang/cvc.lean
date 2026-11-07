@@ -1887,6 +1887,15 @@ explicitly — there is no class for it.
 Its result is sort-erased in the typed layer, since which components an index array selects is a
 runtime value.
 
+**Value conversions** (`Untyped/Theory/Tuple.lean`, bridged to the typed layer) follow the same
+flattening: converting `α × β` expands `β` through `TupleTail`, whose instance for a product (and
+for `OneTuple`) expands it and whose low-priority fallback takes `β` as one component. Instance
+priority is what decides "is the last component a product", the test instance resolution otherwise
+cannot make. In code generic over the last component the fallback is chosen even if it turns out to
+be a product, which its runtime check reports, as `Components.last`'s side condition does
+statically. Reading goes through cvc5's `getTupleValue`, so a built tuple of constants reads back
+as well as a model's.
+
 ## Function sorts, lambdas and application
 
 A function-sorted term is indexed by a **Lean arrow**: `Shape.fn` renders to `dom → cod`, and

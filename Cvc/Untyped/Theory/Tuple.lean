@@ -85,3 +85,56 @@ def isTupleValue (term : Term) : Bool := T.isTupleValue term.toUnsafe
 def getTupleValue (term : Term) : Res Terms := do
   let components : Terms ← T.getTupleValue term.toUnsafe |>.mapError Error.ofUnsafe
   return components
+
+/-- How the last component of a product converts: a product there flattens into the tuple.
+
+`α × β × γ` is one tuple of three components, so converting `α × β` expands `β` when it is itself
+a product (or a `OneTuple`), and takes it as one component otherwise.
+-/
+class TupleTail (β : Type) where
+  /-- The terms of the components `b` stands for. -/
+  toTerms : [Ω] → β → Env (List Term)
+  /-- Reads a value off the remaining components, all of them. -/
+  ofTerms : [Ω] → List Term → Env β
+
+instance (priority := low) [ToTyp β] [ValueToTerm β] [TermToValue β] : TupleTail β where
+  toTerms b := do
+    if let .prod _ := Typ.of β then
+      throwUser s!"a product `{Typ.of β}` is the last component of a tuple but was converted as \
+        one component, as happens in code generic over that component"
+    return [← ValueToTerm.valueToTerm b]
+  ofTerms
+    | [t] => TermToValue.termToValue t
+    | ts => throwUser s!"expected the one last component of a tuple, got {ts.length}"
+-- low priority: a product, or a `OneTuple`, takes the instances below, which expand it
+
+instance [ValueToTerm α] [TermToValue α] [TupleTail β] : TupleTail (α × β) where
+  toTerms | (a, b) => return (← ValueToTerm.valueToTerm a) :: (← TupleTail.toTerms b)
+  ofTerms
+    | t :: ts => return (← TermToValue.termToValue t, ← TupleTail.ofTerms ts)
+    | [] => throwUser "a tuple has fewer components than its sort"
+
+instance [ValueToTerm α] [TermToValue α] : TupleTail (OneTuple α) where
+  toTerms o := return [← ValueToTerm.valueToTerm o.value]
+  ofTerms
+    | [t] => return ⟨← TermToValue.termToValue t⟩
+    | ts => throwUser s!"expected the one last component of a tuple, got {ts.length}"
+
+instance [ValueToTerm α] [TupleTail β] : ValueToTerm (α × β) where
+  valueToTerm | (a, b) => do
+    mkTuple ((← ValueToTerm.valueToTerm a) :: (← TupleTail.toTerms b)).toArray
+
+instance [TermToValue α] [TupleTail β] : TermToValue (α × β) where
+  termToValue t := do
+    match (← t.getTupleValue).toList with
+    | c :: cs => return (← TermToValue.termToValue c, ← TupleTail.ofTerms cs)
+    | [] => throwUser s!"expected a tuple value, got `{t}`"
+
+instance [ValueToTerm α] : ValueToTerm (OneTuple α) where
+  valueToTerm o := do mkTuple #[← ValueToTerm.valueToTerm o.value]
+
+instance [TermToValue α] : TermToValue (OneTuple α) where
+  termToValue t := do
+    match (← t.getTupleValue).toList with
+    | [c] => return ⟨← TermToValue.termToValue c⟩
+    | _ => throwUser s!"expected a one-component tuple value, got `{t}`"

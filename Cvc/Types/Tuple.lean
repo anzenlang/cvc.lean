@@ -74,7 +74,7 @@ Like any product it nests as a *first* component and flattens as a last: `OneTup
 structure OneTuple (α : Type) where
   /-- The component. -/
   value : α
-deriving DecidableEq, Ord, Hashable
+deriving DecidableEq, Ord, Hashable, Repr
 
 namespace OneTuple
 

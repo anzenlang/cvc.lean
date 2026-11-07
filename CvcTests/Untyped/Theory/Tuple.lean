@@ -178,3 +178,29 @@ A tuple equality constrains the components, so the solver answers about them.
   Term.equal lft rgt >>= s.assert
 
   s.checkSat (ifSat := do println! "x = {← s.getValueAs Int x}")
+
+/-! A tuple converts from and to a Lean product. A product in last position flattens into the
+tuple, as the sort does, and so does a `OneTuple`; one in first position nests.
+-/
+
+/-- info:
+pair         : (tuple (- 1) "a\u{9}b") → (-1, "a\tb")
+triple       : (tuple 1 true "c") → (1, true, "c")
+nested first : (tuple (tuple 1 true) "c") → ((1, true), "c")
+OneTuple last: (tuple 1 true) → (1, { value := true })
+model        : (2, false)
+-/
+#guard_msgs in #eval Env.runIO do
+  let display {α} [Cvc.Untyped.ValueToTerm α] [Cvc.Untyped.TermToValue α] [Repr α] (label : String) (v : α)
+  : Env Unit := do
+    let t ← Cvc.Untyped.Term.mkValue v
+    println! "{label}: {t} → {repr (← Cvc.Untyped.Term.extractValueAs α t)}"
+  display "pair         " ((-1, "a\tb") : Int × String)
+  display "triple       " ((1, true, "c") : Int × Bool × String)
+  display "nested first " (((1, true), "c") : (Int × Bool) × String)
+  display "OneTuple last" ((1, ⟨true⟩) : Int × Cvc.OneTuple Bool)
+  let s ← Cvc.Untyped.Solver.new
+  s.setOpt .smt_produceModels true
+  let x ← Cvc.Untyped.Term.mkSymbolAs (Int × Bool) "x"
+  s.assert (← Cvc.Untyped.Term.equal x (← Cvc.Untyped.Term.mkValue ((2, false) : Int × Bool)))
+  s.checkSat (ifSat := do println! "model        : {repr (← s.getValueAs (Int × Bool) x)}")
