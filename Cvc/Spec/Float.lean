@@ -89,7 +89,7 @@ op% fpSqrt {e s : size} (rm : roundingMode) (fp : float e s) : float e s := FLOA
 /-- Rounding to an integral value. -/
 op% fpRti {e s : size} (rm : roundingMode) (fp : float e s) : float e s := FLOATINGPOINT_RTI
 
-/-- Remainder. -/
+/-- IEEE 754 remainder, `lft - rgt * q` for `q` the integer nearest `lft / rgt`. -/
 op% fpRem {e s : size} (lft rgt : float e s) : float e s := FLOATINGPOINT_REM
 
 /-- Minimum. -/
@@ -98,7 +98,7 @@ op% fpMin {e s : size} (lft rgt : float e s) : float e s := FLOATINGPOINT_MIN
 /-- Maximum. -/
 op% fpMax {e s : size} (lft rgt : float e s) : float e s := FLOATINGPOINT_MAX
 
-/-- Conversion to a real. -/
+/-- Conversion to a real; unspecified for NaN and the infinities. -/
 op% fpToReal {e s : size} (fp : float e s) : real := FLOATINGPOINT_TO_REAL
 
 /-- A floating point assembled from its sign, exponent and significand bits.
@@ -112,7 +112,7 @@ op% fpOfBits {e s : size} (sign : bitVec 1) (exponent : bitVec e) (significand :
 
 /-! ## Indexed conversions -/
 
-/-- Reinterpretation of an IEEE-754 bit-vector as a floating point. -/
+/-- Reinterpretation of an IEEE 754 bit pattern of `e + s` bits as a floating point. -/
 op% fpOfIeeeBv [e s] {n : size} (bv : bitVec n) : float e s
   := FLOATINGPOINT_TO_FP_FROM_IEEE_BV
 
@@ -132,11 +132,17 @@ op% fpOfSbv [e s] {n : size} (rm : roundingMode) (bv : bitVec n) : float e s
 op% fpOfUbv [e s] {n : size} (rm : roundingMode) (bv : bitVec n) : float e s
   := FLOATINGPOINT_TO_FP_FROM_UBV
 
-/-- Conversion of a floating point to a signed bit-vector of the given size. -/
+/-- Conversion of a floating point to a signed bit-vector of the given size.
+
+Unspecified for NaN, an infinity, or a value out of range.
+-/
 op% fpToSbv [size] {e s : size} (rm : roundingMode) (fp : float e s) : bitVec size
   := FLOATINGPOINT_TO_SBV
 
-/-- Conversion of a floating point to an unsigned bit-vector of the given size. -/
+/-- Conversion of a floating point to an unsigned bit-vector of the given size.
+
+Unspecified for NaN, an infinity, or a value out of range.
+-/
 op% fpToUbv [size] {e s : size} (rm : roundingMode) (fp : float e s) : bitVec size
   := FLOATINGPOINT_TO_UBV
 
@@ -161,6 +167,6 @@ op% mkFloatPosZero [exp sig] : float exp sig := CONST_FLOATINGPOINT tm mkFloatin
 /-- Negative zero. -/
 op% mkFloatNegZero [exp sig] : float exp sig := CONST_FLOATINGPOINT tm mkFloatingPointNegZero
 
-/-- A floating point read from the bit pattern of a bit-vector. -/
+/-- A floating-point literal read from `bv`, a bit-vector literal of `exp + sig` bits. -/
 op% mkFloat [exp sig] {n : size} (bv : bitVec n) : float exp sig
   := CONST_FLOATINGPOINT tm mkFloatingPoint

@@ -13,9 +13,9 @@ public import Cvc.Spec.Decl
 
 /-! # Boolean and sort-generic specification
 
-The connectives, and the operators that are generic in the sort they operate
-on: `equal` and `distinct`, whose result is `Bool` whatever their arguments,
-and `ite`, which takes its own sort from its branches.
+The connectives, and the operators that are generic in the sort they operate on: `equal` and
+`distinct`, whose result is `Bool` whatever their arguments, and `ite`, which takes its own sort
+from its branches.
 -/
 namespace Cvc public section
 
@@ -30,27 +30,27 @@ op% mkFalse : bool := CONST_BOOLEAN tm mkFalse
 /-- A boolean literal. -/
 op% mkBool (b :! Bool) : bool := CONST_BOOLEAN tm mkBoolean
 
-/-- A symbol of the given sort: a fresh uninterpreted constant. -/
+/-- A fresh uninterpreted constant of sort `α`, named `name`. -/
 op% mkSymbol {α} (name :! String) : α := CONSTANT tm mkConst
 
 -- the bound-variable constructor is *not* specified here: its result is a `BVar`, not a `Term`,
--- and a shape cannot say so. It is hand-written in `Cvc/{Untyped,Typed}/BVar.lean`, beside
--- the type it produces.
+-- and a shape cannot say so. It is hand-written in `Cvc.Untyped.Core.BVar` and
+-- `Cvc.Typed.Core.BVar`, beside the type it produces.
 
 
 
 /-! ## Connectives and equality -/
 
-/-- Binary equality. -/
+/-- Binary equality; `equalN` states all its arguments equal. -/
 op% equal {α} (lft rgt : α) : bool := EQUAL infixr "=" 50 unit true
 
-/-- Binary pairwise inequality. -/
+/-- Whether `lft` and `rgt` differ; `distinctN` states its arguments pairwise different. -/
 op% distinct {α} (lft rgt : α) : bool := DISTINCT infixr "≠" 50 nary
 
 /-- Logical negation. -/
 op% not (boolTerm : bool) : bool := NOT prefix "¬" 1024 40
 
-/-- Binary implication. -/
+/-- Binary implication; `impliesN` is right-associative. -/
 op% implies (lft rgt : bool) : bool := IMPLIES infixr "→" 25 nary
 
 /-- Binary conjunction. -/

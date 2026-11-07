@@ -14,26 +14,27 @@ public import Cvc.Spec.Decl
 /-! # Set specification
 
 Note the operand order of `setMember` and `setInsert`: cvc5 takes the *element* first and the
-set last.
+set last. cvc5 marks `setIsEmpty`, `setIsSingleton`, `setChoose` and the higher-order operators
+experimental.
 -/
 namespace Cvc public section
 
-/-- Set membership. -/
+/-- Whether `elm` is in `s`; the element comes first, as in cvc5. -/
 op% setMember {α} (elm : α) (s : set α) : bool := SET_MEMBER infixr "∈" 50
 
-/-- Subset predicate. -/
+/-- Whether `lft` is a subset of `rgt`. -/
 op% setSubset {α} (lft rgt : set α) : bool := SET_SUBSET infixr "⊆" 50
 
-/-- Emptiness tester. -/
+/-- Whether `s` is empty. -/
 op% setIsEmpty {α} (s : set α) : bool := SET_IS_EMPTY
 
-/-- Singleton tester. -/
+/-- Whether `s` has exactly one element. -/
 op% setIsSingleton {α} (s : set α) : bool := SET_IS_SINGLETON
 
 /-- The singleton set containing one element. -/
 op% setSingleton {α} (elm : α) : set α := SET_SINGLETON
 
-/-- Inserts an element into a set. -/
+/-- Inserts `elm` into `s`; the element comes first, as in cvc5. -/
 op% setInsert {α} (elm : α) (s : set α) : set α := SET_INSERT
 
 /-- Set union. -/
@@ -64,7 +65,7 @@ op% setMap {α β} (f : fn α β) (s : set α) : set β := SET_MAP
 /-- The elements of a set satisfying a predicate. -/
 op% setFilter {α} (p : fn α bool) (s : set α) : set α := SET_FILTER
 
-/-- Folds a binary function over a set, from an initial value. -/
+/-- Folds `f` over the elements of `s` from `init`, in no specified order. -/
 op% setFold {α β} (f : fn α (fn β β)) (init : β) (s : set α) : β := SET_FOLD
 
 /-- Whether every element of a set satisfies a predicate. -/
@@ -76,11 +77,11 @@ op% setSome {α} (p : fn α bool) (s : set α) : bool := SET_SOME
 /-! ## Constants
 
 Built by a `TermManager` method rather than by applying a kind, so the sort-erased constructor
-takes the sort it builds while the typed one recovers it from its index.
+takes the element sort, and the typed one reads it off its index.
 -/
 
-/-- The empty set. -/
+/-- The empty set of elements of sort `α`. -/
 op% setEmpty {α} : set α := SET_EMPTY tm mkEmptySet
 
-/-- The set containing every element of the sort. -/
+/-- The set of every element of sort `α`. -/
 op% setUniverse {α} : set α := SET_UNIVERSE tm mkUniverseSet

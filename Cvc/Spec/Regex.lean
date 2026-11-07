@@ -26,7 +26,7 @@ op% reUnion (lft rgt : regex) : regex := REGEXP_UNION nary
 /-- Intersection. -/
 op% reInter (lft rgt : regex) : regex := REGEXP_INTER nary
 
-/-- Difference. -/
+/-- Difference: the strings matching `lft` but not `rgt`. -/
 op% reDiff (lft rgt : regex) : regex := REGEXP_DIFF
 
 /-- Kleene star. -/
@@ -38,7 +38,7 @@ op% rePlus (re : regex) : regex := REGEXP_PLUS
 /-- Zero or one repetition. -/
 op% reOpt (re : regex) : regex := REGEXP_OPT
 
-/-- The regular expression matching any character between two one-character bounds. -/
+/-- Any one character from `lo` to `hi` included; matches nothing unless both are one character. -/
 op% reRange (lo hi : string) : regex := REGEXP_RANGE
 
 /-- Complement. -/
@@ -48,7 +48,7 @@ op% reComplement (re : regex) : regex := REGEXP_COMPLEMENT
 
 /-! ## Indexed operators -/
 
-/-- Between `lo` and `hi` repetitions. -/
+/-- Between `lo` and `hi` repetitions, both included. -/
 op% reLoop [lo hi] (re : regex) : regex := REGEXP_LOOP
 
 /-- Exactly the given number of repetitions. -/

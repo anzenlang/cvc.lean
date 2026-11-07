@@ -13,8 +13,8 @@ public import Cvc.Spec.Decl
 
 /-! # String specification
 
-The full SMT-LIB string theory, including the operators
-crossing over to `Int` and to regular expressions.
+The full SMT-LIB string theory, including the operators crossing over to `Int` and to regular
+expressions.
 -/
 namespace Cvc public section
 
@@ -22,25 +22,25 @@ namespace Cvc public section
 
 /-! ## Predicates -/
 
-/-- Containment. -/
+/-- Whether `s` contains `sub`. -/
 op% strContains (s sub : string) : bool := STRING_CONTAINS
 
-/-- Prefix predicate: whether the first string is a prefix of the second. -/
+/-- Whether `pre` is a prefix of `s`. -/
 op% strPrefix (pre s : string) : bool := STRING_PREFIX
 
-/-- Suffix predicate: whether the first string is a suffix of the second. -/
+/-- Whether `suf` is a suffix of `s`. -/
 op% strSuffix (suf s : string) : bool := STRING_SUFFIX
 
 /-- Whether the string is a single digit, `"0"` through `"9"`. -/
 op% strIsDigit (s : string) : bool := STRING_IS_DIGIT
 
-/-- Strict lexicographic comparison over code points. -/
+/-- Whether `lft` comes strictly before `rgt`, lexicographically over code points. -/
 op% strLt (lft rgt : string) : bool := STRING_LT
 
-/-- Lexicographic comparison over code points. -/
+/-- Whether `lft` comes before `rgt` or equals it, lexicographically over code points. -/
 op% strLe (lft rgt : string) : bool := STRING_LEQ
 
-/-- Regular-expression membership. -/
+/-- Whether `s` matches `re`. -/
 op% strInRegex (s : string) (re : regex) : bool := STRING_IN_REGEXP
 
 
@@ -53,16 +53,16 @@ op% strConcat (lft rgt : string) : string := STRING_CONCAT nary
 /-- Length. -/
 op% strLength (s : string) : int := STRING_LENGTH
 
-/-- The sub-string of the given length, starting at the given index. -/
+/-- The sub-string of length `len` starting at `idx`; empty when out of range. -/
 op% strSubstr (s : string) (idx len : int) : string := STRING_SUBSTR
 
 /-- The one-character string at an index, or the empty string if out of bounds. -/
 op% strCharAt (s : string) (idx : int) : string := STRING_CHARAT
 
-/-- Index of the first occurrence of a sub-string at or after a starting index. -/
+/-- Index of the first occurrence of `sub` in `s` at or after `start`, or `-1`. -/
 op% strIndexof (s sub : string) (start : int) : int := STRING_INDEXOF
 
-/-- Index of the first match of a regular expression at or after a starting index. -/
+/-- Index of the first match of `re` in `s` at or after `start`, or `-1`. -/
 op% strIndexofRe (s : string) (re : regex) (start : int) : int := STRING_INDEXOF_RE
 
 /-- Replaces the first occurrence of a sub-string. -/
@@ -80,7 +80,7 @@ op% strReplaceReAll (s : string) (re : regex) (repl : string) : string := STRING
 /-- Reversal. -/
 op% strRev (s : string) : string := STRING_REV
 
-/-- Replaces the sub-string starting at an index. -/
+/-- Overwrites `s` from `idx` with `repl`, keeping its length; `s` if `idx` is out of range. -/
 op% strUpdate (s : string) (idx : int) (repl : string) : string := STRING_UPDATE
 
 /-- Conversion to lower case. -/
@@ -106,5 +106,5 @@ op% strToRegex (s : string) : regex := STRING_TO_REGEXP
 
 /-! ## Constructors -/
 
-/-- A string literal. -/
+/-- A string literal; with `useEscapes`, SMT-LIB escapes such as `\u{48}` in `s` are decoded. -/
 op% mkString (s :! String) (useEscapes :! Bool) : string := CONST_STRING tm mkString

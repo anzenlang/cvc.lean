@@ -13,8 +13,7 @@ public import Cvc.Spec.Decl
 
 /-! # Finite-field specification
 
-Arithmetic in a prime field, whose modulus is the
-sort's index.
+Arithmetic in a prime field, whose modulus is the sort's index.
 -/
 namespace Cvc public section
 
@@ -27,5 +26,5 @@ op% ffMul {k : size} (lft rgt : finiteField k) : finiteField k := FINITE_FIELD_M
 /-- Negation. -/
 op% ffNeg {k : size} (ff : finiteField k) : finiteField k := FINITE_FIELD_NEG
 
-/-- Bit-sum, interpreting its arguments as bits. -/
+/-- Weighted sum `lft + 2 * rgt`; `ffBitsumN` weighs further terms by `4`, `8`, … -/
 op% ffBitsum {k : size} (lft rgt : finiteField k) : finiteField k := FINITE_FIELD_BITSUM nary

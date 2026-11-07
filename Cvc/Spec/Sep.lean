@@ -24,7 +24,7 @@ sorts is accepted by cvc5 at construction and rejected at check-sat, with an err
 -/
 namespace Cvc public section
 
-/-- The empty heap. -/
+/-- Holds exactly when the heap is empty. -/
 op% sepEmp : bool := SEP_EMP tm mkSepEmp
 
 /-- Separating conjunction: the heap splits in two, one part satisfying each side. -/

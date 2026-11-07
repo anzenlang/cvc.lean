@@ -13,20 +13,21 @@ public import Cvc.Spec.Decl
 
 /-! # Bag specification
 
-As for sets, `bagMember`, `bagCount` and `bagMake` take the element first.
+As for sets, `bagMember`, `bagCount` and `bagMake` take the element first. cvc5 marks `bagCard`,
+`bagSetof`, `bagChoose` and the higher-order operators experimental.
 -/
 namespace Cvc public section
 
-/-- Bag membership. -/
+/-- Whether `elm` is in `b`; the element comes first, as in cvc5. -/
 op% bagMember {α} (elm : α) (b : bag α) : bool := BAG_MEMBER
 
-/-- Inclusion predicate: every multiplicity on the left is at most the one on the right. -/
+/-- Whether every multiplicity in `lft` is at most the one in `rgt`. -/
 op% bagSubbag {α} (lft rgt : bag α) : bool := BAG_SUBBAG
 
-/-- The bag containing one element with the given multiplicity. -/
+/-- The bag holding `elm` `count` times; the element comes first, as in cvc5. -/
 op% bagMake {α} (elm : α) (count : int) : bag α := BAG_MAKE
 
-/-- Multiplicity of an element. -/
+/-- Multiplicity of `elm` in `b`; the element comes first, as in cvc5. -/
 op% bagCount {α} (elm : α) (b : bag α) : int := BAG_COUNT
 
 /-- Cardinality, counting multiplicities. -/
@@ -63,7 +64,7 @@ op% bagMap {α β} (f : fn α β) (b : bag α) : bag β := BAG_MAP
 /-- The elements of a bag satisfying a predicate, with their multiplicities. -/
 op% bagFilter {α} (p : fn α bool) (b : bag α) : bag α := BAG_FILTER
 
-/-- Folds a binary function over a bag, from an initial value. -/
+/-- Folds `f` over the elements of `b` from `init`, in no specified order. -/
 op% bagFold {α β} (f : fn α (fn β β)) (init : β) (b : bag α) : β := BAG_FOLD
 
 /-- Whether every element of a bag satisfies a predicate. -/
@@ -74,12 +75,11 @@ op% bagSome {α} (p : fn α bool) (b : bag α) : bool := BAG_SOME
 
 /-- Partitions a bag into the equivalence classes of a binary predicate.
 
-The predicate is expected to be an equivalence relation on the bag's elements; the result holds
-one bag per class. Its sort is `Bag (Bag α)`, which is why the element sort needs an order.
+The predicate is expected to be an equivalence relation; the result holds one bag per class.
 -/
 op% bagPartition {α} (p : fn α (fn α bool)) (b : bag α) : bag (bag α) := BAG_PARTITION
 
 /-! ## Constants -/
 
-/-- The empty bag. -/
+/-- The empty bag of elements of sort `α`. -/
 op% bagEmpty {α} : bag α := BAG_EMPTY tm mkEmptyBag
