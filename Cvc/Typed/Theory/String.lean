@@ -41,8 +41,11 @@ def getStringValue (term : Term String) : Res String := T.getStringValue term
 @[inherit_doc T.getStringValue?]
 def getStringValue? (term : Term String) : Option String := T.getStringValue? term
 
+@[inherit_doc T.mkStringValue]
+def mkStringValue (s : String) : Env (Term String) := T.mkStringValue s
+
 instance : SrtLike String where
-  valueToTerm s := mkString s false
+  valueToTerm := mkStringValue
   termToValue t := getStringValue t
 
 
@@ -67,7 +70,7 @@ macro_rules
     unless layer == Layer.typed do Macro.throwUnsupported
     unless t.raw.getKind == ``Cvc.Untyped.Term.smtStr do Macro.throwUnsupported
     let s : TSyntax `term := ⟨t.raw[0]⟩
-    `($(layer.op `mkString) $s false)
+    `($(layer.op `mkStringValue) $s)
 
 end Ext
 

@@ -240,3 +240,26 @@ fromInt    : "17"
     println! "fromInt    : {← str fromInt}")
 
 end solving
+
+/-! A string value survives the round trip whatever it holds: printable characters go to cvc5 as
+they are, every other character as an escape, and the escapes cvc5 prints are undone on the way
+back. An `smt!` literal keeps Lean's own escapes.
+-/
+
+/-- info:
+"say \"hi\"" : ok
+"tab\there" : ok
+"back\\slash" : ok
+"\\u{41}" : ok
+"é 漢" : ok
+model : "a\tb\"c"
+-/
+#guard_msgs in #eval Env.runIO do
+  for str in ["say \"hi\"", "tab\there", "back\\slash", "\\u{41}", "é 漢"] do
+    let back ← (← Cvc.Typed.Term.mkStringValue str).getStringValue
+    println! "{repr str} : {if back == str then "ok" else s!"got {repr back}"}"
+  let s ← Cvc.Typed.Solver.new
+  s.setOpt .smt_produceModels true
+  let x ← Cvc.Typed.Term.mkSymbolAs String "x"
+  s.assert (← Cvc.Typed.Term.equal x (← smtT! "a\tb\"c"))
+  s.checkSat (ifSat := do println! "model : {repr (← s.getValue x)}")

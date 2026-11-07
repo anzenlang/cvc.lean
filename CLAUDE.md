@@ -2320,8 +2320,7 @@ Term construction and the solver are done — every theory is covered, and the s
 with lean-cvc5. What follows is everything that is *not* term construction or solver driving:
 
 1. **`smt!` DSL parity** — the fixed forms the expander still lacks: the `name` literal for
-   `mkSymbol`, a sort ascription `?[term : type]` over `typeCheck`, escaped string literals (both
-   layers' `Theory/String` expansions hard-code `useEscapes := false`), and the
+   `mkSymbol`, a sort ascription `?[term : type]` over `typeCheck`, and the
    `smtFun!`/`smtPred!`/`smtRel!` shorthands on top of `smt! fun`, none of which exist. Both
    remaining literal-shaped items are **asymmetric across the layers** and need a decision before
    they can be written: the typed layer gets the sort from the index, while sort-erased `mkSymbol`
@@ -2433,5 +2432,8 @@ Vendored at `.lake/packages/cvc5` (~25k lines of Lean). Worth reading when a wra
 - Its own tests under `cvc5Test/Unit/Api*.lean` are the best reference for what the raw API does.
 - Known gaps (from its README): `Term.getStringValue`, statistics, option info, driver options,
   plugins, parser stream input. cvc.lean works around the string one by parsing `term.toString`
-  (see `Untyped.Term.getStringValue` in
-  [Cvc/Untyped/Theory/String.lean](Cvc/Untyped/Theory/String.lean)).
+  and undoing its SMT-LIB escapes (`""`, `\u{…}`) — see `Untyped.Term.getStringValue` in
+  [Cvc/Untyped/Theory/String.lean](Cvc/Untyped/Theory/String.lean). The other direction,
+  `mkStringValue`, writes every character outside printable ASCII (and `\`) as `\u{…}`, since cvc5
+  refuses them raw; the value conversions and `smt!`'s string literals go through it, so a Lean
+  string, Lean's escapes included, is the string the term denotes.
