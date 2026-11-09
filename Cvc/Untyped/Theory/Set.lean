@@ -51,7 +51,10 @@ def isSetValue (term : Term) : Bool := T.isSetValue term.toUnsafe
 
 /-- The elements a constant set term denotes. -/
 def getSetElems (term : Term) : Env Terms := do
-  let elems : Terms ← T.getSetValue term.toUnsafe |>.mapError Error.ofUnsafe
+  let elems : Terms ← explainError (m := Res)
+    (T.getSetValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+      if T.isSetValue term.toUnsafe then none
+      else some s!"`{term}` is not a set value, which only a model answers"
   return elems
 
 section variable [Ord α] [ToTyp α]

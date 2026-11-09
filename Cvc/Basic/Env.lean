@@ -48,10 +48,10 @@ private def toUnsafe : Error → cvc5.Error
 /-- Constructor from `cvc5` errors. -/
 private def ofUnsafe : cvc5.Error → Error
 | .missingValue => .internal "a value is missing"
-| .error msg => .internal s!"{msg}"
-| .option msg => .internal s!"option error: {msg}"
+| .error msg => .user msg
+| .option msg => .user s!"option error: {msg}"
 | .unsupported msg => .unsupported msg
-| .recoverable msg => .internal s!"recoverable: {msg}"
+| .recoverable msg => .user s!"recoverable: {msg}"
 
 private instance : MonadLift (Except cvc5.Error) (Except Error) where
   monadLift

@@ -246,7 +246,7 @@ refused.
 -/
 
 /-- info:
-two-state pre : [internal] expected inv and pre to have the same sort
+two-state pre : expected inv and pre to have the same sort
 invariant     : (lambda ((x Int)) (<= x 10))
 -/
 #guard_msgs in #eval Env.runIO do

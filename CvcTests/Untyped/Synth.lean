@@ -242,7 +242,7 @@ and cvc5 refuses when there is none. -/
 
 /-- info:
 after synthFun : (some true)
-without one    : [internal] No grammar available in call to find-synth. Either provide one or ensure synth-fun has been called.
+without one    : No grammar available in call to find-synth. Either provide one or ensure synth-fun has been called.
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new

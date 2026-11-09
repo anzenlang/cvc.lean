@@ -281,7 +281,16 @@ incompatible twin.
 `Cvc.Error` = `internal | unsupported | user | io`, with `Error.ofUnsafe`/`toUnsafe` mapping to/from
 `cvc5.Error`. `Res α := ResT Id α`, `ResT m α := ExceptT Error m α`. `EnvT` has
 `MonadExceptOf Error`, and `MonadLift` instances from `BaseIO`, `IO`, `Res`, `ResT m`, `Env`.
-`throwUser`/`throwInternal`/`throwTodo`/`throwUnreachable`/`throwIO` are `export`ed from `Error`.
+`throwUser`/`throwInternal`/`throwTodo`/`throwUnreachable`/`throwIO`/`explainError` are `export`ed
+from `Error`.
+
+**Every error cvc5 reports is a user error**: `ofUnsafe` maps cvc5's general, option and
+recoverable errors to `Error.user`, they being cvc5's reports of API misuse; `internal` is left to
+failures inside this library, and prints with an `[internal]` prefix where a user error prints bare.
+**A value reader explains a refusal only after it happens**: it calls cvc5 straight away and, if
+cvc5 refuses, `explainError` checks whether a wrong sort or a non-value caused it (`isIntValue`,
+`isSequenceValue`, …) and says so — so a successful read pays for no check. The user asked for
+that order explicitly.
 
 ### The sort layer
 
@@ -1393,7 +1402,7 @@ is how a match covers the constructors it does not name.
 
 Two conditions are cvc5's to check, both being properties of the declaration rather than of any
 term: coverage (`cases for match term are not exhaustive`) and agreement between the bodies
-(`incomparable types in match case list`). Both come back tagged `[internal]`.
+(`incomparable types in match case list`). Both come back as user errors, as every cvc5 error does.
 
 The typed side adds `Datatype.Case α β` — one case of a match on a `Term α` whose bodies are
 `Term β`. The index makes the second of those two runtime errors a type error. What stays a runtime
@@ -1606,7 +1615,7 @@ Sort-erased, everything goes through `Datatype`, and what the module adds is the
 record guarantees plus the error messages that follow: there is exactly one constructor, so
 `Srt.recordCtor` discharges the index; the constructor's name is cvc5's and never the way in, so
 everything is keyed on field names; and a field's sort is known, so `Term.mkRecord` checks its
-arguments itself rather than letting cvc5 report `[internal] bad type for constructor argument`
+arguments itself rather than letting cvc5 report `bad type for constructor argument`
 naming the mono-morphised sort.
 
 ```lean
@@ -1626,7 +1635,7 @@ Typed, the index carries the field names *and* their types, so there is nothing 
 **no `Ctor`/`Field` handle** — the counterpart of the declared-datatype API simply has no reason to
 exist. `Term.mkRecord` takes neither a sort nor field names, and `Term.recordFields` takes no names.
 Fields in the wrong order, a field omitted, an unknown name and a field at the wrong type are all
-compile errors where sort-erased they are cvc5 `[internal]` errors.
+compile errors where sort-erased they are cvc5 errors.
 
 The value conversions read a record's **children**, not its selectors: a record value is an
 `APPLY_CONSTRUCTOR` whose *first child is the constructor* and whose remaining children are the
@@ -2164,7 +2173,7 @@ load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` 
   the whole API is zero-cost; instances are `inferInstanceAs`.
 - **Argument order follows cvc5, not readability.** `setInsert` and `bagCount` take the *element*
   first and the container last, because that is what `SET_INSERT`/`BAG_COUNT` want; calling them the
-  other way round fails at runtime with `[internal] inserting into a non-set`.
+  other way round fails at runtime with `inserting into a non-set`.
 
 ### "null" means two unrelated things in cvc5
 

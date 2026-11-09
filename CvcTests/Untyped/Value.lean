@@ -402,3 +402,25 @@ no symbol: false
       pure "no error"
     catch _ => pure "caught"
   println! "sized kids : {outcome}"
+
+/-! A reader given a term it cannot read says what is wrong with the term, rather than passing on
+cvc5's own message; it only looks once cvc5 has refused.
+-/
+
+/-- info:
+Int of a Boolean: `true` is not an integer value
+Int64 of 2^63   : `9223372036854775808` does not fit a signed 64-bit integer
+Rat of a symbol : `r` is not a real value
+built sequence  : `(seq.unit 1)` is not a sequence value, which only a model answers
+String of an Int: `3` is not a string value
+-/
+#guard_msgs in #eval Env.runIO do
+  let attempt {α} [ToString α] (label : String) (code : Env α) : Env Unit := do
+    try println! "{label}: unexpected {← code}" catch e => println! "{label}: {e}"
+  attempt "Int of a Boolean" do Term.getIntValue (← Term.mkBool true)
+  attempt "Int64 of 2^63   " do Term.getInt64Value (← Term.mkInt (2^63))
+  attempt "Rat of a symbol " do Term.getRatValue (← Term.mkSymbol (← Srt.real) "r")
+  attempt "built sequence  " do
+    let s : Array Int ← Term.getSeqValue (← Term.mkInt 1 >>= Term.seqUnit)
+    return s.size
+  attempt "String of an Int" do Term.getStringValue (← Term.mkInt 3)

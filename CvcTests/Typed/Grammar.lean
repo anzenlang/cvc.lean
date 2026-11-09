@@ -351,7 +351,7 @@ let : ((start Int) (cnd Bool) )((start Int (0 (ite cnd 1 start)))(cnd Bool ((<= 
 
 /-! Extending stops at the freeze: once a solver has used the grammar, cvc5 rejects a new rule. -/
 
-/-- info: [internal] Grammar cannot be modified after passing it as an argument to synthFun
+/-- info: Grammar cannot be modified after passing it as an argument to synthFun
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new

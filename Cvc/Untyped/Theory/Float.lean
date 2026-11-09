@@ -53,7 +53,10 @@ def isRoundingModeValue (term : Term) : Bool := T.isRoundingModeValue term.toUns
 
 /-- The rounding mode a term denotes, failing if it denotes none. -/
 def getRoundingModeValue (term : Term) : Res Cvc.Float.RoundingMode := do
-  let rm ← T.getRoundingModeValue term.toUnsafe |>.mapError Error.ofUnsafe
+  let rm ← explainError (m := Res)
+    (T.getRoundingModeValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+      if T.isRoundingModeValue term.toUnsafe then none
+      else some s!"`{term}` is not a rounding-mode value"
   return Cvc.Float.RoundingMode.ofUnsafe rm
 
 instance : SrtLike Cvc.Float.RoundingMode where
@@ -81,7 +84,10 @@ def isFloatNegZero (term : Term) : Bool := T.isFloatingPointNegZero term.toUnsaf
 
 /-- The exponent size, significand size and bit pattern of a constant floating-point term. -/
 def getFloatComponents (term : Term) : Res (Nat × Nat × Term) := do
-  let (exp, sig, bv) ← T.getFloatingPointValue term.toUnsafe |>.mapError Error.ofUnsafe
+  let (exp, sig, bv) ← explainError (m := Res)
+    (T.getFloatingPointValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+      if T.isFloatingPointValue term.toUnsafe then none
+      else some s!"`{term}` is not a floating-point value"
   let bv : Term := bv
   return (exp.toNat, sig.toNat, bv)
 

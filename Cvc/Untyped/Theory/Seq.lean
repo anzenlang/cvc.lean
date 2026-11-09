@@ -49,7 +49,10 @@ def isSeqValue (term : Term) : Bool := T.isSequenceValue term.toUnsafe
 
 /-- The elements a constant sequence term denotes. -/
 def getSeqValue [TermToValue α] (term : Term) : Env (Array α) := do
-  let elems : Terms ← T.getSequenceValue term.toUnsafe |>.mapError Error.ofUnsafe
+  let elems : Terms ← explainError (m := Res)
+    (T.getSequenceValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+      if T.isSequenceValue term.toUnsafe then none
+      else some s!"`{term}` is not a sequence value, which only a model answers"
   elems.mapM extractValue
 
 @[inherit_doc getSeqValue]

@@ -51,37 +51,61 @@ over if it does. They are views of `getIntValue`, not a different value.
 def isInt32Value (term : Term) : Bool := T.isInt32Value term.toUnsafe
 @[inherit_doc T.getInt32Value]
 def getInt32Value (term : Term) : Res Int32 :=
-  T.getInt32Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getInt32Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isIntegerValue term.toUnsafe then some s!"`{term}` is not an integer value"
+    else if !T.isInt32Value term.toUnsafe then
+      some s!"`{term}` does not fit a signed 32-bit integer"
+    else none
 
 @[inherit_doc T.isInt64Value]
 def isInt64Value (term : Term) : Bool := T.isInt64Value term.toUnsafe
 @[inherit_doc T.getInt64Value]
 def getInt64Value (term : Term) : Res Int64 :=
-  T.getInt64Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getInt64Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isIntegerValue term.toUnsafe then some s!"`{term}` is not an integer value"
+    else if !T.isInt64Value term.toUnsafe then
+      some s!"`{term}` does not fit a signed 64-bit integer"
+    else none
 
 @[inherit_doc T.isUInt32Value]
 def isUInt32Value (term : Term) : Bool := T.isUInt32Value term.toUnsafe
 @[inherit_doc T.getUInt32Value]
 def getUInt32Value (term : Term) : Res UInt32 :=
-  T.getUInt32Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getUInt32Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isIntegerValue term.toUnsafe then some s!"`{term}` is not an integer value"
+    else if !T.isUInt32Value term.toUnsafe then
+      some s!"`{term}` does not fit an unsigned 32-bit integer"
+    else none
 
 @[inherit_doc T.isUInt64Value]
 def isUInt64Value (term : Term) : Bool := T.isUInt64Value term.toUnsafe
 @[inherit_doc T.getUInt64Value]
 def getUInt64Value (term : Term) : Res UInt64 :=
-  T.getUInt64Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getUInt64Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isIntegerValue term.toUnsafe then some s!"`{term}` is not an integer value"
+    else if !T.isUInt64Value term.toUnsafe then
+      some s!"`{term}` does not fit an unsigned 64-bit integer"
+    else none
 
 /-- Whether a term denotes a real that fits a 32-bit numerator and denominator. -/
 def isReal32Value (term : Term) : Bool := T.isReal32Value term.toUnsafe
 /-- The numerator and denominator of a real value, at 32 bits. -/
 def getReal32Value (term : Term) : Res (Int32 × UInt32) :=
-  T.getReal32Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getReal32Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isRealValue term.toUnsafe then some s!"`{term}` is not a real value"
+    else if !T.isReal32Value term.toUnsafe then
+      some s!"`{term}` does not fit a 32-bit numerator and denominator"
+    else none
 
 /-- Whether a term denotes a real that fits a 64-bit numerator and denominator. -/
 def isReal64Value (term : Term) : Bool := T.isReal64Value term.toUnsafe
 /-- The numerator and denominator of a real value, at 64 bits. -/
 def getReal64Value (term : Term) : Res (Int64 × UInt64) :=
-  T.getReal64Value term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getReal64Value term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if !T.isRealValue term.toUnsafe then some s!"`{term}` is not a real value"
+    else if !T.isReal64Value term.toUnsafe then
+      some s!"`{term}` does not fit a 64-bit numerator and denominator"
+    else none
 
 /-! ### Real algebraic numbers
 
@@ -110,7 +134,8 @@ def getRealAlgebraicNumberUpperBound (term : Term) : Env Term :=
 def isIntValue (term : Term) : Bool := T.isIntegerValue term.toUnsafe
 /-- The integer a term denotes, failing if it denotes none. -/
 def getIntValue (term : Term) : Res Int :=
-  T.getIntegerValue term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getIntegerValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if term.isIntValue then none else some s!"`{term}` is not an integer value"
 @[inherit_doc getIntValue]
 def getIntValue? (term : Term) : Option Int := T.getIntegerValue? term.toUnsafe
 
@@ -118,7 +143,8 @@ def getIntValue? (term : Term) : Option Int := T.getIntegerValue? term.toUnsafe
 def isRealValue (term : Term) : Bool := T.isRealValue term.toUnsafe
 /-- The real a term denotes as a string, failing if it denotes none. -/
 def getRealValue (term : Term) : Res String :=
-  T.getRealValue term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getRealValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if term.isRealValue then none else some s!"`{term}` is not a real value"
 @[inherit_doc getRealValue]
 def getRealValue? (term : Term) : Option String := T.getRealValue? term.toUnsafe
 /-- The real a term denotes as a `Rat`, failing if it denotes none.
@@ -127,12 +153,14 @@ An irrational model value, which nonlinear real arithmetic can produce, is no `R
 term instead, and take it apart with the `getRealAlgebraicNumber…` functions.
 -/
 def getRatValue (term : Term) : Res Rat :=
-  if term.isRealAlgebraicNumber then
-    throwUser s!"`{term}` is an irrational real, a root of a polynomial isolated in an interval, \
-      which a `Rat` cannot hold: read it as a term (`Solver.getValueTerm`) and take it apart with \
-      `getRealAlgebraicNumberPolynomial`, `getRealAlgebraicNumberLowerBound` and \
-      `getRealAlgebraicNumberUpperBound`"
-  else T.getRationalValue term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getRationalValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if term.isRealAlgebraicNumber then
+      some s!"`{term}` is an irrational real, a root of a polynomial isolated in an interval, \
+        which a `Rat` cannot hold: read it as a term (`Solver.getValueTerm`) and take it apart \
+        with `getRealAlgebraicNumberPolynomial`, `getRealAlgebraicNumberLowerBound` and \
+        `getRealAlgebraicNumberUpperBound`"
+    else if !term.isRealValue then some s!"`{term}` is not a real value"
+    else none
 @[inherit_doc getRatValue]
 def getRatValue? (term : Term) : Option Rat := T.getRationalValue? term.toUnsafe
 

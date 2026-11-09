@@ -162,7 +162,7 @@ elaboration rather than by cvc5.
 /-- info:
 partial 1 of 2 : (f i) : (-> Bool Int)
 partial 2 of 4 : (g i i) : (-> Int Int Int)
-too many       : [internal] too many arguments to operator
+too many       : too many arguments to operator
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Cvc.Untyped.Solver.new

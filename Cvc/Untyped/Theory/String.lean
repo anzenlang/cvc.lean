@@ -70,12 +70,11 @@ private partial def unescape : List Char → List Char
 
 /-- The string a term denotes, failing if it denotes none. -/
 def getStringValue (term : Term) : Res String :=
-  if term.isStringValue then
-    let s := toString term
-    if s.startsWith '"' ∧ s.endsWith '"' then
-      return String.ofList (unescape (s.drop 1 |>.dropEnd 1 |>.toString).toList)
-    else throwUser s!"failed to retrieve string value of term `{s}`"
-  else throwUser "cannot extract the string value of a term that denotes no string"
+  let s := toString term
+  if s.startsWith '"' ∧ s.endsWith '"' ∧ 2 ≤ s.length then
+    return String.ofList (unescape (s.drop 1 |>.dropEnd 1 |>.toString).toList)
+  else if term.isStringValue then throwInternal s!"cannot read the string value `{s}`"
+  else throwUser s!"`{term}` is not a string value"
 -- lean-cvc5 does not expose cvc5's string-value accessor, so this reads the term's printed form,
 -- the SMT-LIB string literal, and undoes its escapes.
 

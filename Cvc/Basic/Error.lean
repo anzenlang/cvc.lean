@@ -21,11 +21,11 @@ namespace Cvc public section
 
 /-- The error type of this library. -/
 inductive Error : Type
-/-- An error reported by cvc5, or a failure inside this library. -/
+/-- A failure inside this library. -/
 | internal (msg : String)
 /-- Unsupported feature. -/
 | unsupported (msg : String)
-/-- User-input error. -/
+/-- A misuse of the library or of cvc5, including every error cvc5 reports. -/
 | user (msg : String)
 /-- Input/output error. -/
 | io (msg : String)
@@ -86,11 +86,19 @@ def throwUnreachable (msg : String := "") : m α := do
 def throwIO (e : IO.Error) : m α := do
   throw <| Error.io <| toString e
 
+/-- `code`, failing with the user error `explain` gives, if it gives one, when `code` fails. -/
+def explainError (code : m α) (explain : Unit → Option String) : m α :=
+  tryCatch code fun e => match explain () with
+    | some msg => throw (Error.user msg)
+    | none => throw e
+-- `explain` runs only after a failure, so the check it makes costs nothing when `code` succeeds.
+
 end
 
 end Error
 
-export Error (throwUser someOrThrowUser throwInternal throwTodo throwUnreachable throwIO)
+export Error (throwUser someOrThrowUser throwInternal throwTodo throwUnreachable throwIO
+  explainError)
 
 
 

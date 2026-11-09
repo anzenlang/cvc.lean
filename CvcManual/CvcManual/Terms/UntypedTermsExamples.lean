@@ -119,5 +119,5 @@ Running that code fails with a relatively obscure error.
 #eval Env.runIO badTerms
 ```
 ```leanOutput term_ex_untyped_bad_1
-[internal] expecting a Boolean subexpression
+expecting a Boolean subexpression
 ```

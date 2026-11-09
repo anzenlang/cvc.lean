@@ -65,7 +65,7 @@ joinImage R  : (Set (Tuple Int))
 
 /-! `relIden` is the one with a shape requirement cvc5 states outright. -/
 
-/-- info: iden on binary : [internal] Identity operates on non-unary relations -/
+/-- info: iden on binary : Identity operates on non-unary relations -/
 #guard_msgs in #eval Env.runIO do
   let (a, _b, _r, _u) ← setup
   let caught (code : Env String) : Env String := try code catch e => pure s!"{e}"

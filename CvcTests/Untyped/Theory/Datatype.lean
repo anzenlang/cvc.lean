@@ -241,7 +241,7 @@ parametric   : true
 parameters   : #[T]
 instantiated : (Box Int)
 value        : ((as box (Box Int)) 5) : (Box Int)
-plain params : [internal] expected parametric datatype
+plain params : expected parametric datatype
 -/
 #guard_msgs in #eval Env.runIO do
   let t ← Srt.param "T"
@@ -384,8 +384,8 @@ are cvc5's to check, both being properties of the datatype's declaration.
 
 /-- info:
 catch-all : (match l (((cons h t) h) (x 0)))
-partial   : [internal] cases for match term are not exhaustive
-mixed     : [internal] incomparable types in match case list
+partial   : cases for match term are not exhaustive
+mixed     : incomparable types in match case list
 true: Bool
 expected: Int
 -/
@@ -500,10 +500,10 @@ nested     : (match l (((cons h t) (match t (((cons h t) h) (_ 0)))) (_ 0)))
 /-! What the expansion checks, and what it leaves to cvc5. -/
 
 /-- info:
-unknown ctor : [internal] no constructor snoc for datatype Lst exists, among { nil cons }
+unknown ctor : no constructor snoc for datatype Lst exists, among { nil cons }
 wrong width  : constructor `cons` takes 2 field(s), bound 1
 not datatype : cannot match on a term of sort `Int`, which is not a datatype
-non-exhaustive: [internal] cases for match term are not exhaustive
+non-exhaustive: cases for match term are not exhaustive
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new

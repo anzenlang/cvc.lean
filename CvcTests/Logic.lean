@@ -194,8 +194,8 @@ one that still does — it is `HO_APPLY`, consumes a single argument whatever th
 -/
 
 /-- info:
-default : ERR [internal] Function terms are only supported with higher-order logic. Try adding the logic prefix HO_.
-ALL     : ERR [internal] Function terms are only supported with higher-order logic. Try adding the logic prefix HO_.
+default : ERR Function terms are only supported with higher-order logic. Try adding the logic prefix HO_.
+ALL     : ERR Function terms are only supported with higher-order logic. Try adding the logic prefix HO_.
 HO_ALL  : sat
 -/
 #guard_msgs in #eval Env.runIO do

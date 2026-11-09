@@ -25,7 +25,7 @@ open Cvc.Untyped
 
 /-- info: (+ x y 1)
 (=> p (< x y))
-error: [internal] expecting a Boolean subexpression
+error: expecting a Boolean subexpression
 -/
 #guard_msgs in #eval Env.runIO do
   let int ← Srt.int
@@ -43,7 +43,7 @@ error: [internal] expecting a Boolean subexpression
 (f y)
 7
 (forall ((n Int)) (< n y))
-error: [internal] expecting an arithmetic subterm
+error: expecting an arithmetic subterm
 -/
 #guard_msgs in #eval Env.runIO do
   let int ← Srt.int

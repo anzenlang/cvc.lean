@@ -45,7 +45,8 @@ def mkSymbolAs (α : Type) [ToTyp α] (name : String) : Env Term := do
 def isBoolValue (term : Term) : Bool := T.isBooleanValue term.toUnsafe
 /-- The boolean a term denotes, failing if it denotes none. -/
 def getBoolValue (term : Term) : Res Bool :=
-  T.getBooleanValue term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getBooleanValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if term.isBoolValue then none else some s!"`{term}` is not a Boolean value"
 @[inherit_doc getBoolValue]
 def getBoolValue? (term : Term) : Option Bool := T.getBooleanValue? term.toUnsafe
 

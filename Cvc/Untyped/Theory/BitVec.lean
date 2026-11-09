@@ -37,7 +37,10 @@ def isBitVecValue (term : Term) : Bool := T.isBitVectorValue term.toUnsafe
 
 /-- The bit-vector a constant term denotes, failing unless it has the expected size. -/
 def getBitVecValue (term : Term) : Env (BitVec size) := do
-  let binRepr ← T.getBitVectorValue term.toUnsafe 2 |>.mapError Error.ofUnsafe
+  let binRepr ← explainError (m := Res)
+    (T.getBitVectorValue term.toUnsafe 2 |>.mapError Error.ofUnsafe) fun _ =>
+      if T.isBitVectorValue term.toUnsafe then none
+      else some s!"`{term}` is not a bit-vector value"
   let empty : (size : Nat) × BitVec size := ⟨0, BitVec.zero 0⟩
   let ⟨size', bv⟩ ← binRepr.chars.foldM (init := empty) fun
     | ⟨size, bv⟩, '0' => pure ⟨size + 1, bv.concat false⟩

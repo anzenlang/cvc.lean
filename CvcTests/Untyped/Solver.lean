@@ -438,7 +438,7 @@ sat!   : 1 #[1] 1 #[1] #[(as @U_0 U)] true (
 )
 unsat  : #[(and (< 0 x) (< x 2)), (< x 0)] #[(< x 0)]
 unsat! : #[(and (< 0 x) (< x 2)), (< x 0)] #[(< x 0)]
-value after unsat : [internal] cannot get value unless after a SAT or UNKNOWN response.
+value after unsat : cannot get value unless after a SAT or UNKNOWN response.
 -/
 #guard_msgs in #eval Env.runIO do
   let s ← Solver.new

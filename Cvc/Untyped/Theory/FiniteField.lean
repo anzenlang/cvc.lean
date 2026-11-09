@@ -52,7 +52,9 @@ def isFiniteFieldValue (term : Term) : Bool := T.isFiniteFieldValue term.toUnsaf
 
 /-- The integer representing a constant finite-field element, in cvc5's symmetric representation. -/
 def getFiniteFieldRepr (term : Term) : Res Int :=
-  T.getFiniteFieldValue term.toUnsafe |>.mapError Error.ofUnsafe
+  explainError (m := Res) (T.getFiniteFieldValue term.toUnsafe |>.mapError Error.ofUnsafe) fun _ =>
+    if T.isFiniteFieldValue term.toUnsafe then none
+    else some s!"`{term}` is not a finite-field value"
 
 
 namespace FiniteField

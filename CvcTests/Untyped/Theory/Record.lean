@@ -163,7 +163,7 @@ mixing them.
 
 /-- info:
 same sort : false
-mixed     : caught: [internal] Subexpressions must have the same type:
+mixed     : caught: Subexpressions must have the same type:
 Equation: (= (__cvc5_record_a_Int_b_Bool_ctor 7 true) (__cvc5_record_b_Bool_a_Int_ctor true 7))
 Type 1: __cvc5_record_a_Int_b_Bool
 Type 2: __cvc5_record_b_Bool_a_Int

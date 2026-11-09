@@ -181,7 +181,7 @@ ill-sorted term is only noticed when the parent is rebuilt. -/
 
 /-- info:
 replace          : cannot replace `x`, of sort `Int`, by `true`, of sort `Bool`
-replaceUnchecked : [internal] expecting an arithmetic subterm
+replaceUnchecked : expecting an arithmetic subterm
 -/
 #guard_msgs in #eval Env.runIO do
   let int ← Srt.int
