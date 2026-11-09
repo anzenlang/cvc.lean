@@ -78,7 +78,7 @@ same as getValueTerms : true
   s.assert (← counter.nextAt s2 s3)
   -- going down into step 1 and reaching 1 at step 3 forces going up into steps 2 and 3
   s.assert (← smt! ¬ s0.up ∧ ¬ s1.up ∧ s3.count = 1)
-  let trace : Symbols.TermTrace (SVars := Counter) 3 := .cons s3 (.cons s2 (.cons s1 (.zero s0)))
+  let trace : Counter.TermTrace 3 := .cons s3 (.cons s2 (.cons s1 (.zero s0)))
   s.checkSat (ifSat := do
     let cex ← trace.getCex
     cex.iterM fun {k} values =>
@@ -88,3 +88,8 @@ same as getValueTerms : true
     println! "terms @3   : up {terms.getCurrent.up.get}, count {terms.getCurrent.count.get}"
     let terms' ← trace.getValueTerms
     println! "same as getValueTerms : {terms.getCurrent.count.get == terms'.getCurrent.count.get}")
+
+/-! Where transition systems are imported, `structure.symbols` also aliases their traces. -/
+
+/-- info: Cvc.Tests.Untyped.Sys.Counter.TermTrace [Ω] (k : Nat) : Type -/
+#guard_msgs in #check Counter.TermTrace

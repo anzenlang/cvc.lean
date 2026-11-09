@@ -299,6 +299,10 @@ structure.symbols MySymbols where
   isOn : Bool
   count : Int
 ```
+
+It also declares `MySymbols.idents`, naming each symbol after its field, and one alias per
+`Symbols.Sig` type (`MySymbols.Terms`, …); where `Cvc.Untyped.Extra.Sys` is imported, the traces
+`TermTrace`, `ValueTrace` and `ValueTermTrace` too.
 -/
 scoped syntax (name := symbolsStructure) atomic((docComment)? "structure.symbols ") ident
   " where" withPosition((ppLine colGe Lean.Parser.Command.structSimpleBinder)+) : command

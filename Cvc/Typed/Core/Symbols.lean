@@ -270,7 +270,8 @@ meta section
 
 /-- Declares a symbol structure, its `Symbols` instance, its `idents` and its aliases (`Terms`, …).
 
-`idents` names each symbol after its field.
+`idents` names each symbol after its field. Where `Cvc.Typed.Extra.Sys` is imported, the aliases
+include the traces `TermTrace`, `ValueTrace` and `ValueTermTrace`.
 -/
 scoped syntax (name := symbolsStructure) atomic((docComment)? "structure.symbols ") ident
   " where" withPosition((ppLine colGe Lean.Parser.Command.structSimpleBinder)+) : command

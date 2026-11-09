@@ -2073,6 +2073,9 @@ scope, and is emitted as `abbrev MySymbols.X [Ω]? := @Symbols.Sig.X _? MySymbol
 load-bearing: plain application would fill `Fun2At`'s optional `k'` with its default inside the
 alias, and `MySymbols.Fun2At 0 5` could no longer be written. Adding a `Sig` type means adding its
 name to one list. `CvcTests/SymbolsAliases.lean` pins every alias's signature, with no `Ω` in scope.
+The traces of `Extra/Sys` (`TermTrace`, `ValueTrace`, `ValueTermTrace`, `symbolsTraceAliases`) are
+aliased too, but only where that module is imported — the generator checks the environment — and
+after the instance, which they need, taking the structure by name (`SVars := …`).
 
 `Cvc/Gen/Symbols.lean` holds what both layers share; each layer declares its own `scoped` spelling,
 so `open Cvc.Untyped` selects the sort-erased one exactly as it selects `smt!`.

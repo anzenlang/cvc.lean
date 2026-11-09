@@ -50,7 +50,13 @@ open Lean Elab Command
 /-- Names generated or reached beside a symbols structure other than its aliases, which a symbol
 therefore cannot be called. -/
 def symbolsReserved : Array Name :=
-  #[`idents, `mapM, `foldM, `declare, `declareIn, `getValues, `findCex]
+  #[`idents, `mapM, `foldM, `declare, `declareIn, `getValues, `findCex,
+    `TermTrace, `ValueTrace, `ValueTermTrace]
+
+/-- The traces of `Cvc.{Untyped,Typed}.Extra.Sys`, aliased beside a symbols structure where that
+module is imported, each with whether it takes the scope. -/
+def symbolsTraceAliases : Array (Name × Bool) :=
+  #[(`TermTrace, true), (`ValueTrace, false), (`ValueTermTrace, true)]
 
 /-- The aliases of `Symbols.Sig` both layers generate beside a symbols structure, with the same
 parameters in both, each with whether it takes the scope. A layer's own aliases are its `extras`. -/
@@ -156,6 +162,15 @@ def elabSymbols (root : Name) (extras : Array (Name × Bool))
     idents _ := $identsId
     mapM syms f := return ⟨$mapArgs,*⟩
     foldM syms acc f := $foldBody))
+  for (name, omega) in symbolsTraceAliases do
+    let sigName := root ++ `Symbols.Sig ++ name
+    unless (← getEnv).contains sigName do continue
+    let args := if omega then #[omegaArg] else #[]
+    let sigId := mkIdent sigName
+    cmds := cmds.push (← `(command|
+      @[inherit_doc $sigId] abbrev $(mkIdent (ns ++ name)) $[$args]* := $sigId (SVars := $id)))
   for cmd in cmds do elabCommand cmd
+-- The traces come after the instance, which they need, and take the structure by name, whatever the
+-- order of their binders; where `Extra.Sys` is not imported they do not exist, and are not aliased.
 
 end
