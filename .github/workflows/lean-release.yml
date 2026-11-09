@@ -1,0 +1,66 @@
+name: Lean release
+
+# Opens an issue when Lean publishes a stable release newer than the one in `lean-toolchain`.
+#
+# The bump itself is done by hand: lean-cvc5 follows Lean releases manually and usually with a
+# delay, and cvc.lean cannot move before it does. So the issue says which version lean-cvc5 is on
+# when it is opened, which is what decides whether the bump can be attempted yet. One issue per
+# release, open or closed: a release already reported is never reported again.
+#
+# Scheduled workflows run from the default branch only, and GitHub disables them on a public
+# repository after 60 days without activity.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Report a new Lean release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current=$(sed 's/.*://' lean-toolchain)
+          latest=$(gh api repos/leanprover/lean4/releases/latest --jq .tag_name)
+          newest=$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)
+          if [ "$latest" = "$current" ] || [ "$newest" != "$latest" ]; then
+            echo "on $current, the latest Lean release is $latest: nothing to report"
+            exit 0
+          fi
+          title="Bump to Lean $latest"
+          found=$(gh issue list --state all --search "\"$title\" in:title" --json title \
+            --jq "map(select(.title == \"$title\")) | length")
+          if [ "$found" != "0" ]; then
+            echo "Lean $latest has already been reported"
+            exit 0
+          fi
+          cvc5=$(gh api repos/abdoo8080/lean-cvc5/contents/lean-toolchain --jq .content \
+            | base64 -d | sed 's/.*://')
+          if [ "$cvc5" = "$latest" ]; then
+            status="lean-cvc5 is already on $latest, so the bump can be attempted."
+          else
+            status="lean-cvc5 is on $cvc5, so the bump has to wait for it to move to $latest."
+          fi
+          gh issue create --title "$title" --body "$(cat <<EOF
+          Lean [$latest](https://github.com/leanprover/lean4/releases/tag/$latest) is out, and this
+          repository is on $current.
+
+          $status
+
+          Bumping means moving \`lean-toolchain\` and \`CvcManual/lean-toolchain\` to $latest, with
+          Verso's \`rev\` in \`CvcManual/lakefile.toml\`, then updating lean-cvc5. The API reference
+          follows \`lean-toolchain\` on its own.
+          EOF
+          )"

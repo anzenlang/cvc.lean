@@ -1,0 +1,141 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+import Cvc.Typed.Theory.Set
+import Cvc.Typed.Core.Bool
+import Cvc.Typed.Theory.Arith
+
+public meta import Cvc.Typed.Theory.Set
+public meta import Cvc.Typed.Core.Bool
+public meta import Cvc.Typed.Theory.Arith
+
+
+
+/-! # Generated Set constructors, typed -/
+namespace Cvc.Tests.Typed.Term.Set
+
+open Cvc
+open Cvc.Typed.Term
+
+/-- info:
+member    : (set.member i s)
+subset    : (set.subset s t)
+isEmpty   : (set.is_empty s)
+isSingle  : (set.is_singleton s)
+singleton : (set.singleton i)
+insert    : (set.insert i s)
+union     : (set.union s t)
+inter     : (set.inter s t)
+minus     : (set.minus s t)
+complement: (set.complement s)
+card      : (set.card s)
+choose    : (set.choose s)
+unionN    : (set.union (set.union s t) s)
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← Cvc.Typed.Term.mkSymbolAs (Int) "i"
+  let s ← Cvc.Typed.Term.mkSymbolAs (Cvc.Set Int) "s"
+  let t ← Cvc.Typed.Term.mkSymbolAs (Cvc.Set Int) "t"
+
+  println! "member    : {← setMember i s}"
+  println! "subset    : {← setSubset s t}"
+  println! "isEmpty   : {← setIsEmpty s}"
+  println! "isSingle  : {← setIsSingleton s}"
+  println! "singleton : {← setSingleton i}"
+  println! "insert    : {← setInsert i s}"
+  println! "union     : {← setUnion s t}"
+  println! "inter     : {← setInter s t}"
+  println! "minus     : {← setMinus s t}"
+  println! "complement: {← setComplement s}"
+  println! "card      : {← setCard s}"
+  println! "choose    : {← setChoose s}"
+  println! "unionN    : {← setUnionN #[s, t, s]}"
+
+/-! ## Higher-order operators -/
+
+/-- info:
+map   : (set.map m s)
+filter: (set.filter p s)
+fold  : (set.fold acc z s)
+all   : (set.all p s)
+some  : (set.some p s)
+-/
+#guard_msgs in #eval Env.runIO do
+  let p ← Cvc.Typed.Term.mkSymbolAs ((Int → Bool)) "p"
+  let m ← Cvc.Typed.Term.mkSymbolAs ((Int → Int)) "m"
+  let acc ← Cvc.Typed.Term.mkSymbolAs ((Int → Int → Int)) "acc"
+  let z ← Cvc.Typed.Term.mkSymbolAs (Int) "z"
+  let s ← Cvc.Typed.Term.mkSymbolAs (Cvc.Set Int) "s"
+
+  println! "map   : {← setMap m s}"
+  println! "filter: {← setFilter p s}"
+  println! "fold  : {← setFold acc z s}"
+  println! "all   : {← setAll p s}"
+  println! "some  : {← setSome p s}"
+
+/-! ## Constants
+
+The sort-erased constructor takes the sort it builds; the typed one recovers it from its index.
+-/
+
+/-- info:
+empty    : (as set.empty (Set Int))
+universe : (as set.universe (Set Int))
+-/
+#guard_msgs in #eval Env.runIO do
+  println! "empty    : {← (setEmpty : Env (Cvc.Typed.Term (Cvc.Set Int)))}"
+  println! "universe : {← (setUniverse : Env (Cvc.Typed.Term (Cvc.Set Int)))}"
+
+
+/-! # The `smt!` DSL, set notation
+
+These notations come from this theory's `op%` entries and are emitted beside its constructors, so
+they exist exactly where the theory does. What the typed layer adds is the *index* the expansion
+carries, pinned by the `example`s below.
+-/
+
+open Cvc.Typed in
+/-- info:
+member    : (set.member i s)
+subset    : (set.subset s t)
+union     : (set.union s t)
+inter     : (set.inter s t)
+minus     : (set.minus s t)
+unionN    : (set.union (set.union s t) s)
+mixed     : (and (set.member i s) (set.subset s t))
+-/
+#guard_msgs in #eval Env.runIO do
+  let i ← mkSymbolAs Int "i"
+  let s ← mkSymbolAs (Cvc.Set Int) "s"
+  let t ← mkSymbolAs (Cvc.Set Int) "t"
+
+  println! "member    : {← smt! i ∈ s}"
+  println! "subset    : {← smt! s ⊆ t}"
+  println! "union     : {← smt! s ∪ t}"
+  println! "inter     : {← smt! s ∩ t}"
+  println! "minus     : {← smt! s ∖ t}"
+  println! "unionN    : {← smt! ∪[s, t, s]}"
+  println! "mixed     : {← smt! (i ∈ s) ∧ (s ⊆ t)}"
+
+
+
+/-! ## Comprehension
+
+The index is the element term's: the bound variables, here an `Int` and a `Bool`, do not reach it.
+-/
+
+/-- info: comprehension : (set.comprehension ((x Int) (b Bool)) (and b (> x 0)) (* x 2)) -/
+#guard_msgs in #eval Env.runIO do
+  let x ← Typed.BVar.mk (α := Int) "x"
+  let b ← Typed.BVar.mk (α := Bool) "b"
+  let pred ← and b.toTerm (← gt x.toTerm (← mkInt 0))
+  let elem ← mul x.toTerm (← mkInt 2)
+  let comp : Typed.Term (Cvc.Set Int) ←
+    setComprehension (Typed.BVars.push b (Typed.BVars.push x [])) pred elem
+  println! "comprehension : {comp}"

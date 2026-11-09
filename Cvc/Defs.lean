@@ -1,1209 +1,608 @@
 /-
-Copyright (c) 2023-2025 by the authors listed in the file AUTHORS and their
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
 institutional affiliations. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Adrien Champion
 -/
 
-import Cvc.Logic
-import Cvc.Basic
-import Cvc.Srt
-import Cvc.Option
+module
+
+public meta import Lean.Elab.BuiltinCommand
+
+public import Cvc.Basic.Env
 
 
 
-/-! # Functions and monads for term, term building, SMT *etc.* helpers and monads -/
+/-! # Sorts and their Lean descriptions
+
+`Srt` is an SMT-LIB sort of the current scope, `Typ` a pure Lean description of one, and `ToTyp`
+the class mapping a Lean type to the `Typ` it denotes. The sort constructors are in `Cvc.Srt`.
+-/
 namespace Cvc
 
+-- `def0%`–`def3%` declare a `def` equal to a cvc5 type, with `private` conversions either way, so
+-- that a wrapper costs nothing at runtime while staying opaque to a user who imports it plainly.
+-- The level says which instances come with it: `1` adds `ToString`, `2` adds `BEq`/`Hashable`, `3`
+-- adds `Ord`/`LT`/`LE`/`compare`. An optional `( ofId / toId )` suffix renames the conversions.
+--
+-- A doc comment in front of one documents the declared type. Without one the type inherits the
+-- underlying cvc5 type's docstring, which a downstream `module` only sees under `import all` of
+-- lean-cvc5's own module, so a type a user is meant to read about should carry its own.
+--
+-- The generated `toString` and `hash` carry docstrings of their own, lean-cvc5's being wrong for
+-- some types (a constructor's `toString` speaks of a datatype); `beq` and the order functions
+-- inherit lean-cvc5's.
 
 
-/-- Type-safe cvc5 terms, input type expected to be `IsSrt` for most uses.
 
-- No direct constructor exposed publicly, users must go through the `Term.Build` monadic
-  constructors.
+public meta section codeGen open Lean Syntax Elab Command
+
+structure TypeGen where mk' ::
+  doc? : Option (TSyntax ``Lean.Parser.Command.docComment)
+  mainId : Ident
+  tParam? : Option Ident
+  subId : Ident
+  ofSubId : Ident
+  toSubId : Ident
+  idTerm : Term
+  idSig : Term
+  idDef : Term
+
+namespace TypeGen variable (tg : TypeGen)
+
+def mk
+  (doc? : Option (TSyntax ``Lean.Parser.Command.docComment))
+  (mainId : Ident) (subId : Ident)  (tParam? ofSubId? toSubId? : Option Ident)
+: CommandElabM TypeGen := do
+  let mut ofSubId := mkIdent `ofUnsafe
+  let mut toSubId := mkIdent `toUnsafe
+  if let (some ofSubId', some toSubId') := (ofSubId?, toSubId?) then
+    ofSubId := ofSubId'
+    toSubId := toSubId'
+  let mut idDef ← `($subId)
+  let mut idSig ← ``(Type)
+  let mut idTerm ← `($mainId)
+  if let some tParam := tParam? then
+    idDef ← `(fun _ => $idDef)
+    idSig ← `( (_ : Type) → $idSig )
+    idTerm ← `($idTerm $tParam)
+  return {
+    doc?, mainId, tParam?, subId, ofSubId, toSubId
+    idTerm, idSig, idDef
+  }
+
+def namespaced (code : CommandElabM α) : CommandElabM α :=
+  Lean.Elab.Command.withNamespace tg.mainId.getId code
+
+def elaborate (stx : CommandElabM (TSyntax `command)) : CommandElabM Unit := do
+  let stx ← stx
+  elabCommand stx
+
+def elab0 : CommandElabM Unit := do
+  if let some doc := tg.doc? then
+    elaborate `(
+      $doc:docComment
+      def $tg.mainId [Ω] : $tg.idSig := $tg.idDef
+    )
+  else
+    elaborate `(
+      @[inherit_doc $tg.subId]
+      def $tg.mainId [Ω] : $tg.idSig := $tg.idDef
+    )
+  tg.namespaced do elaborate `(
+    instance : Nonempty $tg.idTerm := inferInstanceAs (Nonempty $tg.subId)
+    @[inline] private def $tg.ofSubId : $tg.subId → $tg.idTerm := id
+    @[inline] private def $tg.toSubId : $tg.idTerm → $tg.subId := id
+  )
+
+def elab1 : CommandElabM Unit := do
+  tg.elab0
+  let toStringId := `toString |> mkIdent
+  let toStringSubId := tg.subId.getId |>.append `toString |> mkIdent
+  tg.namespaced do elaborate `(
+    instance : ToString $tg.idTerm := inferInstanceAs (ToString $tg.subId)
+    /-- The string cvc5 prints for this value. -/
+    protected def $toStringId : $tg.idTerm → String := $toStringSubId
+  )
+
+def elab2 : CommandElabM Unit := do
+  tg.elab1
+  let beqId := `beq |> mkIdent
+  let beqSubId := tg.subId.getId |>.append `beq |> mkIdent
+  let hashId := `hash |> mkIdent
+  let hashSubId := tg.subId.getId |>.append `hash |> mkIdent
+  tg.namespaced do elaborate `(
+    instance : BEq $tg.idTerm := inferInstanceAs (BEq $tg.subId)
+    @[inherit_doc $beqSubId]
+    protected def $beqId : $tg.idTerm → $tg.idTerm → Bool := $beqSubId
+    instance : Hashable $tg.idTerm := inferInstanceAs (Hashable $tg.subId)
+    /-- cvc5's hash of this value. -/
+    protected def $hashId : $tg.idTerm → UInt64 := $hashSubId
+  )
+
+def elab3 : CommandElabM Unit := do
+  tg.elab2
+  let bltId := `blt |> mkIdent
+  let bltSrc := tg.subId.getId |>.append `blt |> mkIdent
+  let bleId := `ble |> mkIdent
+  let bleSrc := tg.subId.getId |>.append `ble |> mkIdent
+  let bgtId := `bgt |> mkIdent
+  let bgtSrc := tg.subId.getId |>.append `bgt |> mkIdent
+  let bgeId := `bge |> mkIdent
+  let bgeSrc := tg.subId.getId |>.append `bge |> mkIdent
+  let compareId := `compare |> mkIdent
+  let compareSrc := tg.subId.getId |>.append `compare |> mkIdent
+  tg.namespaced do elaborate `(
+    instance : LT $tg.idTerm := inferInstanceAs (LT $tg.subId)
+    instance : DecidableLT $tg.idTerm := inferInstanceAs (DecidableLT $tg.subId)
+    instance : LE $tg.idTerm := inferInstanceAs (LE $tg.subId)
+    instance : DecidableLE $tg.idTerm := inferInstanceAs (DecidableLE $tg.subId)
+
+    @[inherit_doc $bltSrc]
+    protected def $bltId : $tg.idTerm → $tg.idTerm → Bool := $bltSrc
+    @[inherit_doc $bleSrc]
+    protected def $bleId : $tg.idTerm → $tg.idTerm → Bool := $bleSrc
+    @[inherit_doc $bgtSrc]
+    protected def $bgtId : $tg.idTerm → $tg.idTerm → Bool := $bgtSrc
+    @[inherit_doc $bgeSrc]
+    protected def $bgeId : $tg.idTerm → $tg.idTerm → Bool := $bgeSrc
+
+    instance : Ord $tg.idTerm := inferInstanceAs (Ord $tg.subId)
+
+    @[inherit_doc $compareSrc]
+    protected def $compareId : $tg.idTerm → $tg.idTerm → Ordering := $compareSrc
+  )
+
+end TypeGen
+
+declare_syntax_cat cvcCustomDefKw
+
+syntax "def0% " : cvcCustomDefKw
+syntax "def1% " : cvcCustomDefKw
+syntax "def2% " : cvcCustomDefKw
+syntax "def3% " : cvcCustomDefKw
+
+syntax (name := cvcCustomDef)
+  (docComment)? cvcCustomDefKw ident (ident)? " ← " ident
+    ("( " ident " / " ident " )")?
+: command
+
+@[command_elab cvcCustomDef]
+def elab_cvcCustomDef : CommandElab
+| `( $[$doc?:docComment]? $kw:cvcCustomDefKw $id $[ $tParam? ]? ← $subId
+    $[ ( $ofSubId? / $toSubId? ) ]? ) => do
+  let tg ← TypeGen.mk doc? id subId tParam? ofSubId? toSubId?
+  match kw with
+  | `(cvcCustomDefKw| def0%) => tg.elab0
+  | `(cvcCustomDefKw| def1%) => tg.elab1
+  | `(cvcCustomDefKw| def2%) => tg.elab2
+  | `(cvcCustomDefKw| def3%) => tg.elab3
+  | _ => throwUnsupportedSyntax
+| _ => throwUnsupportedSyntax
+
+end codeGen
+
+
+
+/-! ## Re-exported from lean-cvc5
+
+The enums `Kind`, `SortKind`, `ProofRule` and `ProofRewriteRule`, and the type `Op`, are lean-cvc5's
+own, re-exported so that naming one does not mean reaching into `cvc5`.
 -/
-structure Term (α : Type) where
-/-- Constructor from an unsafe term. -/
-private ofUnsafe ::
-  /-- True if the term mentions symbols. -/
-  hasSymbols : Bool
-  /-- Underlying unsafe term. -/
-  toUnsafe : cvc5.Term
+-- Not wrapped: restating a 320- or 23-variant enum buys nothing, and `Op` is only ever produced and
+-- consumed by the term API.
 
-/-- Abbreviation for a `Term Bool`. -/
-abbrev Formula := Term Bool
+public section variable [Ω]
+
+export cvc5 (Kind SortKind Op ProofRule ProofRewriteRule)
 
 
-
-namespace Term
-
-/-- Boolean terms: `Term Bool`. -/
-protected abbrev Bool := Term Bool
-/-- Integer terms: `Term Int`. -/
-protected abbrev Int := Term Int
-/-- Real/`Rat` terms: `Term Rat`. -/
-protected abbrev Real := Term Rat
-/-- String terms: `Term String`. -/
-protected abbrev String := Term String
-/-- Array terms. -/
-protected abbrev Array (α β : Type) := Term (Cvc.TMap α β)
-/-- Sequence terms. -/
-protected abbrev Seq (α : Type) := Term (Array α)
-/-- Function terms. -/
-protected abbrev Fun (α β : Type) := Term (α → β)
-/-- Product terms. -/
-protected abbrev Prod (α β : Type) := Term (α × β)
+/-- A datatype declaration being built, which `Srt.datatype` turns into a sort. -/
+def2% Datatype.Decl ← cvc5.DatatypeDecl
+/-- A declared datatype, as read back from its sort. -/
+def2% Datatype ← cvc5.Datatype
+/-- A constructor declaration being built, added to a `Datatype.Decl`. -/
+def2% Datatype.Ctor.Decl ← cvc5.DatatypeConstructorDecl
+/-- A constructor of a declared datatype. -/
+def2% Datatype.Ctor ← cvc5.DatatypeConstructor
+/-- A field selector of a datatype constructor. -/
+def2% Datatype.Selector ← cvc5.DatatypeSelector
 
 
 
-section variable [A : IsSrt α] (term : Term α)
+/-- An SMT-LIB sort of the current scope.
 
-/-- Sort of some term.
-
-> Note that due to strong-typing, this function does not perform any FFI.
+Built with `Srt.int`, `Srt.set` and the other constructors, or from a Lean type with `Srt.of`.
 -/
-abbrev srt : (term : Term α) → Srt := 𝕂 A.srt
-
-theorem srt_bij : α = term.srt := A.h_bij
-
-/-- Re-types `t` in terms of the type of `t.srt`. -/
-def retype : Term term.srt := term.srt_bij ▸ term
-
-/-- Helper for dependent-pattern-matching the sort of a term. -/
-def inspectSrt (f : (srt : Srt) → Term srt → β) : β :=
-  f term.srt term.retype
-
-end
-
-
-
-/-- Monadic constructor from an unsafe term. -/
-private def ofUnsafeM [Monad m] [IsSrt α] (hasSymbols : Bool) : m cvc5.Term → m (Term α) :=
-  (Term.ofUnsafe hasSymbols <$> ·)
-
-/-- SMT-LIB string representation. -/
-def toSmtString (term : Term α) : String :=
-  term.toUnsafe.toString
-
-instance : ToString (Term α) := ⟨Term.toSmtString⟩
-
-
-
-/-! ## Term building -/
-open cvc5 renaming TermManager → Manager
-
-/-- State of the term builder monad. -/
-structure Build.State where
-/-- Constructor from a term manager. -/
-mk' ::
-  /-- Term manager. -/
-  manager : Manager
-  /-- Logic builder, used to track the logic necessary to express the terms actually built.
-
-  Updated when building terms.
-  -/
-  logic : Logic.Builder := Logic.Builder.mk
-
-namespace Build.State
-
-@[inherit_doc Build.State.mk']
-def ofManager (manager : Manager) (logic : Logic.Builder := Logic.Builder.mk) : Build.State :=
-  ⟨manager, logic⟩
-
-/-- Creates a new term builder state. -/
-def mk : BaseIO Build.State :=
-  ofManager <$> cvc5.TermManager.new
-
-
-end Build.State
-
-
-
-/-- Term-building error-state-monad transformer. -/
-abbrev BuildT (m : Type → Type u) :=
-  ResT (StateT Build.State m)
-
-/-- Term-building error-state-monad in `IO`. -/
-abbrev BuildIO := BuildT IO
-
-/-- Plain term-building error-state-monad. -/
-abbrev Build := BuildT Id
-
-namespace BuildT
-
-example [Monad m] : MonadLiftT Res (BuildT m) := inferInstance
-
-instance : MonadLift (Except cvc5.Error) Build where
-  monadLift code tm := do
-    match ← code with
-    | .ok res => return (.ok res, tm)
-    | .error error => return (.error <| Error.ofCvc5 error, tm)
-
-instance [Monad m] : MonadLift Build (BuildT m) :=
-  ⟨fun code state => return code state⟩
-
-instance [Monad m] [MonadLiftT IO m] : MonadLift BuildIO (BuildT m) :=
-  ⟨fun code state => return ← code state⟩
-
-/-- Runs term-building code with a specific build state. -/
-def runWith' (build : BuildT m α) (state : Build.State) : m (Except Error α × Build.State) :=
-  build state
-
-section variable [Monad m]
-
-@[inherit_doc runWith']
-def runWith (build : BuildT m α) (state : Build.State) : m (Except Error α) :=
-  Prod.fst <$> build.runWith' state
-
-section variable [MonadLiftT BaseIO m]
-
-/-- Runs term-building code, creates an initial build state if none is provided. -/
-def run' [MonadLiftT BaseIO m]
-  (build : BuildT m α) (state? : Option Build.State := none)
-: m (Except Error α × Build.State) := do
-  let state ← if let some state := state? then pure state else Build.State.mk
-  build state
-
-@[inherit_doc run']
-def run [MonadLiftT BaseIO m]
-  (build : BuildT m α) (state? : Option Build.State := none)
-: m (Except Error α) :=
-  Prod.fst <$> build.run' state?
-
-end
-
-end
-
-/-- Runs term-building code in `IO`, creates an initial build state if none is provided -/
-def runIO'
-  (build : BuildIO α) (state? : Option Build.State := none)
-: IO (α × Build.State) := do
-  let (a?, state) ← build.run' state?
-  match a? with
-  | .ok a => return (a, state)
-  | .error error =>
-    IO.eprintln s!"{error}"
-    throw <| IO.Error.userError error.toString
-
-@[inherit_doc runIO']
-def runIO (build : BuildIO α) (state? : Option Build.State := none) : IO α :=
-  Prod.fst <$> build.runIO' state?
-
-end BuildT
-
--- export `BuildT.<run>` runners to `Build.<run>`
-namespace Build
-export BuildT (runWith' runWith run' run runIO' runIO)
-end Build
-
--- also export `Term.BuildT.<run>`/`Term.Build.<run>` runners to `Term.<run>`
-export Build (runWith' runWith run' run runIO' runIO)
-
-
-
-
-/-- Applies a monadic function to the term manager part of the `Build.State`. -/
-private def managerDoM [Monad m] [MonadLiftT m Build] (f : Manager → m γ) : Build γ := do
-  let state ← get
-  f state.manager
-
-/-- Applies a function to the term manager part of the `Build.State`. -/
-private def managerDo (f : Manager → γ) : Build γ :=
-  managerDoM (m := Id) f
-
-/-- Applies a function to the `Logic.Builder` part of the `Build.State`. -/
-private def logicDo (f : Logic.Builder → Logic.Builder) : Build Unit :=
-  fun state =>
-    let logic := f state.logic
-    return (.ok (), {state with logic})
-
-end Term
-
-
+def3% Srt ← cvc5.Sort
 
 namespace Srt
 
+/-- The kinds of abstract sort: a sort of a known family, its parameters left unspecified. -/
+inductive Abstract
+| bitVec
+| float
+| finiteField
+| function
+deriving Inhabited, DecidableEq, BEq, Ord, Hashable, Repr
+-- Only the four kinds cvc5 really keeps abstract. An abstract *container* is not one of them:
+-- `mkAbstractSort SET_SORT` is literally `mkSetSort ?`, of sort kind `SET_SORT`, so it is
+-- `Typ.set .any` rather than an abstract sort.
 
-/-- Conversion to unsafe sorts.
+namespace Abstract
 
-- function sorts are flattened:\
-  `srt → srt' → srt'' → nonFunSrt` becomes `#[srt, srt', srt''] → nonFunSrt`
--/
-def toSort (srt : Srt) : Term.Build cvc5.Sort :=
-  Term.managerDoM fun tm => aux tm srt 10_000
-where
-  aux (tm : cvc5.TermManager) (srt' : Srt) : (maxRec : Nat) → Term.Build cvc5.Sort
-    | 0 => Cvc.throwInternal s!"[Srt.toSort] maximum depth reached on `{srt}`"
-    | maxRec + 1 =>
-      match srt' with
-      | .bool => pure tm.getBooleanSort
-      | .int => pure tm.getIntegerSort
-      | .real => pure tm.getRealSort
-      | .regex => pure tm.getRegExpSort
-      | .string => pure tm.getStringSort
-      | .roundingMode => pure tm.getRoundingModeSort
-      | .finiteField size => tm.mkFiniteFieldSort size
-      | .bitVec size => tm.mkBitVectorSort size
-      | .float exp sig => tm.mkFloatingPointSort exp sig
-      | .uninterpreted name => pure <| tm.mkUninterpretedSort name
-      | .bag elm => do tm.mkBagSort (← aux tm elm maxRec)
-      | .seq elm => do tm.mkSequenceSort (← aux tm elm maxRec)
-      | .set elm => do tm.mkSetSort (← aux tm elm maxRec)
-      | .array idx elm => do tm.mkArraySort (← aux tm idx maxRec) (← aux tm elm maxRec)
-      | .function dom cod => do
-        let (doms, cod) ← flattenFun tm maxRec #[← aux tm dom maxRec] cod
-        tm.mkFunctionSort doms cod
-      | .prod lft rgt => do tm.mkTupleSort #[← aux tm lft maxRec, ← aux tm rgt maxRec]
-      | .unit => tm.mkTupleSort #[]
-      | .abstract _k => Cvc.throwInternal s!"[Srt.toSort] todo `{srt'}`"
-  flattenFun (tm : cvc5.TermManager) (maxRec : Nat)
-    (doms : Array cvc5.Sort)
-  : (cod : Srt) → Term.Build (Array cvc5.Sort × cvc5.Sort)
-    | .function dom cod => do
-      let dom ← aux tm dom maxRec
-      flattenFun tm maxRec (doms.push dom) cod
-    | cod => return (doms, (← aux tm cod maxRec))
+protected def toString : (a : Srt.Abstract) → String
+| bitVec => "BitVec _"
+| float => "Float _ _"
+| finiteField => "FiniteField _"
+| function => "_ → _"
 
-/-- Retrieves the domain and codomain of `srt` for `declareFun`-like functions.
+instance : ToString Srt.Abstract := ⟨Abstract.toString⟩
 
-This function uncurries `α → β → ... → γ` to `#[α, β, ...] → γ`.
--/
-private def toSignature! (srt : Srt) : Term.Build (Array cvc5.Sort × cvc5.Sort) :=
-  Term.managerDoM (toSort.flattenFun srt · 10_000 #[] srt)
+private def ofKind : (k : cvc5.SortKind) → Res Abstract
+  | .BITVECTOR_SORT => return bitVec
+  | .FLOATINGPOINT_SORT => return float
+  | .FINITE_FIELD_SORT => return finiteField
+  | .FUNCTION_SORT => return function
+  | k => throwInternal s!"sort kind `{k}` is not abstract-able"
 
+def toKind : (a : Abstract) → cvc5.SortKind
+  | bitVec => .BITVECTOR_SORT
+  | float => .FLOATINGPOINT_SORT
+  | finiteField => .FINITE_FIELD_SORT
+  | function => .FUNCTION_SORT
+
+instance : Ord Abstract := ⟨fun a1 a2 => compare a1.ctorIdx a2.ctorIdx⟩
+
+section variable (a1 a2 : Abstract)
+
+protected def ble : Bool := a1.ctorIdx ≤ a2.ctorIdx
+protected def blt : Bool := a1.ctorIdx < a2.ctorIdx
+
+end
+
+instance : LE Abstract := ⟨(Abstract.ble · ·)⟩
+instance : DecidableLE Abstract := fun a1 a2 => if h : a1.ble a2 then isTrue h else isFalse h
+instance : LT Abstract := ⟨(Abstract.blt · ·)⟩
+instance : DecidableLT Abstract := fun a1 a2 => if h : a1.blt a2 then isTrue h else isFalse h
+
+end Abstract
 end Srt
 
+/-- An array of `Srt`s. -/
+abbrev Srts := Array Srt
 
+namespace Srts
 
-/-! ## Term creation API -/
-namespace Term
+private def toUnsafe : Srts → Array cvc5.Sort := id
+private def ofUnsafe : Array cvc5.Sort → Srts := id
 
-/-- Unsafe term creation. -/
-private def mk [IsSrt α]
-  (hasSymbols : Bool) (k : cvc5.Kind) (args : Array cvc5.Term)
-: Build (Term α) :=
-  managerDoM fun tm => ofUnsafe hasSymbols <$> tm.mkTerm k args
-
-
-
-/-- Builds a constant Boolean term. -/
-def bool (b : Bool) : Build Term.Bool :=
-  managerDo fun tm => tm.mkBoolean b |> Term.ofUnsafe false
-
-/-- Retrieves the value of a constant Boolean term. -/
-def boolVal? (t : Term.Bool) : Option Bool :=
-  t.toUnsafe.getBooleanValue?
-
-@[inherit_doc boolVal?]
-def boolVal (t : Term.Bool) : Res Bool :=
-  if let some t := t.boolVal?
-  then return t
-  else
-    Res.failUser "cannot retrieve Boolean value of a non-constant term"
-    |>.context s!"on term `{t}`"
-
-/-- Builds a constant integer term. -/
-def int (i : Int) : Build Term.Int := do
-  logicDo .int
-  managerDo fun tm => tm.mkInteger i |> Term.ofUnsafe false
-
-/-- Retrieves the value of a constant integer term. -/
-def intVal? (t : Term.Int) : Option Int :=
-  t.toUnsafe.getIntegerValue?
-
-@[inherit_doc intVal?]
-def intVal (t : Term.Int) : Res Int :=
-  if let some t := t.intVal?
-  then return t
-  else
-    Res.failUser "cannot retrieve integer value of a non-constant term"
-    |>.context s!"on term `{t}`"
-
-/-- Retrieves the value of a constant rational/real term. -/
-def ratVal? (t : Term.Real) : Res (Option Rat) :=
-  t.toUnsafe.getRationalValue?.mapM fun r =>
-    if h : r.den ≠ 0 then return Rat.normalize r.num r.den h
-    else Res.failInternal s!"cvc5 produced an illegal ration value: `{r}`"
-
-@[inherit_doc ratVal?]
-def ratVal (t : Term.Real) : Res Rat := do
-  if let some r ← t.ratVal? then return r else
-    Res.failUser "cannot retrieve rational value of a non-constant term"
-    |>.context s!"on term `{t}`"
-
--- /-- Retrieves the value of a constant rational/real term. -/
--- def stringVal? (t : Term.String) : Option String :=
---   t.toUnsafe.getStringValue?
-
--- @[inherit_doc stringVal?]
--- def stringVal (t : Term.String) : Res String := do
---   if let some r ← t.stringVal? then return r else
---     Res.failUser "cannot retrieve string value of a non-constant term"
---     |>.context s!"on term `{t}`"
-
-/-- Builds the Boolean negation of a term. -/
-def mkNot (term : Term.Bool) : Build Term.Bool :=
-  mk term.hasSymbols .NOT #[term.toUnsafe]
-
-@[inherit_doc mkNot]
-def not := mkNot
-
-/-- Builds an if-then-else term. -/
-def ite [IsSrt α] (cnd : Term.Bool) (thn els : Term α) : Build (Term α) :=
-  mk (cnd.hasSymbols ∨ thn.hasSymbols ∨ els.hasSymbols)
-    .ITE #[cnd.toUnsafe, thn.toUnsafe, els.toUnsafe]
+end Srts
 
 
 
-/-! ### `n`-ary operators (`2 ≤ n`) -/
-section nary2_bool
-variable (terms : Array (Term Bool)) (lft rgt : Term Bool)
-variable (h_size : 2 ≤ terms.size := by
-  (try (try simp <;> try omega) ; done)
-  <;> fail "expected an array of **at least** two terms"
-)
+/-! ## Sort descriptions
 
-/-- Builds a conjunction term. -/
-def mkAnd : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .AND (terms.map toUnsafe)
-
-@[inherit_doc mkAnd]
-def and : Build Formula :=
-  mkAnd #[lft, rgt]
-
--- def iand (k : Nat) (i j : Term Int) : Build Formula := do
---   sorry
-
-/-- Builds a disjunction term. -/
-def mkOr : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .OR (terms.map toUnsafe)
-
-@[inherit_doc mkOr]
-def or : Build Formula :=
-  mkOr #[lft, rgt]
-
-/-- Builds an exclusive-disjunction term. -/
-def mkXor : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .XOR (terms.map toUnsafe)
-
-@[inherit_doc mkXor]
-def xor : Build Formula :=
-  mkXor #[lft, rgt]
-
-/-- Builds a disjunction term. -/
-def mkImplies : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .IMPLIES (terms.map toUnsafe)
-
-@[inherit_doc mkImplies]
-def implies : Build Formula :=
-  mkImplies #[lft, rgt]
-
-end nary2_bool
-
-
-
-section nary2_generic
-variable [IsSrt α] (terms : Array (Term α)) (lft rgt : Term α)
-variable (h_size : 2 ≤ terms.size := by
-  (try (try simp <;> try omega) ; done)
-  <;> fail "expected an array of **at least** two terms"
-)
-
-/-- Builds an equality term. -/
-def mkEqual : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .EQUAL (terms.map toUnsafe)
-
-@[inherit_doc mkEqual]
-def equal : Build Formula :=
-  mkEqual #[lft, rgt]
-
-/-- Builds a pairwise-*distinct* term. -/
-def mkDistinct : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .DISTINCT (terms.map toUnsafe)
-
-@[inherit_doc mkDistinct]
-def distinct : Build Formula :=
-  mkDistinct #[lft, rgt]
-
-@[inherit_doc mkDistinct]
-abbrev mkNEqual := @distinct
-@[inherit_doc distinct]
-abbrev nequal := @distinct
-
-end nary2_generic
-
-
-
-section nary2_arith
-variable [IsSrt.Arith α] (terms : Array (Term α)) (lft rgt : Term α)
-variable (h_size : 2 ≤ terms.size := by
-  (try (try simp <;> try omega) ; done)
-  <;> fail "expected an array of **at least** two terms"
-)
-
-/-- Builds a less-than term. -/
-def mkLt : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .LT (terms.map toUnsafe)
-
-@[inherit_doc mkLt]
-def lt : Build Formula :=
-  mkLt #[lft, rgt]
-
-/-- Builds a less-than-or-equal-to term. -/
-def mkLe : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .LEQ (terms.map toUnsafe)
-
-@[inherit_doc mkLe]
-def le : Build Formula :=
-  mkLe #[lft, rgt]
-
-/-- Builds a greater-than-or-equal-to term. -/
-def mkGe : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .GEQ (terms.map toUnsafe)
-
-@[inherit_doc mkGe]
-def ge : Build Formula :=
-  mkGe #[lft, rgt]
-
-/-- Builds a greater-than term. -/
-def mkGt : Build Formula :=
-  let _ := h_size
-  mk (terms.any hasSymbols) .GT (terms.map toUnsafe)
-
-@[inherit_doc mkGt]
-def gt : Build Formula :=
-  mkGt #[lft, rgt]
-
-end nary2_arith
-
-
-
-/-! #### Arithmetic -/
-section arith
-
-variable [IsSrt α] (terms : Array (Term α)) (term lft rgt : Term α)
-variable (h_size : 2 ≤ terms.size := by
-  (try (try simp <;> try omega) ; done)
-  <;> fail "expected an array of **at least** two terms"
-)
-variable (Arith : IsSrt.Arith α := by
-  (try ( exact inferInstance ) ; done)
-  <;> fail "expected arithmetic type `Int` or `Rat`, see `Cvc.is_arith` and `Cvc.IsSrt.Arith`"
-)
-
-/-- Forbids difference logics. -/
-private def nonDiff : Build Unit := logicDo .nonDiff
-
-/-- Forces non-linear logic if non-linear, true if one of the terms has symbols. -/
-private def checkNonLinearOfArgs (terms : Array (Term α)) : Build Bool := do
-  let mut hasSymbols := false
-  let mut nonLinear := false
-  for term in terms do
-    if term.hasSymbols then
-      if hasSymbols then
-        nonLinear := true
-        break
-      else
-        hasSymbols := true
-  if nonLinear then
-    logicDo (.nonLinear ∘ .nonDiff)
-  return hasSymbols
-
-/-- Builds an addition term.
-
-- Forbids difference logics.
+`Typ` describes a sort Lean-side, and `Typ?` adds the sorts cvc5 calls *abstract*: the fully
+abstract `?`, and `?BITVECTOR_TYPE`, `?FLOATINGPOINT_TYPE`, `?FINITE_FIELD_TYPE` and `?->`. cvc5
+accepts an abstract sort only as a set, bag or sequence element, as an array's index or element, and
+as a function's codomain. Those positions take a `Typ?` and every other takes a `Typ`, so no `Typ`
+describes a sort cvc5 would reject.
 -/
-def mkAdd : Build (Term α) := do
-  nonDiff
-  let _ := h_size ; let _ := Arith
-  mk (terms.any hasSymbols) .ADD (terms.map toUnsafe)
 
-@[inherit_doc mkAdd]
-def add : Build (Term α) :=
-  mkAdd #[lft, rgt]
+mutual
 
-/-- Builds a subtraction term. -/
-def mkSub : Build (Term α) := do
-  nonDiff
-  let _ := h_size ; let _ := Arith
-  mk (terms.any hasSymbols) .SUB (terms.map toUnsafe)
+/-- A sort, described Lean-side; never an abstract sort. -/
+inductive Typ
+| bool | int | real | string | regex | roundingMode
+| bitVec (size : Nat)
+| float (exp sig : Nat)
+| finiteField (size : Nat)
+| arrayTo (idx elm : Typ?)
+| bag (elm : Typ?) | set (elm : Typ?) | seq (elm : Typ?)
+/-- cvc5's `Nullable`, denoted Lean-side by `Option`. -/
+| nullable (elm : Typ)
+/-- A tuple, of the given components. -/
+| prod (args : List Typ)
+/-- A record, of named fields.
 
-@[inherit_doc mkSub]
-def sub : Build (Term α) :=
-  mkSub #[lft, rgt]
-
-def neg : Build (Term α) :=
-  let _ := Arith
-  mk term.hasSymbols cvc5.Kind.NEG #[term.toUnsafe]
-
-
-/-- Builds a multiplication term.
-
-- Forbids difference logic.
-- Forces non-linear logic if non-linear.
+The order is part of the sort: `{a : Int, b : Bool}` and `{b : Bool, a : Int}` are different.
 -/
-def mkMul : Build (Term α) := do
-  let _ := h_size ; let _ := Arith
-  nonDiff
-  let hasSymbols ← checkNonLinearOfArgs terms
-  mk hasSymbols .MULT (terms.map toUnsafe)
+| record (fields : List (String × Typ))
+/-- A datatype, by the name it was declared under.
 
-@[inherit_doc mkMul]
-def mul : Build (Term α) := mkMul #[lft, rgt]
-
-/-- Arithmetic division with division by `0` undefined, left associative.
-
-- Forbids difference logic.
-- Forces non-linear logic if non-linear.
+`Typ.toSrt` fails unless a datatype of that name has been declared in the current scope, with
+`Srt.datatype`, `Srt.datatypes` or `Solver.declareDatatype`.
 -/
-def mkDiv! : Build (Term α) := do
-  let _ := h_size
-  nonDiff
-  let hasSymbols ← checkNonLinearOfArgs terms
-  let terms := terms.map toUnsafe
-  Arith.inspect
-    (fInt := fun _ => mk hasSymbols .INTS_DIVISION terms)
-    (fRat := fun _ => mk hasSymbols .DIVISION terms)
+| datatype (name : String)
+/-- A function sort, its codomain possibly abstract. -/
+| function (dom : Typ) (cod : Typ?)
+/-- An uninterpreted sort, by name; like `datatype`, it must be declared (`Srt.uninterpreted`). -/
+| uninterpreted (name : String)
+-- A declared sort is known by name only because cvc5 makes a *fresh* sort on every declaration,
+-- even an identical one, so `Typ.toSrt` looks it up in the scope's state rather than rebuilding it.
+-- Nullables and records are structural: cvc5 builds the same sort from the same parts, so `toSrt`
+-- rebuilds them.
 
-@[inherit_doc mkDiv!]
-def div! : Build (Term α) := do
-  mkDiv! #[lft, rgt]
-
-/-- Arithmetic division with division by `0` defined to be `0`, left associative. -/
-def mkDivTotal : Build (Term α) := do
-  nonDiff
-  let hasSymbols ← checkNonLinearOfArgs #[lft, rgt]
-  let args := #[lft.toUnsafe, rgt.toUnsafe]
-  Arith.inspect
-    (fInt := fun _ => mk hasSymbols .INTS_DIVISION_TOTAL args)
-    (fRat := fun _ => mk hasSymbols .DIVISION_TOTAL args)
-
-@[inherit_doc mkDivTotal]
-def divTotal : Build (Term α) := mkDivTotal lft rgt
-
-end arith
-
-
-
-/-! ### Function application -/
-section apply
-
-/-- Flattens higher-order applications. -/
-private partial def flattenHoApply
-  (revArgs : Array cvc5.Term) (functionTerm : cvc5.Term)
-: Term.Build cvc5.Term := do
-  match functionTerm.getKind with
-  -- if `functionTerm` is a higher-order apply, deconstruct it
-  | .HO_APPLY =>
-    let args := functionTerm.getChildren
-    if h : 0 < args.size then
-      let functionTerm := args[0]
-      let args := args.toSubarray (start := 1)
-      let revArgs := revArgs |> args.foldr fun arg acc => acc.push arg
-      flattenHoApply revArgs functionTerm
-    else Cvc.throwInternal s!"cannot deconstruct `HO_APPLY` with no arguments"
-  -- otherwise reconstruct a normal application
-  | _ =>
-    if revArgs.isEmpty
-    then Cvc.throwInternal s!"unreachable: `flattenHoApply` with empty list of arguments"
-    else
-      let revArgs := revArgs.push functionTerm
-      -- build the unsafe term
-      managerDoM fun tm => tm.mkTerm cvc5.Kind.APPLY_UF revArgs.reverse
-
-/-- Applies a function term to an argument.
-
-## Partial applications and higher-order
-
-This function supports partial applications: they are encoded as `cvc5.Kind.HO_APPLY` terms, which
-**would** trigger errors if used in a solver without support for higher-order. Since support for
-higher-order makes cvc5-level reasoning much more expensive, we want to avoid having `HO_APPLY`
-terms as much as possible.
-
-For this reason, this function detects when it is building an application that yields a non-function
-term; in this case, it will destruct the underlying higher-order terms (recursively, and if any) and
-rewrite them as a regular (first-order) function application.
--/
-protected def apply [IsSrt β]
-  (function : Term (α → β)) (arg : Term α)
-: Term.Build (Term β) := do
-  let hasSymbols := function.hasSymbols ∨ arg.hasSymbols
-  let term! := function.toUnsafe
-  let sort! := term!.getSort
-  let dom ← sort!.getFunctionDomainSorts
-  if 1 < dom.size
-  then Term.mk hasSymbols .HO_APPLY #[function.toUnsafe, arg.toUnsafe]
-  else ofUnsafe hasSymbols <$> flattenHoApply #[arg.toUnsafe] term!
-
-end apply
-
-end Term
-
-
-
-/-- A term-value, as produced by `getValue`-like (SMT) function. -/
-structure Value (α : Type) where
-/-- Private constructor so that users can't compromise this type's semantics. -/
-private ofTerm ::
-  /-- Underlying term. -/
-  toTerm : Term α
-
-namespace Value
-
-protected def toString (value : Value α) : String := toString value.toTerm
-
-instance : ToString (Value α) := ⟨Value.toString⟩
-
-/-- Boolean values. -/
-protected abbrev Bool := Value Bool
-/-- Integer values. -/
-protected abbrev Int := Value Int
-/-- Real/`Rat` values. -/
-protected abbrev Real := Value Rat
-/-- String values. -/
-protected abbrev String := Value String
-/-- Array values. -/
-protected abbrev Array (α β : Type) := Value (Cvc.TMap α β)
-/-- Sequence values. -/
-protected abbrev Seq (α : Type) := Value (Array α)
-/-- Function values. -/
-protected abbrev Fun (α β : Type) := Value (α → β)
-/-- Product values. -/
-protected abbrev Prod (α β : Type) := Value (α × β)
-
-section variable [A : IsSrt α] (value : Value α)
-
-abbrev srt : (value : Value α) → Srt := 𝕂 A.srt
-
-theorem srt_bij : α = value.srt := A.h_bij
-
-def retype : Value value.srt := value.srt_bij ▸ value
-
-def inspectSrt (f : (srt : Srt) → Value srt → β) : β :=
-  f value.srt value.retype
+/-- A `Typ`, or one of the sorts cvc5 calls abstract, for the positions that accept one. -/
+inductive Typ?
+/-- An ordinary, first-class sort. -/
+| typ (t : Typ)
+/-- cvc5's fully abstract sort `?`. -/
+| any
+/-- An abstract sort of a known kind, `?BITVECTOR_TYPE` and friends. -/
+| abstract (a : Srt.Abstract)
 
 end
 
-def boolVal (value : Value.Bool) : Res Bool := value.toTerm.boolVal
-def intVal (value : Value.Int) : Res Int := value.toTerm.intVal
-def ratVal (value : Value.Real) : Res Rat := value.toTerm.ratVal
+-- Lexicographic order on pairs, `local` and only so that `Ord` derives: `record`'s fields are a
+-- `List (String × Typ)`, and core has `Ord (List ·)` but no `Ord (· × ·)`.
+local instance [Ord α] [Ord β] : Ord (α × β) where
+  compare | (a₁, b₁), (a₂, b₂) => match compare a₁ a₂ with | .eq => compare b₁ b₂ | o => o
 
-end Value
+deriving instance Ord for Typ, Typ?
+deriving instance Hashable for Typ, Typ?
+
+/-- Every `Typ` is a `Typ?`, so the wrapping is implicit. -/
+instance : Coe Typ Typ? := ⟨.typ⟩
+
+namespace Typ?
+
+/-! ### `Typ`'s constructors, mirrored
+
+Dot notation resolves against the expected type, so `.set .int` would look for `Typ?.int` and fail.
+These restore it, and `@[match_pattern]` makes them usable in patterns as well as in terms.
+-/
+
+@[match_pattern] abbrev bool : Typ? := .typ .bool
+@[match_pattern] abbrev int : Typ? := .typ .int
+@[match_pattern] abbrev real : Typ? := .typ .real
+@[match_pattern] abbrev string : Typ? := .typ .string
+@[match_pattern] abbrev regex : Typ? := .typ .regex
+@[match_pattern] abbrev roundingMode : Typ? := .typ .roundingMode
+@[match_pattern] abbrev bitVec (size : Nat) : Typ? := .typ (.bitVec size)
+@[match_pattern] abbrev float (exp sig : Nat) : Typ? := .typ (.float exp sig)
+@[match_pattern] abbrev finiteField (size : Nat) : Typ? := .typ (.finiteField size)
+@[match_pattern] abbrev arrayTo (idx elm : Typ?) : Typ? := .typ (.arrayTo idx elm)
+@[match_pattern] abbrev bag (elm : Typ?) : Typ? := .typ (.bag elm)
+@[match_pattern] abbrev set (elm : Typ?) : Typ? := .typ (.set elm)
+@[match_pattern] abbrev seq (elm : Typ?) : Typ? := .typ (.seq elm)
+@[match_pattern] abbrev nullable (elm : Typ) : Typ? := .typ (.nullable elm)
+@[match_pattern] abbrev prod (args : List Typ) : Typ? := .typ (.prod args)
+@[match_pattern] abbrev record (fields : List (String × Typ)) : Typ? := .typ (.record fields)
+@[match_pattern] abbrev datatype (name : String) : Typ? := .typ (.datatype name)
+@[match_pattern] abbrev function (dom : Typ) (cod : Typ?) : Typ? := .typ (.function dom cod)
+@[match_pattern] abbrev uninterpreted (name : String) : Typ? := .typ (.uninterpreted name)
+
+end Typ?
 
 
 
-namespace Conv
+-- Decidable equality. `prod` makes `Typ` a *nested* inductive — it recurses through `List` — and
+-- it is mutual with `Typ?` besides, so no `deriving` handler covers equality: it is decided by
+-- hand, as a boolean equality by mutual structural recursion, proved reflexive and sound, then
+-- transported onto `DecidableEq`.
+--
+-- Two things shape the proofs. Reflexivity matches a single argument, so every case is diagonal and
+-- there is nothing else to discharge. Soundness matches only the *first* argument and splits the
+-- second with `cases`, because a catch-all in a dependent match is elaborated once against generic
+-- scrutinees, where it cannot know the two constructors differ.
 
-class ValueToVal (m : Type → Type) (α : Type) extends IsSrt α where
-mk' ::
-  Val : Type
-  ofValue : Value α → m Val
+mutual
 
-namespace ValueToVal
+/-- Structural equality. -/
+protected def Typ.beq : Typ → Typ → Bool
+  | .bool, .bool | .int, .int | .real, .real | .string, .string
+  | .regex, .regex | .roundingMode, .roundingMode => true
+  | .bitVec s₁, .bitVec s₂ => s₁ == s₂
+  | .float e₁ s₁, .float e₂ s₂ => e₁ == e₂ && s₁ == s₂
+  | .finiteField s₁, .finiteField s₂ => s₁ == s₂
+  | .arrayTo i₁ e₁, .arrayTo i₂ e₂ => Cvc.Typ?.beq i₁ i₂ && Cvc.Typ?.beq e₁ e₂
+  | .bag e₁, .bag e₂ | .set e₁, .set e₂ | .seq e₁, .seq e₂ => Cvc.Typ?.beq e₁ e₂
+  | .nullable e₁, .nullable e₂ => Cvc.Typ.beq e₁ e₂
+  | .prod as₁, .prod as₂ => Cvc.Typ.beqList as₁ as₂
+  | .record fs₁, .record fs₂ => Cvc.Typ.beqFields fs₁ fs₂
+  | .datatype n₁, .datatype n₂ => n₁ == n₂
+  | .function d₁ c₁, .function d₂ c₂ => Cvc.Typ.beq d₁ d₂ && Cvc.Typ?.beq c₁ c₂
+  | .uninterpreted name₁, .uninterpreted name₂ => name₁ == name₂
+  | _, _ => false
+-- `structural` and not the well-founded default: only a structural definition reduces, and
+-- `decide` on a `Typ` equation needs it to
+termination_by structural t => t
 
-protected abbrev Id (α : Type) [IsSrt α] : ValueToVal Id α := ⟨Value α, id⟩
+@[inherit_doc Cvc.Typ.beq]
+protected def Typ.beqList : List Typ → List Typ → Bool
+  | [], [] => true
+  | hd₁ :: tl₁, hd₂ :: tl₂ => Cvc.Typ.beq hd₁ hd₂ && Cvc.Typ.beqList tl₁ tl₂
+  | _, _ => false
+termination_by structural ts => ts
 
-def mk [IsSrt α] (Val : Type) (ofValue : Value α → m Val) : ValueToVal m α :=
-  ⟨Val, ofValue⟩
+@[inherit_doc Cvc.Typ.beq]
+protected def Typ.beqFields : List (String × Typ) → List (String × Typ) → Bool
+  | [], [] => true
+  | (n₁, t₁) :: r₁, (n₂, t₂) :: r₂ => n₁ == n₂ && Cvc.Typ.beq t₁ t₂ && Cvc.Typ.beqFields r₁ r₂
+  | _, _ => false
+termination_by structural fs => fs
 
-def mkId [IsSrt α] : ValueToVal Id α := ⟨Value α, id⟩
-
-instance : CoeSort (ValueToVal m α) Type := ⟨fun conv => conv.Val⟩
-
-abbrev adaptM [A : ValueToVal m α]
-  (lift : {β : Type} → m β → m' β)
-: ValueToVal m' α := ⟨A.Val, lift ∘ A.ofValue⟩
-
-protected abbrev liftM [MonadLiftT m m'] [A : ValueToVal m α] : ValueToVal m' α :=
-  A.adaptM liftM
-
-instance defaultInstUnit : ValueToVal Id Unit := mk Unit fun _ => pure ()
-instance defaultInstBool : ValueToVal Res Bool := mk Bool fun v => v.boolVal
-instance : ToString defaultInstBool.Val := inferInstanceAs (ToString Bool)
-instance defaultInstInt : ValueToVal Res Int := mk Int fun v => v.intVal
-instance : ToString defaultInstInt.Val := inferInstanceAs (ToString Int)
-instance defaultInstRat : ValueToVal Res Rat := mk Rat fun t => t.ratVal
-instance : ToString defaultInstRat.Val := inferInstanceAs (ToString Rat)
-instance defaultInstString : ValueToVal Id String := mkId
-instance defaultInstRoundingMode : ValueToVal Id RoundingMode := mkId
-instance defaultInstRegex : ValueToVal Id Cvc.Regex := mkId
-
-instance defaultInstFloat : ValueToVal Id (Cvc.AnyFloat exp sig) := mkId
-instance defaultInstAbstract : ValueToVal Id (Cvc.Abstract k) := mkId
-instance defaultInstFiniteField : ValueToVal Id (Cvc.FiniteField n) := mkId
-instance defaultInstBitVec : ValueToVal Id (BitVec size) := mkId
-instance defaultInstUninterpreted : ValueToVal Id (Uninterpreted name) := mkId
-
-section variable [IsSrt α] [IsSrt β]
-
-instance defaultInstArray : ValueToVal Id (Array α) := mkId
-instance defaultInstProd : ValueToVal Id (α × β) := mkId
-instance defaultInstFun : ValueToVal Id (α → β) := mkId
-instance defaultInstTMap : ValueToVal Id (Cvc.TMap α β) := mkId
-instance defaultInstBag : ValueToVal Id (Cvc.Bag α) := mkId
-instance defaultInstSet : ValueToVal Id (Cvc.Set α) := mkId
+@[inherit_doc Cvc.Typ.beq]
+protected def Typ?.beq : Typ? → Typ? → Bool
+  | .typ t₁, .typ t₂ => Cvc.Typ.beq t₁ t₂
+  | .any, .any => true
+  -- `decide` rather than `==`: `Srt.Abstract` derives both `BEq` and `DecidableEq`, and nothing
+  -- says the two agree, so `simp` cannot turn the boolean back into an equality
+  | .abstract a₁, .abstract a₂ => decide (a₁ = a₂)
+  | _, _ => false
+termination_by structural t => t
 
 end
 
-abbrev defaultFor : (srt : Srt) → ValueToVal Res srt
-| .abstract _kind => defaultInstAbstract.adaptM .ok
-| .array _idx _elm =>
-  -- let (_, _) := (defaultFor idx, defaultFor elm)
-  defaultInstTMap.adaptM .ok
-| .bag _elm =>
-  -- let _ := defaultFor elm
-  defaultInstBag.adaptM .ok
-| .bool => defaultInstBool
-| .bitVec _n => defaultInstBitVec.adaptM .ok
-| .finiteField _n => defaultInstFiniteField.adaptM .ok
-| .float _exp _sig => defaultInstFloat.adaptM .ok
-| .function _dom _cod =>
-  -- let (_, _) := (defaultFor dom, defaultFor cod)
-  defaultInstFun.adaptM .ok
-| .int => defaultInstInt
-| .prod _lft _rgt =>
-  -- let (_, _) := (defaultFor lft, defaultFor rgt)
-  defaultInstProd.adaptM .ok
-| .real => defaultInstRat
-| .regex => defaultInstRegex.adaptM .ok
-| .roundingMode => defaultInstRoundingMode.adaptM .ok
-| .seq _elm =>
-  -- let _ := defaultFor elm
-  defaultInstArray.adaptM .ok
-| .set _elm =>
-  -- let _ := defaultFor elm
-  defaultInstSet.adaptM .ok
-| .string => defaultInstString.adaptM .ok
-| .unit => defaultInstUnit.adaptM .ok
-| .uninterpreted _ => defaultInstUninterpreted.adaptM .ok
+section
+omit [Ω]
 
-namespace Default
+mutual
 
-scoped instance (srt : Srt) : ValueToVal Res srt := defaultFor srt
+/-- `Cvc.Typ.beq` is reflexive. -/
+protected theorem Typ.beq_refl : (t : Typ) → Cvc.Typ.beq t t = true
+  | .bool | .int | .real | .string | .regex | .roundingMode => by simp [Cvc.Typ.beq]
+  | .bitVec _ | .finiteField _ | .datatype _ => by simp [Cvc.Typ.beq]
+  | .float _ _ => by simp [Cvc.Typ.beq]
+  | .arrayTo i e => by simp [Cvc.Typ.beq, Cvc.Typ?.beq_refl i, Cvc.Typ?.beq_refl e]
+  | .bag e | .set e | .seq e => by simp [Cvc.Typ.beq, Cvc.Typ?.beq_refl e]
+  | .nullable e => by simp [Cvc.Typ.beq, Cvc.Typ.beq_refl e]
+  | .prod ts => by simp [Cvc.Typ.beq, Cvc.Typ.beqList_refl ts]
+  | .record fs => by simp [Cvc.Typ.beq, Cvc.Typ.beqFields_refl fs]
+  | .function d c => by simp [Cvc.Typ.beq, Cvc.Typ.beq_refl d, Cvc.Typ?.beq_refl c]
+  | .uninterpreted name => by simp [Cvc.Typ.beq]
 
-end Default
+@[inherit_doc Cvc.Typ.beq_refl]
+protected theorem Typ.beqList_refl : (ts : List Typ) → Cvc.Typ.beqList ts ts = true
+  | [] => by simp [Cvc.Typ.beqList]
+  | hd :: tl => by simp [Cvc.Typ.beqList, Cvc.Typ.beq_refl hd, Cvc.Typ.beqList_refl tl]
 
-end ValueToVal
+@[inherit_doc Cvc.Typ.beq_refl]
+protected theorem Typ.beqFields_refl : (fs : List (String × Typ)) → Cvc.Typ.beqFields fs fs = true
+  | [] => by simp [Cvc.Typ.beqFields]
+  | (_, t) :: tl => by simp [Cvc.Typ.beqFields, Cvc.Typ.beq_refl t, Cvc.Typ.beqFields_refl tl]
 
+@[inherit_doc Cvc.Typ.beq_refl]
+protected theorem Typ?.beq_refl : (t : Typ?) → Cvc.Typ?.beq t t = true
+  | .typ t => by simp [Cvc.Typ?.beq, Cvc.Typ.beq_refl t]
+  | .any => by simp [Cvc.Typ?.beq]
+  | .abstract _ => by simp [Cvc.Typ?.beq]
 
+end
 
-class ValuesToVal (m : Type → Type) where
-  instValueToVal : (srt : Srt) → ValueToVal m srt
+mutual
 
-namespace ValuesToVal
+/-- `Cvc.Typ.beq` holds only of equals. -/
+protected theorem Typ.eq_of_beq : (t₁ t₂ : Typ) → Cvc.Typ.beq t₁ t₂ = true → t₁ = t₂
+  | .bool, t₂, h | .int, t₂, h | .real, t₂, h | .string, t₂, h
+  | .regex, t₂, h | .roundingMode, t₂, h => by cases t₂ <;> simp_all [Cvc.Typ.beq]
+  | .bitVec _, t₂, h | .finiteField _, t₂, h | .datatype _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+  | .float _ _, t₂, h => by cases t₂ <;> simp_all [Cvc.Typ.beq]
+  | .arrayTo _ _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact ⟨Cvc.Typ?.eq_of_beq _ _ h.left, Cvc.Typ?.eq_of_beq _ _ h.right⟩
+  | .bag _, t₂, h | .set _, t₂, h | .seq _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact Cvc.Typ?.eq_of_beq _ _ h
+  | .nullable _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact Cvc.Typ.eq_of_beq _ _ h
+  | .prod _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact Cvc.Typ.eq_of_beqList _ _ h
+  | .record _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact Cvc.Typ.eq_of_beqFields _ _ h
+  | .function _ _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ.beq]
+    exact ⟨Cvc.Typ.eq_of_beq _ _ h.left, Cvc.Typ?.eq_of_beq _ _ h.right⟩
+  | .uninterpreted name, t₂, h => by cases t₂ <;> simp_all [Cvc.Typ.beq]
 
-protected abbrev Values : ValuesToVal Id := ⟨(ValueToVal.Id ·)⟩
+@[inherit_doc Cvc.Typ.eq_of_beq]
+protected theorem Typ.eq_of_beqList
+: (ts₁ ts₂ : List Typ) → Cvc.Typ.beqList ts₁ ts₂ = true → ts₁ = ts₂
+  | [], ts₂, h => by cases ts₂ <;> simp_all [Cvc.Typ.beqList]
+  | _ :: _, ts₂, h => by
+    cases ts₂ <;> simp_all [Cvc.Typ.beqList]
+    exact ⟨Cvc.Typ.eq_of_beq _ _ h.left, Cvc.Typ.eq_of_beqList _ _ h.right⟩
 
-protected abbrev Default : ValuesToVal Res where
-  instValueToVal := ValueToVal.defaultFor
+@[inherit_doc Cvc.Typ.eq_of_beq]
+protected theorem Typ.eq_of_beqFields
+: (fs₁ fs₂ : List (String × Typ)) → Cvc.Typ.beqFields fs₁ fs₂ = true → fs₁ = fs₂
+  | [], fs₂, h => by cases fs₂ <;> simp_all [Cvc.Typ.beqFields]
+  -- the head pair is destructured rather than projected: `t₁` has to be a genuine subterm for the
+  -- recursion to be structural, `Typ` being nested through `List (String × ·)` here
+  | (n₁, t₁) :: r₁, fs₂, h => by
+    cases fs₂ with
+    | nil => simp_all [Cvc.Typ.beqFields]
+    | cons hd r₂ =>
+      obtain ⟨n₂, t₂⟩ := hd
+      simp_all [Cvc.Typ.beqFields]
+      refine ⟨?_, Cvc.Typ.eq_of_beqFields _ _ h.right⟩
+      have := Cvc.Typ.eq_of_beq _ _ h.left.right
+      simp_all
 
-end ValuesToVal
+@[inherit_doc Cvc.Typ.eq_of_beq]
+protected theorem Typ?.eq_of_beq : (t₁ t₂ : Typ?) → Cvc.Typ?.beq t₁ t₂ = true → t₁ = t₂
+  | .typ _, t₂, h => by
+    cases t₂ <;> simp_all [Cvc.Typ?.beq]
+    exact Cvc.Typ.eq_of_beq _ _ h
+  | .any, t₂, h => by cases t₂ <;> simp_all [Cvc.Typ?.beq]
+  | .abstract _, t₂, h => by cases t₂ <;> simp_all [Cvc.Typ?.beq]
 
-end Conv
+end
 
+instance Typ.instDecidableEq : DecidableEq Typ := fun t₁ t₂ =>
+  decidable_of_iff (Cvc.Typ.beq t₁ t₂ = true)
+    ⟨Cvc.Typ.eq_of_beq t₁ t₂, fun h => h ▸ Cvc.Typ.beq_refl t₁⟩
 
-
-/-! ## Conversion of *term-values* -/
-
-class Srt.ToValType where
-  Val : Srt → Type
-
-def Srt.ToValType.Terms : ToValType where
-  Val (srt : Srt) := Term srt
-
-namespace Term
-
-class ToVals extends toValConv : Srt.ToValType where
-  build : (srt : Srt) → Term srt → Val srt
-
-def ToVals.Terms : ToVals where
-  toValConv := .Terms
-  build := fun _ => id
-
--- def ToVals.Default : ToVals where
-
-namespace ToVals
-
--- protected def Terms :
-
-end ToVals
-
-end Term
-
-
-
-/-! ## `Smt` environment and functions -/
-
-structure Smt.State where
-  solver : cvc5.Solver
-  builder : Term.Build.State
-  private nextActlitIdx' : Nat
-
-abbrev SmtT (m : Type → Type) :=
-  ResT (StateT Smt.State m)
-
-abbrev SmtIO := SmtT IO
-
-abbrev Smt := SmtT Id
-
-namespace Smt variable [Monad m]
-
-instance : MonadLift ResIO SmtIO where
-  monadLift code state := return (← code, state)
-
-instance : MonadLift m (SmtT m) := ⟨fun code state => return (.ok (← code), state)⟩
-
-instance [Monad m] [Monad m'] [MonadLift m m'] : MonadLift (SmtT m) (SmtT m') :=
-  ⟨fun code state => return ← code state⟩
-
-instance [Monad m] : MonadLift Smt (SmtT m) :=
-  ⟨fun code state => return code state⟩
-
-instance [Monad m] [MonadLiftT IO m] : MonadLift SmtIO (SmtT m) :=
-  ⟨fun code state => return ← code state⟩
-
-instance [Monad m] : MonadLift Term.Build (SmtT m) where
-  monadLift build := do
-    let res ← modifyGet fun state =>
-      let (res, builder) := build state.builder
-      (res, {state with builder})
-    res
-
-def nextActlitIdx : Smt Nat :=
-  modifyGetThe Smt.State fun state =>
-    let idx := state.nextActlitIdx'
-    (idx, {state with nextActlitIdx' := idx.succ})
-
-private def lift5 [Monad m] (code : cvc5.SolverT m α) : SmtT m α := do
-  let state ← getThe Smt.State
-  let (res, solver) ← code state.solver
-  set {state with solver}
-  return ← res
-
-/-- Sets an option in the solver. -/
-def setOption (opt : Cvc.Option) : Smt Unit := do
-  let (key, val) := opt.keyVal
-  let state ← getThe Smt.State
-  let (res, solver) ← cvc5.Solver.setOption key val state.solver
-  let () ← res
-  set {state with solver}
-
-
-/-- Declares a function symbol. -/
-def declare (symbol : String) (α : Type) [IsSrt α] : Smt (Term α) := do
-  let srt := getSrt α
-  let (doms, cod) ← srt.toSignature!
-  let f ← lift5 <| cvc5.Solver.declareFun symbol doms cod
-  return Term.ofUnsafe true f
-
-@[inherit_doc declare]
-def declare' {α : Type} [IsSrt α] (symbol : String) : Smt (Term α) :=
-  declare symbol α
-
-/-- Asserts a formula. -/
-def assert (formula : Formula) : Smt Unit := do
-  lift5 <| cvc5.Solver.assertFormula formula.toUnsafe
-
-section variable (assuming : Option (Array Formula) := none)
-
-/-- Checks the satisfiability of the formulas asserted with `Smt.assert`. -/
-def checkSat : Smt CheckSat := do
-  let res ←
-    match assuming with
-    | none | some #[] =>
-      cvc5.Solver.checkSat |> lift5
-    | some assuming =>
-      assuming.map Term.toUnsafe |> cvc5.Solver.checkSatAssuming |> lift5
-  pure <|
-    if res.isSat then CheckSat.sat
-    else if res.isUnsat then CheckSat.unsat
-    else if res.isUnknown then CheckSat.unknown res.toString
-    else CheckSat.other res.toString
-
-/-- Simplified `Smt.checkSat`, returns true/false for sat/unsat, `none` for unknown/unexpected. -/
-def checkSat? : Smt (Option Bool) :=
-  CheckSat.isSat? <$> checkSat assuming
+instance Typ?.instDecidableEq : DecidableEq Typ? := fun t₁ t₂ =>
+  decidable_of_iff (Cvc.Typ?.beq t₁ t₂ = true)
+    ⟨Cvc.Typ?.eq_of_beq t₁ t₂, fun h => h ▸ Cvc.Typ?.beq_refl t₁⟩
 
 end
 
 
 
+mutual
 
-/-- Sat-mode state. -/
-structure Sat.State extends Smt.State where
-/-- Constructor. -/
-private mk ::
+/-- String representation. -/
+protected def Typ.toString (t : Typ) (paren : Bool := false) : String :=
+  let paren (s : String) := if paren then s!"({s})" else s
+  match t with
+  | .bool => "Bool" | .int => "Int" | .real => "Real" | .string => "String"
+  | .regex => "Regex" | .roundingMode => "RoundingMode"
+  | .bitVec size => paren s!"BitVec {size}"
+  | .float exp sig => paren s!"Float {exp} {sig}"
+  | .finiteField size => paren s!"FiniteField {size}"
+  | .arrayTo idx elm => paren s!"Array {Cvc.Typ?.toString idx true} {Cvc.Typ?.toString elm true}"
+  | .bag elm => paren s!"Bag {Cvc.Typ?.toString elm true}"
+  | .set elm => paren s!"Set {Cvc.Typ?.toString elm true}"
+  | .seq elm => paren s!"Seq {Cvc.Typ?.toString elm true}"
+  | .nullable elm => paren s!"Option {Cvc.Typ.toString elm true}"
+  | .prod [] => "Unit"
+  | .prod [α] => s!"(× {Cvc.Typ.toString α})"
+  | .prod args => paren (Cvc.Typ.tupleArgsFold args "")
+  | .record fields => paren s!"\{{Cvc.Typ.fieldsFold fields ""}}"
+  | .datatype name => name
+  | .function dom cod => paren s!"{Cvc.Typ.toString dom true} → {Cvc.Typ?.toString cod false}"
+  | .uninterpreted name => paren s!"Uninterpreted `{name}`"
 
-/-- Unsat-mode state. -/
-structure Unsat.State extends Smt.State where
-/-- Constructor. -/
-private mk ::
+@[inherit_doc Cvc.Typ.toString]
+protected def Typ?.toString (t : Typ?) (paren : Bool := false) : String :=
+  match t with
+  | .typ t => Cvc.Typ.toString t paren
+  | .any => "?"
+  | .abstract a => if paren then s!"(Abstract {a})" else s!"Abstract {a}"
 
-/-- Unknown-mode state. -/
-structure Unknown.State extends Smt.State where
-/-- Constructor. -/
-private mk ::
+/-- Renders a record's fields, for `Typ.toString`. -/
+protected def Typ.fieldsFold : (fields : List (String × Typ)) → (acc : String) → String
+  | [], acc => acc
+  | (name, ty) :: tl, acc =>
+    let field := s!"{name} : {Cvc.Typ.toString ty}"
+    Cvc.Typ.fieldsFold tl (if acc.isEmpty then field else s!"{acc}, {field}")
 
-/-- Sat-mode monad, allows running commands such as get-value.
+/-- Renders a tuple's components, for `Typ.toString`. -/
+protected def Typ.tupleArgsFold : (args : List Typ) → (acc : String) → String
+  | [], "" => "Unit"
+  | [ty], "" => s!"(× {Cvc.Typ.toString ty})"
+  | [], acc => acc
+  | hd::tl, acc =>
+    if acc.isEmpty then Cvc.Typ.tupleArgsFold tl (Cvc.Typ.toString hd true)
+    else Cvc.Typ.tupleArgsFold tl s!"{acc} × {Cvc.Typ.toString hd true}"
 
-`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
-different solver mode.
+end
+
+instance : ToString Typ := ⟨(Cvc.Typ.toString · )⟩
+instance : ToString Typ? := ⟨(Cvc.Typ?.toString · )⟩
+
+/-- The sort a Lean type denotes, which lets it index terms.
+
+For a declared datatype, name it and declare it in the scope before use:
+`instance : ToTyp Pair := ⟨.datatype "Pair"⟩`.
 -/
-abbrev SatT (m : Type → Type u) :=
-  ResT (StateT Sat.State m)
-
-@[inherit_doc SatT]
-abbrev Sat := SatT (m := Id)
-
-def Sat.unexpected : SatT m α :=
-  Error.throwUser "unexpected sat result"
-
-/-- Unsat-mode monad, allows running commands such as get-proof.
-
-`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
-different solver mode.
--/
-abbrev UnsatT (m : Type → Type u) :=
-  ResT (StateT Unsat.State m)
-
-@[inherit_doc UnsatT]
-abbrev Unsat := UnsatT (m := Id)
-
-def Unsat.unexpected : UnsatT m α :=
-  Error.throwUser "unexpected unsat result"
-
-/-- Unknown-mode monad, allows running unknown-mode-specific commands.
-
-`Smt` does not lift to this monad as this would allow issuing a check-sat that could switch to a
-different solver mode.
--/
-abbrev UnknownT (m : Type → Type u) :=
-  ResT (StateT Unknown.State m)
-
-@[inherit_doc UnknownT]
-abbrev Unknown := UnknownT (m := Id)
-
-def Unknown.unexpected : UnknownT m α :=
-  Error.throwUser "unexpected unknown result"
-
-
-
-/-- Performs a check-sat and runs sat/unsat/unknown-specific code. -/
-def checkSatAnd
-  (assuming : Option (Array Formula) := none)
-  (ifSat : Smt.SatT m α := Sat.unexpected)
-  (ifUnsat : Smt.UnsatT m α := Unsat.unexpected)
-  (ifUnknown : Smt.UnknownT m α := Unknown.unexpected)
-: SmtT m α := do
-  if let some isSat ← checkSat? assuming then
-    let state ← getThe Smt.State
-    if isSat then
-      let (res, state) ← ifSat ⟨state⟩
-      set state.toState
-      return ← res
-    else
-      let (res, state) ← ifUnsat ⟨state⟩
-      set state.toState
-      return ← res
-  else
-    let state ← getThe Smt.State
-    let (res, state) ← ifUnknown ⟨state⟩
-    set state.toState
-    return ← res
-
-namespace Sat
-
-instance [Monad m] : MonadLift Smt.Sat (Smt.SatT m) :=
-  ⟨fun code state => return code state⟩
-instance [Monad m] : MonadLift Term.Build (Smt.SatT m) := ⟨fun build => do
-  let res ← modifyGet fun state =>
-    let (res, builder) := build state.builder
-    (res, {state with builder})
-  res
-⟩
-
-/-- Unsafe solver monad lift. -/
-private def lift5 (code : cvc5.SolverT m α) : SatT m α := fun state => do
-  let (res, solver) ← code state.solver
-  return (Res.lift res, {state with solver})
-
-/-- Retrieves the value of a term in `Sat` mode.
-
-This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
--/
-def getValue (term : Term α) : Sat (Value α) := do
-  let term! ← lift5 <| cvc5.Solver.getValue (m := Id) term.toUnsafe
-  return Term.ofUnsafe false term! |> Value.ofTerm
-
-/-- Retrieves the values of some terms of the same sort in `Sat` mode.
-
-This function is available the following namespaces: `Cvc.Term`, `Cvc.Smt`, and `Cvc.Smt.Sat`.
--/
-def getValues (terms : Array (Term α)) : Sat (Array (Term α × Value α)) := do
-  let mut values := Array.mkEmpty terms.size
-  for term in terms do
-    let value ← getValue term
-    values := values.push (term, value)
-  return values
-
-/-- Retrieves the *concrete `Val`ue* of a term in `Sat` mode. -/
-def getValUsing [Monad m] [MonadLiftT m Sat]
-  (Val : Conv.ValueToVal m α) (term : Term α)
-: Sat Val :=
-  getValue term >>= liftM ∘ Val.ofValue
-
-@[inherit_doc getValUsing]
-def getVal [Monad m] [MonadLiftT m Sat] [Val : Conv.ValueToVal m α] (term : Term α) : Sat Val :=
-  getValUsing Val term
-
-/-- Retrieves the *concrete values* of some terms of the same sort in `Sat` mode. -/
-def getValsUsing (Val : Conv.ValueToVal Sat α) (terms : Array (Term α))
-: Sat (Array (Term α × Val)) := do
-  let mut values := Array.mkEmpty terms.size
-  for term in terms do
-    let value ← getVal term
-    values := values.push (term, value)
-  return values
-
-@[inherit_doc getValsUsing]
-def getVals [Val : Conv.ValueToVal Sat α] (terms : Array (Term α)) : Sat (Array (Term α × Val)) :=
-  getValsUsing Val terms
-
-end Sat
-
-export Sat (getValue getValues getValUsing getValsUsing getVal getVals)
-
-
-
-namespace Unsat
-
-instance [Monad m] : MonadLift Smt.Unsat (Smt.UnsatT m) :=
-  ⟨fun code state => return code state⟩
-instance [Monad m] : MonadLift Term.Build (Smt.UnsatT m) := ⟨fun build => do
-  let res ← modifyGet fun state =>
-    let (res, builder) := build state.builder
-    (res, {state with builder})
-  res
-⟩
-
-/-- Unsafe solver monad lift. -/
-private def lift5 (code : cvc5.SolverT m α) : UnsatT m α := fun state => do
-  let (res, solver) ← code state.solver
-  return (Res.lift res, {state with solver})
-
-/-- Retrieves the unsat-proofs in `Unsat` mode. -/
-def getProof : Unsat (Array cvc5.Proof) := do
-  lift5 <| cvc5.Solver.getProof
-
-end Unsat
-
-export Unsat (getProof)
-
-
-
-namespace Unknown
-
-instance [Monad m] : MonadLift Smt.Unknown (Smt.UnknownT m) :=
-  ⟨fun code state => return code state⟩
-instance [Monad m] : MonadLift Term.Build (Smt.UnknownT m) := ⟨fun build => do
-  let res ← modifyGet fun state =>
-    let (res, builder) := build state.builder
-    (res, {state with builder})
-  res
-⟩
-
-/-- Unsafe solver monad lift. -/
-private def lift5 (code : cvc5.SolverT m α) : UnknownT m α := fun state => do
-  let (res, solver) ← code state.solver
-  return (Res.lift res, {state with solver})
-
-end Unknown
-
-end Smt
-
-
-
-namespace Term
-
-export Smt (getValue getValues getVal getValUsing getVals getValsUsing)
-
-namespace ToVal
-export Term (getVal getValUsing getVals getValsUsing)
-end ToVal
-
-/-- Returns the symbol of a symbol-term. -/
-def getSymbol? (term : Term α) : Option String :=
-  term.toUnsafe.getSymbol?
-
-end Term
-
-
-
-namespace SmtT variable [M : Monad m]
-
-def runWith' (smt : SmtT m α) (state : Smt.State) : m (Except Error α × Smt.State) :=
-  smt state
-
-def runWith (smt : SmtT m α) (state : Smt.State) : m (Except Error α) :=
-  Prod.fst <$> smt.runWith' state
-
-def run' [MonadLiftT BaseIO m]
-  (smt : SmtT m α) (state? : Option Smt.State := none)
-: m (Except Error (α × Smt.State)) := do
-  if let some state := state? then
-    let (res, state) ← smt.runWith' state
-    return res.map (·, state)
-  else
-    let tm ← cvc5.TermManager.new
-    let builder := Term.Build.State.ofManager tm
-    let res ← cvc5.Solver.run builder.manager fun solver => do
-      let (res, state) ← smt ⟨solver, builder, 0⟩
-      return (.ok (res, state), solver)
-    match res with
-    | .ok (.ok res, state) => return .ok (res, state)
-    | .ok (.error err, _) => return .error err
-    | .error err => return .error <| Error.ofCvc5 err
-
-abbrev run [MonadLiftT BaseIO m]
-  (smt : SmtT m α) (state? : Option Smt.State := none)
-: m (Except Error α) := do
-  Except.map Prod.fst <$> smt.run' state?
-
-def runIO' (smt : SmtIO α) (state? : Option Smt.State := none) : IO (α × Smt.State) := do
-  match ← smt.run' state? with
-  | .ok res => return res
-  | .error err =>
-    IO.eprintln s!"{err}"
-    throw <| IO.Error.userError err.toString
-
-def runIO (smt : SmtIO α) (state? : Option Smt.State := none) : IO α :=
-  Prod.fst <$> smt.runIO' state?
-
-def runWithBuilder'
-  (smt : SmtT m α) (builder : Term.Build.State)
-: m (Except Error (α × Smt.State)) := do
-  let res ← cvc5.Solver.run builder.manager fun solver => do
-    let (res, state) ← smt.runWith' ⟨solver, builder, 0⟩
-    return (.ok (res.map (·, state)), state.solver)
-  match res with
-  | .ok (.ok (res, state)) => return .ok (res, state)
-  | .ok (.error err) => return .error err
-  | .error err => return .error <| Error.ofCvc5 err
-
-def runWithBuilder (smt : SmtT m α) (builder : Term.Build.State) : m (Except Error α) :=
-  Except.map Prod.fst <$> smt.runWithBuilder' builder
-
-end SmtT
-
-namespace Smt
-export SmtT (runWith' runWith run' run runIO' runIO runWithBuilder' runWithBuilder)
-end Smt
+class ToTyp (α : Type) where
+  /-- `Typ` associated to a type through `ToTyp`. -/
+  typ : Typ

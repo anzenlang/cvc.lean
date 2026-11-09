@@ -1,0 +1,17 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+public import Cvc.Typed.Extra.Sys
+
+
+
+/-! # Extras, typed
+
+Transition systems and bounded model checking over them, in `Cvc.Typed.Extra.Sys`.
+-/

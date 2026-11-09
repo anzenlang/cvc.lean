@@ -1,0 +1,66 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+import all Cvc.Srt
+
+public import Cvc.Srt
+
+
+
+/-! # Finite-field elements
+
+The Lean type denoting a value of SMT sort `(_ FiniteField size)`, held as the integer representing
+it. cvc5 answers in the *symmetric* representation, so an element of `GF(5)` comes back in
+`[-2, 2]` rather than `[0, 4]`: `3` reads back as `-2`.
+
+Converting an element to a term and back is done by `Cvc.Untyped.Theory.FiniteField` and
+`Cvc.Typed.Theory.FiniteField`.
+-/
+namespace Cvc public section variable [Ω]
+
+/-- An element of a finite field of size `size`, held as an integer representing it.
+
+Any integer congruent to it modulo `size` represents the same element, but equality, order and
+hashing compare the integers: `⟨6⟩ : FiniteField 7` and `⟨-1⟩` are the same element yet not equal.
+Values read from cvc5 come in its symmetric representation, `6` reading back as `-1`.
+-/
+structure FiniteField (size : Nat) where
+  /-- Element representation. -/
+  repr : Int
+deriving DecidableEq, Hashable, Ord
+
+namespace FiniteField
+
+instance : ToTyp (FiniteField size) := ⟨.finiteField size⟩
+
+/-- Erased version of `FiniteField`. -/
+structure Erased where
+  /-- The field's size. -/
+  size : Nat
+  /-- The actual finite field element. -/
+  get : FiniteField size
+
+/-- Erases a finite-field-element's size. -/
+def erase (elem : FiniteField size) : Erased := {size, get := elem}
+
+/-- String representation. -/
+protected def toString (ff : FiniteField size) : String := toString ff.repr
+
+instance : ToString (FiniteField size) := ⟨FiniteField.toString⟩
+
+namespace Erased
+
+@[inherit_doc FiniteField.toString]
+protected def toString (elem : Erased) := elem.get.toString
+
+instance : ToString Erased := ⟨Erased.toString⟩
+
+end Erased
+
+end FiniteField

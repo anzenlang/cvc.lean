@@ -1,0 +1,136 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+public import Cvc.Defs
+public import Cvc.Ext
+
+import all Cvc.Basic.Env
+
+
+
+/-! # The sort-erased term type
+
+`Term`, `Terms`, substitution, building a term from a raw `Kind`, and the layer's `smt!`.
+-/
+-- A term is exactly a cvc5 term, so the wrapper is a zero-cost `def` and the conversions either way
+-- are `id`; `def3%` derives the comparison and printing instances from the underlying type.
+--
+-- `Cvc.Untyped.Term` names both this type and the namespace holding the generated constructors.
+-- Being a *declaration* as well as a namespace is what lets a typed generation site write
+-- `open Cvc renaming Untyped.Term → T` and have the generator's `T.<id>` delegation resolve.
+namespace Cvc.Untyped public section variable [Ω]
+
+/-- A sort-erased cvc5 term.
+
+The term carries no sort on the Lean side: its sort is known to cvc5 alone, so a sort mistake, such
+as `and` applied to an integer, is reported by cvc5 at runtime. In exchange, terms of different
+sorts share one type, and an `Array Term` can hold them side by side.
+
+A term belongs to the `Ω` scope it was built in and cannot leave it. At runtime it is exactly a
+cvc5 term, so the wrapper costs nothing. `typeCheck` checks its sort against a Lean type and gives
+it that type as an index, producing a `Cvc.Typed.Term`.
+-/
+def3% Term ← cvc5.Term
+
+/-- An array of sort-erased terms. -/
+abbrev Terms := Array Term
+
+namespace Term
+
+/-! ## Substitution
+
+cvc5 substitutes **simultaneously and once**: the sources are matched in a single pre-order pass,
+so a replacement is never itself rewritten, and the result is not driven to a fixed point.
+Substituting `x` by `g z` in `f x y` gives `f (g z) y` even when `z` is also a source.
+-/
+
+/-- Simultaneously replaces each `src[i]` by `tgt[i]` throughout `t`.
+
+A source may be any sub-term, not only a variable, and one that does not occur leaves the term
+unchanged. Where `src` holds duplicates the earliest wins. cvc5 reads the two arrays as a 1:1
+mapping, which is what `valid` keeps true.
+
+`substitute` is the same thing over pairs and is usually the one to reach for; this form exists
+because the two arrays are what cvc5 takes.
+-/
+def substitute'
+  (t : Term) (src tgt : Terms)
+  (valid : src.size = tgt.size := by
+    (try grind) <;> fail "failed to prove there are as many replacements as sub-terms")
+: Env Term :=
+  let _ := valid
+  runUnsafe' do t.toUnsafe.substitute src tgt
+
+/-- Simultaneously replaces the first of each pair by the second throughout `t`.
+
+The pairs are applied in one pass, so a replacement is not itself rewritten by a later pair, and
+the earliest pair wins where a sub-term appears as the source of more than one.
+-/
+def substitute (t : Term) (terms : Array (Term × Term)) : Env Term := do
+  -- the arrays are built together, carrying the proof that they stay the same length
+  let mut res : (src : Array Term) × (tgt : Array Term) ×' src.size = tgt.size :=
+    ⟨Array.mkEmpty terms.size, Array.mkEmpty terms.size, rfl⟩
+  for (from', to') in terms do
+    let ⟨src, tgt, h⟩ := res
+    res := ⟨src.push from', tgt.push to', by simp [h]⟩
+  let ⟨src, tgt, valid⟩ := res
+  t.substitute' src tgt valid
+
+/-! ## Building from a kind
+
+The escape hatch below every dedicated constructor. `mkOfKind` takes a raw `Kind` and checks
+nothing itself: arity, sorts and indices are left to cvc5, which rejects most mistakes at run time
+but not all of them, so a dedicated constructor — `Term.add`, `Term.bvExtract`, … — is the one to
+reach for wherever there is one. `replaceKids` is the safe half: it reuses an existing term's
+operator, indices included, so only the kids can be wrong.
+-/
+
+/-- Applies the operator of kind `kind` to `kids`, checked by cvc5 alone.
+
+An indexed operator cannot be built this way, its indices having nowhere to go; `replaceKids` can
+rebuild one from an existing term.
+-/
+def mkOfKind (kind : Kind) (kids : Terms) : Env Term :=
+  runUnsafe fun tm => tm.mkTerm kind kids
+
+/-- Applies `t`'s operator, indices included, to `kids` instead of its own kids.
+
+A term with no kids — a value, a symbol, a bound variable — is answered as is when `kids` is empty
+too. cvc5 checks the kids' number and sorts.
+-/
+def replaceKids (t : Term) (kids : Terms) : Env Term := do
+  if t.toUnsafe.getNumChildren == 0 && kids.isEmpty then return t
+  runUnsafe fun tm => do
+    match cvc5.Term.getOp? t.toUnsafe with
+    | some op => if op.isIndexed then tm.mkTermOfOp op kids else byKind tm
+    | none => byKind tm
+where
+  byKind (tm : cvc5.TermManager) : cvc5.Env cvc5.Term := do
+    let some kind := cvc5.Term.getKind? t.toUnsafe | throw (.error s!"`{t}` has no kind")
+    tm.mkTerm kind kids
+
+end Term
+
+namespace Terms
+
+private def toUnsafe : Terms → Array cvc5.Term := id
+private def ofUnsafe : Array cvc5.Term → Terms := id
+
+private example (ts : Terms) : ofUnsafe ts.toUnsafe = ts := rfl
+
+end Terms
+
+/-- Builds a sort-erased term, in `Env`, from SMT notation: `smt! x + 1 ≤ y ∧ b`.
+
+The forms accepted are those of the theories imported. `open Cvc.Untyped` selects this spelling;
+`smtU!` is the same notation whatever is open.
+-/
+scoped syntax "smt! " ppLine group(colGt smtTerm) : term
+
+macro_rules | `(smt! $t:smtTerm) => `(smtU! $t)

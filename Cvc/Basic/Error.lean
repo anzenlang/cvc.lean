@@ -1,0 +1,141 @@
+/-
+Copyright (c) 2025 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+
+
+/-! # Errors
+
+`Cvc.Error` is what every failing operation of this library throws, `Res`/`ResT` the result types
+carrying one, and `throwUser` and friends the ways to throw one.
+-/
+
+namespace Cvc public section
+
+
+
+/-- The error type of this library. -/
+inductive Error : Type
+/-- A failure inside this library. -/
+| internal (msg : String)
+/-- Unsupported feature. -/
+| unsupported (msg : String)
+/-- A misuse of the library or of cvc5, including every error cvc5 reports. -/
+| user (msg : String)
+/-- Input/output error. -/
+| io (msg : String)
+deriving Inhabited
+
+
+namespace Error
+
+/-- Maps over an error's message. -/
+def mapMsg (f : String → String) : Error → Error
+| .internal msg => f msg |> .internal
+| .unsupported msg => f msg |> .unsupported
+| .user msg => f msg |> .user
+| .io msg => f msg |> .io
+
+/-- Appends some text to an error's internal message. -/
+def append (self : Error) (txt : String) (newline := true) : Error :=
+  let txt := if newline then "\n"++txt else txt
+  self.mapMsg (· ++ txt)
+
+/-- String representation. -/
+protected def toString : Error → String
+| .user msg => msg
+| .internal msg => s!"[internal] {msg}"
+| .unsupported msg => s!"[unsupported] {msg}"
+| .io msg => s!"[io] {msg}"
+
+instance instToString : ToString Error :=
+  ⟨Error.toString⟩
+
+section variable [Monad m] [MonadExcept Error m] (msg : String)
+
+/-- Throws an `Error.user`. -/
+def throwUser : m α := do
+  throw <| Error.user msg
+
+/-- Unwraps an `Option`, throwing an `Error.user` on `none`. -/
+def someOrThrowUser : Option α → m α
+  | some a => return a
+  | none => throwUser msg
+-- What the `!` form of an `Option`-answering query goes through, `none` standing for cvc5's null
+-- term.
+
+/-- Throws an `Error.internal`. -/
+def throwInternal : m α := do
+  throw <| Error.internal msg
+
+/-- Throws an `Error.internal` with an unsupported-feature message. -/
+def throwTodo : m α := do
+  throw <| Error.internal s!"[unsupported] {msg}"
+
+/-- Throws an `Error.internal` reporting that unreachable code was reached. -/
+def throwUnreachable (msg : String := "") : m α := do
+  let sep := if msg.isEmpty then "" else ": "
+  throw <| Error.internal s!"reached unreachable code{sep}{msg}"
+
+/-- Throws an `Error.io`. -/
+def throwIO (e : IO.Error) : m α := do
+  throw <| Error.io <| toString e
+
+/-- `code`, failing with the user error `explain` gives, if it gives one, when `code` fails. -/
+def explainError (code : m α) (explain : Unit → Option String) : m α :=
+  tryCatch code fun e => match explain () with
+    | some msg => throw (Error.user msg)
+    | none => throw e
+-- `explain` runs only after a failure, so the check it makes costs nothing when `code` succeeds.
+
+end
+
+end Error
+
+export Error (throwUser someOrThrowUser throwInternal throwTodo throwUnreachable throwIO
+  explainError)
+
+
+
+/-- Sets an error context as a lazy string to newline-append after `code`'s error, if any. -/
+def errorContext [Monad m] [MonadExcept Error m] (s : Unit → String) (code : m α) : m α :=
+  try code catch e => e.mapMsg (s!"{·}\n{s ()}") |> throw
+
+
+
+/-- `Error`-result monad transformer. -/
+abbrev ResT (m : Type → Type) (α : Type) : Type := ExceptT Error m α
+
+/-- `Error` monad. -/
+abbrev Res (α : Type) : Type := ResT Id α
+
+namespace ResT
+
+-- sanity
+example [Monad m] : Monad (ResT m) := inferInstance
+example [Monad m] : MonadExcept Error (ResT m) := inferInstance
+example [Monad m] : MonadLift m (ResT m) := inferInstance
+
+end ResT
+
+namespace Res
+
+@[inherit_doc Except.ok]
+abbrev ok (a : α) : Res α := return a
+
+@[inherit_doc Except.error]
+abbrev error (e : Error) : Res α := throw e
+
+-- sanity
+example : Monad Res := inferInstance
+example : MonadExcept Error Res := inferInstance
+
+instance [Monad m] : MonadLift Res (ResT m) :=
+  ⟨fun | .ok a => return a | .error e => throw e⟩
+
+end Res

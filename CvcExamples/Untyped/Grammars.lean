@@ -1,0 +1,241 @@
+/-
+Copyright (c) 2026 by the authors listed in the file AUTHORS and their
+institutional affiliations. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Adrien Champion
+-/
+
+module
+
+import Cvc.Untyped
+-- `#eval` in a `module` file also needs the library at the meta phase; an ordinary file does not
+public meta import Cvc.Untyped
+
+
+
+/-! # Grammars, sort-erased
+
+A grammar restricts the *shape* of a term the solver may produce — the candidates a `synth-fun`
+may return, or an interpolant. It is built from non-terminals and rules, and then handed to
+whichever solver query should be restricted by it.
+
+Two things about grammars are worth knowing before writing one:
+
+- **the start symbol is its own argument**, `mkGrammar boundVars start others`, and a non-terminal
+  the start symbol cannot reach is left out of the grammar;
+- **a grammar freezes once used.** The rule builders answer a new `Grammar`, so the API reads as
+  though grammars were persistent, but the object underneath is shared: after `synthFun`, cvc5
+  rejects further rules.
+-/
+namespace Cvc.Untyped.Examples.Grammars
+
+open Cvc Untyped
+
+variable [Ω]
+
+
+
+/-! ## Building one
+
+`toString` on a grammar prints its non-terminals with their sorts, then its rules.
+-/
+
+/-- info: ((start Int) (cnd Bool) )((start Int (x y (ite cnd start start)))(cnd Bool ((<= start start))))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let bool ← Srt.bool
+
+  -- the parameters the generated term may mention…
+  let x ← BVar.mk int "x"
+  let y ← BVar.mk int "y"
+  -- …and the non-terminals it is built from
+  let start ← NT.mk int "start"
+  let cnd ← NT.mk bool "cnd"
+
+  let g ← s.mkGrammar #[x, y] start #[cnd]
+  -- a non-terminal is a term, which is how it appears inside its own rules
+  let g ← g.addRules start #[x.toTerm, y.toTerm]
+  let g ← g.addRule start (← Term.ite cnd start start)
+  let g ← g.addRule cnd (← Term.le start start)
+  println! "{g}"
+
+/-! Two shorthands stand in for whole families of rules: any constant of the non-terminal's sort,
+and any of the grammar's own parameters. -/
+
+/-- info: ((start Int) )((start Int ((Constant Int) x)))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let x ← BVar.mk (← Srt.int) "x"
+  let start ← NT.mk (← Srt.int) "start"
+
+  let g ← s.mkGrammar #[x] start
+  let g ← g.addAnyConstant start
+  let g ← g.addAnyVariable start
+  println! "{g}"
+
+
+
+/-! ## Handing one to the solver
+
+`synthFun` asks for a function satisfying its constraints *for every input*, where `checkSat` asks
+whether constraints can be satisfied at all. With a grammar, the answer is restricted to terms the
+grammar can produce — which is what makes the solution below an `ite` and not, say, an arithmetic
+expression that happens to agree.
+
+`checkSynth` splits the world as `checkSat` does, and `getSynthSolution` exists only in the branch
+where a solution was found.
+-/
+
+/-- info: max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  let x ← BVar.mk int "x"
+  let y ← BVar.mk int "y"
+  let start ← NT.mk int "start"
+  let cnd ← NT.mk (← Srt.bool) "cnd"
+
+  let g ← s.mkGrammar #[x, y] start #[cnd]
+  let g ← g.addRules start #[x.toTerm, y.toTerm]
+  let g ← g.addRule start (← Term.ite cnd start start)
+  let g ← g.addRule cnd (← Term.le start start)
+
+  -- the function to find, restricted to what the grammar generates
+  let mx ← s.synthFun "max" #[x, y] int g
+
+  -- its specification, over universally quantified inputs
+  let a ← s.declareSygusVar "a" int
+  let b ← s.declareSygusVar "b" int
+  let mab ← smt! mx a b
+  s.addSygusConstraint (← smt! mab ≥ a)
+  s.addSygusConstraint (← smt! mab ≥ b)
+  s.addSygusConstraint (← smt! mab = a ∨ mab = b)
+
+  s.checkSynth (ifSolved := do
+    println! "max := {← s.getSynthSolution mx}")
+
+/-! Without a grammar, `synthFun` allows any term of the right sort, and the shape of the answer is
+the solver's to choose. -/
+
+/-- info: f := (lambda ((x Int)) (+ x 1))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+  let x ← BVar.mk int "x"
+
+  let f ← s.synthFun "f" #[x] int
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 1)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {← s.getSynthSolution f}")
+
+
+
+/-! ## Writing one as a block
+
+`smt.grammar!` writes a grammar BNF-style, its alternatives in `smt!` syntax: the solver, the
+parameters, then one line per non-terminal, the first being the start symbol. A sort is a Lean type
+or a `Srt`, mixed freely.
+
+The parameters are made by the block, out of sight, and `synthFun` must be declared over those very
+variables — so a grammar carries them, as `boundVars`.
+-/
+
+/-- info: max := (lambda ((x Int) (y Int)) (ite (<= y x) x y))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  let g ← smt.grammar! s (x y : Int) where
+    start : int  := x | y | if cnd then start else start
+    cnd   : Bool := start ≤ start
+
+  let mx ← s.synthFun "max" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  let b ← s.declareSygusVar "b" int
+  let mab ← smt! mx a b
+  s.addSygusConstraint (← smt! mab ≥ a)
+  s.addSygusConstraint (← smt! mab ≥ b)
+  s.addSygusConstraint (← smt! mab = a ∨ mab = b)
+
+  s.checkSynth (ifSolved := do
+    println! "max := {← s.getSynthSolution mx}")
+
+
+
+/-! ## Extending one afterwards
+
+`smt.grammar!` answers the grammar alone. When part of a grammar comes from data, write the fixed
+part as a block with `smt.mkGrammar!`, which also answers what the block made, and add the rest
+with the builders. Without parameters that is the grammar then the non-terminals; with some, the
+grammar is grouped with its parameters, so that one is never taken for a non-terminal:
+
+```
+smt.mkGrammar! s (x : Int) where …   : Env ((Grammar × BVar) × NT × NT)
+```
+
+Here the constants a solution may use are a list. The block declares the non-terminal `num` with
+no alternatives at all, `num : Int` alone, and its rules are added from the list afterwards. There
+is no `1` among them, so `x + 10` has to be built out of what the list offers.
+-/
+
+/-- info: f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  let ((g, _), _, num) ← smt.mkGrammar! s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+
+  let f ← s.synthFun "f" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 10)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {← s.getSynthSolution f}")
+
+/-! `smt.letGrammar!` is the same thing as a `do` element, binding the grammar, its parameters and
+its non-terminals under the names the block declares, so there is no tuple to get the order of
+wrong. A name the rest of the block never mentions draws no warning. Rules can be added until a
+solver has used the grammar; after that cvc5 rejects them.
+-/
+
+/-- info: f := (lambda ((x Int)) (+ (+ x 3) 7))
+-/
+#guard_msgs in #eval Env.runIO do
+  let s ← Solver.new
+  s.setOption "sygus" "true"
+  let int ← Srt.int
+
+  smt.letGrammar! g ← s (x : Int) where
+    start : Int := x | start + num
+    num   : Int
+  let mut g := g
+  for k in [3, 7] do
+    g ← g.addRule num (← Term.mkInt k)
+
+  let f ← s.synthFun "f" g.boundVars int g
+  let a ← s.declareSygusVar "a" int
+  s.addSygusConstraint (← smt! f a = a + 10)
+
+  s.checkSynth (ifSolved := do
+    println! "f := {← s.getSynthSolution f}")
