@@ -62,10 +62,15 @@ needed once when you add cvc.lean, and again when you move to another of its rel
   your project's `lean-toolchain` must name the same. cvc.lean moves to a new Lean version once
   lean-cvc5 supports it, which can take a while after the Lean release.
 - **Platforms.** Linux (x86_64 and arm64) and macOS 11 or later (Apple silicon and Intel). Windows
-  is not supported yet.
+  is not supported yet: the library builds there, lean-cvc5 fetching its own files, but abstract
+  sorts (`Srt.any`, `Srt.abstract`) can fail because of a lean-cvc5 bug, and nothing is tested on
+  Windows.
+  <!-- Remove the Windows caveat once lean-cvc5 fixes `mkAbstractSort` (entry 11 of
+  .notes/Cvc5Issues.md) and Windows is tested in CI. -->
 - **Nothing else to install.** Each release carries a prebuilt lean-cvc5 and cvc5 for every
-  platform, which the build fetches with the library: no C or C++ compiler is needed. Depending on
-  a commit rather than a release tag works too, but lean-cvc5 then fetches its own files.
+  supported platform, which the build fetches with the library: no C or C++ compiler is needed.
+  Depending on a commit rather than a release tag works too, but lean-cvc5 then fetches its own
+  files.
 - **Write modules.** The typed API's guarantees rely on Lean's module system: a file using it
   should start with `module`, otherwise some of its static checks will not be enforced.
 

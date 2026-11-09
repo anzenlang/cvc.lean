@@ -93,15 +93,18 @@ def restoreLeanCvc5 (url : String) (staging leanCvc5 : System.FilePath) : IO Uni
 
 /-- Restores lean-cvc5 from this release's bundle, when this package is a dependency at a release.
 
-Does nothing unless this package is a git dependency checked out at a tag and lean-cvc5 has no build
-directory yet. The bundle is looked up where Lake looks up release archives: on the release of that
-tag, in the repository this package was cloned from. Failing to restore it is only a warning, since
-lean-cvc5 then fetches its own files.
+Does nothing unless this package is a git dependency checked out at a tag, lean-cvc5 has no build
+directory yet, and the platform is not Windows, for which releases carry no bundle. The bundle is
+looked up where Lake looks up release archives: on the release of that tag, in the repository this
+package was cloned from. Failing to restore it is only a warning, since lean-cvc5 then fetches its
+own files.
 -/
 target leanCvc5Bundle pkg : Unit := do
   let some leanCvc5 ← findPackageByName? `cvc5
     | error "lean-cvc5 is not in the workspace"
-  if pkg.isRoot || (← leanCvc5.buildDir.pathExists) then return pure ()
+  -- on Windows the bundle never exists, and failing to find it would only print a warning
+  if pkg.isRoot || System.Platform.isWindows || (← leanCvc5.buildDir.pathExists) then
+    return pure ()
   let some repo := pkg.remoteUrl? | return pure ()
   let some tag ← (GitRepo.mk pkg.dir).findTag? | return pure ()
   let repo := if repo.endsWith ".git" then (repo.dropEnd 4).copy else repo

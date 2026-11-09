@@ -22,8 +22,8 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   with Verso's `rev` pinned to the same version tag. The API reference's project is generated and
   follows `lean-toolchain` on its own (see "Documentation").
 - One dependency: `cvc5 @ d19a134` (`inputRev = "main"`, so `lake update` moves it). lean-cvc5 tags
-  every commit with its short hash and attaches its build archives to that release; `d19a134` carries
-  a second tag, `0e593cc`, whose release Lake picks, with the same archives.
+  every commit with its short hash and attaches its build archives to that release; `d19a134`
+  carries a second tag, `0e593cc`, whose release Lake picks, with the same archives.
   `precompileModules := true` on the `cvc` package.
 - **No `lake update` is needed to build.** A fresh clone builds with `lake build` alone: Lake
   clones lean-cvc5 at the manifest's revision, and lean-cvc5's `cvc5Enums` build target downloads
@@ -71,8 +71,9 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   CLANG64), built the library and passed every test but `CvcTests.Srt`, whose abstract sorts a
   lean-cvc5 bug breaks there (entry 11 of [Cvc5Issues.md](.notes/Cvc5Issues.md)). It was dropped
   rather than merged failing; the workflow and what it found are entry 1 of
-  [CvcLeanIssues.md](.notes/CvcLeanIssues.md), a draft issue. The glibc shim is linked on Linux
-  only, so a Windows build compiles no C of its own.
+  [CvcLeanIssues.md](.notes/CvcLeanIssues.md), a draft issue. The README warns Windows users of
+  the abstract-sort bug, in an HTML-commented caveat to remove once it is fixed and Windows is
+  tested. The glibc shim is linked on Linux only, so a Windows build compiles no C of its own.
 - [.github/workflows/lean-release.yml](.github/workflows/lean-release.yml) checks daily for a stable
   Lean release newer than `lean-toolchain` and opens one "Bump to Lean vX" issue per release,
   saying which version lean-cvc5 is on. Bumps are done by hand: lean-cvc5 follows Lean manually
@@ -135,7 +136,8 @@ one it was built at. With `-v`, the replayed logs show the build machine's `curl
 is how `check_release.sh` tells a real download (naming the check's directory) from a replay.
 
 The restore runs only when this package is a non-root git dependency, checked out at a tag, and
-lean-cvc5 has no build directory. The bundle is looked up as Lake looks up release archives:
+lean-cvc5 has no build directory, and not on Windows, for which releases carry no bundle. The
+bundle is looked up as Lake looks up release archives:
 `<remote URL>/releases/download/<tag>/<bundle>`, so a fork's releases serve its own bundles. It
 stages and unpacks everything before moving anything, the build directory last; any failure is a
 **warning** and lean-cvc5 fetches its own files as before. Failures are caught as `BaseIO` results,
