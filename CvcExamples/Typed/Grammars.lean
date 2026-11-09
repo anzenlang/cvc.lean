@@ -56,8 +56,8 @@ Parameters are collected in a `BVars` spine, in order: pushing `x` then `y` give
   let g ← s.mkGrammar bVars start (NTs.push cnd [])
   let g ← g.addRule start x.toTerm
   let g ← g.addRule start y.toTerm
-  let g ← g.addRule start (← Term.ite cnd.toTerm start.toTerm start.toTerm)
-  let g ← g.addRule cnd (← Term.le start.toTerm start.toTerm)
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  let g ← smt! start ≤ start >>= g.addRule cnd
   println! "{g}"
 
 /-! A rule at the wrong sort does not compile. The `cnd` non-terminal is `Bool`, so an `Int` rule
@@ -102,8 +102,8 @@ function is ordinary typed application, with no re-typing anywhere.
   let g ← s.mkGrammar (BVars.empty.push x |>.push y) start (NTs.push cnd [])
   let g ← g.addRule start x.toTerm
   let g ← g.addRule start y.toTerm
-  let g ← g.addRule start (← Term.ite cnd.toTerm start.toTerm start.toTerm)
-  let g ← g.addRule cnd (← Term.le start.toTerm start.toTerm)
+  let g ← g.addRule start (← smt! if cnd then start else start)
+  let g ← g.addRule cnd (← smt! start ≤ start)
 
   -- `max : Term (Int → Int → Int)`, the signature the grammar already carried
   let mx ← s.synthFun "max" g
