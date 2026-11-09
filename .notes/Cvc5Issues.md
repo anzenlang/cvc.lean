@@ -862,3 +862,57 @@ Correct the wording as indicated above, and replace each `\verbatim` block with 
 
 **What it costs a wrapper.** cvc.lean gives these declarations docstrings of its own rather than
 inheriting lean-cvc5's.
+
+## 13. `addSygusInvConstraint` reports the wrong expected sort for a mis-sorted `trans`
+
+**Severity: low.** A misleading error message. The call is refused rightly, but the message names
+the invariant's sort as the one `trans` should have.
+
+### Reproduction
+
+```cpp
+#include <cvc5/cvc5.h>
+#include <iostream>
+
+using namespace cvc5;
+
+int main() {
+  TermManager tm;
+  Solver s(tm);
+  s.setOption("sygus", "true");
+  Sort i = tm.getIntegerSort(), b = tm.getBooleanSort();
+  Term x = tm.mkVar(i, "x"), x1 = tm.mkVar(i, "x1"), x2 = tm.mkVar(i, "x2");
+  // an invariant over one variable, so `trans` must be over two: (-> Int Int Bool)
+  Term inv = s.synthFun("inv", {x}, b);
+  Term pre = s.defineFun("pre", {x}, b, tm.mkTerm(Kind::EQUAL, {x, tm.mkInteger(0)}));
+  Term post = s.defineFun("post", {x}, b, tm.mkTerm(Kind::LEQ, {x, tm.mkInteger(10)}));
+  // a transition over three, (-> Int Int Int Bool)
+  Term trans = s.defineFun("trans", {x, x1, x2}, b,
+                           tm.mkTerm(Kind::LT, {x, tm.mkTerm(Kind::ADD, {x1, x2})}));
+  try {
+    s.addSygusInvConstraint(inv, pre, trans, post);
+    std::cout << "accepted" << std::endl;
+  } catch (const CVC5ApiException& e) {
+    std::cout << e.what() << std::endl;
+  }
+  return 0;
+}
+```
+
+prints
+
+```
+expected the sort of trans sort to be (-> Int Bool)
+```
+
+`(-> Int Bool)` is `inv`'s sort. `trans` relates a pre-state to a post-state, so for an invariant of
+sort `(-> Int Bool)` it should be `(-> Int Int Bool)`, which the message should name. A mis-sorted
+`pre` or `post` is reported correctly ("expected inv and pre to have the same sort").
+
+### Suggested fix
+
+Print the expected transition sort, the invariant's domain twice onto `Bool`, and drop the doubled
+"sort": "expected trans to have sort (-> Int Int Bool)".
+
+**What it costs a wrapper.** cvc.lean passes the message through. Its typed layer cannot catch the
+mistake statically either, a state being any number of variables.
