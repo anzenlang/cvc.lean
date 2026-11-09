@@ -139,9 +139,9 @@ def congruence : Env Solver := do
   s.setOpt .smt_produceProofs true
   let f ← Term.mkSymbolAs (Int → Int) "f"
   let x ← Term.mkSymbolAs Int "x"
-  (smt! x ≥ 1) >>= s.assert
-  (smt! x ≤ 1) >>= s.assert
-  (smt! f x ≠ f 1) >>= s.assert
+  smt! x ≥ 1 >>= s.assert
+  smt! x ≤ 1 >>= s.assert
+  smt! f x ≠ f 1 >>= s.assert
   return s
 ```
 

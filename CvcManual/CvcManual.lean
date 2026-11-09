@@ -32,7 +32,7 @@ shortTitle := "Cvc.lean user manual"
 %%%
 
 
-_Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver][cvc5], built on top of the [lean-cvc5 Lean library][lean-cvc5]. It adds a lot of quality of life features and strives to provide strong static guarantees. The following sections of this manual present the library in detail.
+_Cvc.lean_ is a high-level Lean 4 API for the [cvc5 SMT solver](https://cvc5.github.io), built on top of the [lean-cvc5 Lean library](https://github.com/abdoo8080/lean-cvc5). It adds a lot of quality of life features and strives to provide strong static guarantees. The following sections of this manual present the library in detail.
 
 {ref "overview"}[The Overview section] showcases various features of cvc.lean to give an overview for newcomers to survey quickly. The rest of this document goes over the technical details needed to understand and use cvc.lean properly.
 
@@ -60,6 +60,3 @@ tag := "index"
 %%%
 
 {theIndex}
-
-[cvc5]: (https://cvc5.github.io)
-[lean-cvc5]: (https://github.com/abdoo8080/lean-cvc5)
