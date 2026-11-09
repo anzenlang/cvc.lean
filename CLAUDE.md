@@ -2146,6 +2146,9 @@ load-bearing in the sort-erased module, because `Terms.getValues` runs an `Env` 
 
   A one-line docstring stays on one line: `/-- Binary conjunction. -/`.
 - The closing `-/` of a multi-paragraph docstring goes on its own line.
+- **Exception: the manual's prose is not wrapped.** Verso renders a newline in its Markdown as a
+  line break, so each paragraph, and each list item, of a `CvcManual/` page is one line, however
+  long. Code blocks there are wrapped as Lean code is (Verso warns past 60 columns).
 - **Exception**: `#guard_msgs` expected-output docstrings are compared verbatim against Lean's own
   message rendering, so they keep whatever wrapping Lean produces even past 100 columns. Never
   reflow them.

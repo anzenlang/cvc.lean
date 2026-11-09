@@ -112,30 +112,22 @@ namespace Conversions
 variable [Ω]
 ```
 
-Every type that exists in both layers converts the same way: `toTyped` goes from the sort-erased
-value to the typed one, and `toUntyped` the other way. Two families of aliases say what the
-conversion does:
+Every type that exists in both layers converts the same way: `toTyped` goes from the sort-erased value to the typed one, and `toUntyped` the other way. Two families of aliases say what the conversion does:
 
-- a type indexed by a sort, such as {lean}`Typed.Term Bool` or a bound variable, also answers to
-  `erase` going down, and going up has `toTypedAs`, which takes the index explicitly, besides
-  `toTyped`, which infers it; their aliases are `typeCheckAs` and `typeCheck`;
-- a type with no index but with both a typed and a sort-erased API, such as a solver, answers to
-  `relax` going down.
+- a type indexed by a sort, such as {lean}`Typed.Term Bool` or a bound variable, also answers to `erase` going down, and going up has `toTypedAs`, which takes the index explicitly, besides `toTyped`, which infers it; their aliases are `typeCheckAs` and `typeCheck`;
+- a type with no index but with both a typed and a sort-erased API, such as a solver, answers to `relax` going down.
 
 ## Untyped to typed
 
-{lean}`Untyped.Term.toTypedAs` checks, at runtime, an untyped term against (the sort associated to)
-a static type to produce a typed term.
+{lean}`Untyped.Term.toTypedAs` checks, at runtime, an untyped term against (the sort associated to) a static type to produce a typed term.
 
 {decl Untyped.Term.toTypedAs}
 
-If the term's type can be inferred from context, `Untyped.Term.toTyped` is a more concise
-alternative.
+If the term's type can be inferred from context, `Untyped.Term.toTyped` is a more concise alternative.
 
 {decl Untyped.Term.toTyped}
 
-Under their aliases, {lean}`Untyped.Term.typeCheckAs` and `Untyped.Term.typeCheck`, the
-same two functions say what they do. For example:
+Under their aliases, {lean}`Untyped.Term.typeCheckAs` and `Untyped.Term.typeCheck`, the same two functions say what they do. For example:
 
 ```lean (name := ex_Terms_toTypedAs)
 open Untyped in
@@ -173,8 +165,7 @@ cannot type the following term as `Int`, term has sort `Bool`:
 
 ## Typed to untyped
 
-This direction cannot fail: a typed term already *is* a sort-erased one, and
-{lean}`Typed.Term.toUntyped` merely forgets its index.
+This direction cannot fail: a typed term already *is* a sort-erased one, and {lean}`Typed.Term.toUntyped` merely forgets its index.
 
 {decl Typed.Term.toUntyped}
 
@@ -201,10 +192,7 @@ erase:       (or x false)
 
 ## Every conversion
 
-Going down is always free. Going up checks sorts at runtime, except for solvers and proofs, where
-there is nothing to check: a solver is the same type in both layers, and a typed proof is a
-sort-erased one under a type of its own. Where the sort-erased counterpart has no type of its own,
-there is no way back up.
+Going down is always free. Going up checks sorts at runtime, except for solvers and proofs, where there is nothing to check: a solver is the same type in both layers, and a typed proof is a sort-erased one under a type of its own. Where the sort-erased counterpart has no type of its own, there is no way back up.
 
 | typed | sort-erased | down | up |
 |---|---|---|---|
@@ -222,8 +210,7 @@ there is no way back up.
 | datatype `Args`, tuple and application spines | `Terms` | `toUntyped`, `erase` | none |
 | `Datatype.Case α β` | `Term` | `toUntyped`, `erase` | none |
 
-The value classes convert too: a typed `TermToValue` or `ValueToTerm` instance gives a sort-erased
-one and the other way round, so a Lean type given conversions in one layer is usable in both.
+The value classes convert too: a typed `TermToValue` or `ValueToTerm` instance gives a sort-erased one and the other way round, so a Lean type given conversions in one layer is usable in both.
 
 ```lean -show
 end Conversions

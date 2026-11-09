@@ -422,8 +422,7 @@ a := { 3 ↦ 17, _ ↦ 0 }
 
 # Separation logic
 
-A solver's heap is declared once, at the Lean types of its locations and data, and `pto` (points-to) hangs off the handle that declaration returns, so a mismatched location or datum is a type error.
-The separating conjunction `sepStar` splits the heap into disjoint parts, which is what sets it apart from `∧`.
+A solver's heap is declared once, at the Lean types of its locations and data, and `pto` (points-to) hangs off the handle that declaration returns, so a mismatched location or datum is a type error. The separating conjunction `sepStar` splits the heap into disjoint parts, which is what sets it apart from `∧`.
 
 ```lean (name := intro_ex_sep)
 /-- Runs `query` on a fresh solver with an `Int ↦ Int` heap.
