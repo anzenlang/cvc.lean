@@ -135,6 +135,11 @@ def demo : Env Unit := do
   -- `Typed` has the `smt!` extension too
   let term ← smt! b1 ∧ 0 < i1
 
+  -- as an aside, strong-typing and `smt!` work with function application too
+  let f ← Term.mkSymbolAs (Int → Bool → Int) "f"
+  let partialApp ← smt! f i1
+  let _totalApp ← smt! partialApp term
+
   let solver ← Solver.new
   solver.setOpt .smt_produceModels true
   solver.assert term
