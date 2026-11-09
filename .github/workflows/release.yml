@@ -25,6 +25,11 @@ name: Release
 # bare Ubuntu container with only what Lean and Lake need added, and no C compiler: the runner
 # images come with compilers and headers, which would hide a build quietly relying on them.
 #
+# The site — the manual, the API reference and the README as front page, whose header names the
+# release — is built at the tag and published on GitHub Pages once the release is, so the site
+# always documents the latest release. The `github-pages` environment must allow deploying from `v*` tags:
+# by default it only allows the default branch, and this workflow runs on the tag.
+#
 # A failed job leaves the pre-release as it is. Delete it along with its tag and publish it again,
 # or publish the next version. Windows is not built yet: the library builds there under MSYS2, as
 # lean-cvc5 does, but a lean-cvc5 bug breaks its abstract sorts on Windows.
@@ -153,8 +158,45 @@ jobs:
       - name: Build a project requiring the release
         run: .github/scripts/check_release.sh "https://github.com/$GH_REPO" "$TAG"
 
+  # the site at the tag, uploaded for `deploy`; `publish` waits for it, so a release never goes out
+  # without its documentation
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check that the projects agree on versions
+        run: >-
+          python3 .github/scripts/check_versions.py lake-manifest.json CvcManual/lake-manifest.json
+      - name: Install Lean
+        run: .github/scripts/install_lean.sh
+      - name: Build
+        run: lake build
+      - name: Build the manual
+        run: lake run buildManual
+      - name: Build the API reference
+        run: lake run buildApiDocs
+      # the generated project's manifest only exists now
+      - name: Check that the API reference agrees on versions
+        run: >-
+          python3 .github/scripts/check_versions.py
+          lake-manifest.json CvcManual/lake-manifest.json .lake/docbuild/lake-manifest.json
+      - name: Assemble the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir _site
+          cp -r .lake/docbuild/.lake/build/doc _site/api
+          cp -r CvcManual/_out/html-multi _site/manual
+          .github/scripts/render_readme.sh README.md _site/index.html "$TAG"
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
   publish:
-    needs: [check-linux, check-macos]
+    needs: [check-linux, check-macos, site]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -162,3 +204,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "$TAG" --prerelease=false --latest
+
+  # GitHub Pages deploys the artifact `site` uploaded, the repository's Pages source being "GitHub
+  # Actions"; each deployment replaces the whole site
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

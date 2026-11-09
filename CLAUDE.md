@@ -45,16 +45,12 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   cvc5 built against an older glibc.
 - CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on Linux, on pushes to `main` and
   PRs to `main` only, so a topic branch is **not** covered. **One job does everything in sequence**,
-  on one machine, so the manual and the API reference build on the library `lake build` just built,
-  in one Lake directory with nothing to hand over: `.github/scripts/check_versions.py` (the manual
-  on the root's toolchain, Verso pinned to it, every package the projects sharing `.lake/packages`
-  have in common at one revision), Lean, `lake build`, `lake test`, `lake run buildManual` (which
-  fails on any example whose output drifts); then, on `main` only, `lake run buildApiDocs`, the
-  version check again with the generated project's manifest, and the site — `api/`, `manual/`, and
-  the README rendered as `index.html` (`.github/scripts/render_readme.sh`, through GitHub's Markdown
-  API) — uploaded for a second `deploy` job, which publishes it with `actions/deploy-pages`. No
-  branch: the repository's Pages source must be "GitHub Actions", and each deployment replaces the
-  whole site.
+  on one machine, so the manual builds on the library `lake build` just built, in one Lake
+  directory with nothing to hand over: `.github/scripts/check_versions.py` (the manual on the
+  root's toolchain, Verso pinned to it, every package the projects sharing `.lake/packages` have in
+  common at one revision), Lean, `lake build`, `lake test`, `lake run buildManual` (which fails on
+  any example whose output drifts). **CI publishes nothing**: the site documents the latest release
+  only, so the release workflow builds and deploys it (see below).
 
   Separate jobs were tried and dropped: each job is a fresh machine, and a GitHub cache entry is an
   immutable snapshot that cannot be added to or merged, so parallel jobs sharing `.lake/packages`
@@ -65,8 +61,7 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   Caches: `~/.elan`, keyed on the exact toolchain **with no fallback**, so a Lean bump starts empty
   and saves an entry holding only the new toolchain (a fallback would restore the old one and
   accumulate toolchains); and the Lake directories, saved only from `main` (the entry holds the
-  library, Verso and doc-gen4) and restored everywhere, minus the API reference's build directory,
-  since doc-gen4 never drops the page of a removed module. Lean is installed by
+  library and Verso) and restored everywhere. Lean is installed by
   `.github/scripts/install_lean.sh` rather than `leanprover/lean-action`, which caches no
   toolchain: it skips what the cache restored and retries the toolchain download, Lean's release
   server answering the occasional 504 (it failed the first run). A newer push cancels a superseded
@@ -101,6 +96,19 @@ lake run buildApiDocs / serveApiDocs   # the doc-gen4 API reference
   fails if any C compiler is present: the runner images come with compilers and headers, which
   hid the shim's need for a system `clang`. macOS has its own job (`check-macos`), since a job
   container needs a Linux runner — and what an empty `container:` value does is undocumented.
+
+  **The site is published by the release workflow**, for the latest release only. A `site` job,
+  which `publish` waits for, builds at the tag the manual, the API reference (with the version
+  check on its generated project) and the front page: the README through GitHub's Markdown API
+  (`.github/scripts/render_readme.sh`), under a header reading "latest release: vX, for Lean Y" —
+  the tag linking to its release page, the Lean version from `lean-toolchain` — with links to the
+  manual, the API reference and the repository, styled with GitHub's Markdown stylesheet. A
+  `deploy` job, after `publish`, deploys it with `actions/deploy-pages`: no branch, the Pages source
+  must be "GitHub Actions", and each deployment replaces the whole site. **The `github-pages`
+  environment must allow `v*` tags** (Settings → Environments → `github-pages` → deployment
+  branches and tags): it only allows the default branch by default, and this workflow runs on the
+  tag. Updating a release during setup means deleting it, moving its tag and publishing the
+  pre-release again, which rebuilds the bundles and the site.
 
 ### Releases carry the lean-cvc5 build they were made with
 
@@ -2396,8 +2404,8 @@ changes, or there is no manifest yet, it runs `lake update doc-gen4`: doc-gen4 a
 the shared `cvc5` at the root manifest's revision (verified; Lake pins it from the library's own
 manifest). Otherwise it does nothing, so a rebuild costs nothing extra. A toolchain bump therefore
 carries doc-gen4 along with no edit. doc-gen4 never deletes the page of a module that is gone, so a
-local output keeps stale pages across versions; the Pages workflow excludes the project's build
-directory from its cache for that reason.
+local output keeps stale pages across versions. The release workflow, which builds the published
+site, caches nothing, so it never meets them.
 
 - **The scripts run each project under its own toolchain**, through `elan run --install
   <lean-toolchain> lake …` with the outer `lake`'s variables cleared (`lakeEnvVars`, the list Verso
