@@ -54,8 +54,8 @@ Parameters are collected in a `BVars` spine, in order: pushing `x` then `y` give
 
   let bVars := BVars.empty.push x |>.push y
   let g ← s.mkGrammar bVars start (NTs.push cnd [])
-  let g ← g.addRule start x.toTerm
-  let g ← g.addRule start y.toTerm
+  let g ← g.addRule start x
+  let g ← g.addRule start y
   let g ← g.addRule start (← smt! if cnd then start else start)
   let g ← smt! start ≤ start >>= g.addRule cnd
   println! "{g}"
@@ -100,8 +100,8 @@ function is ordinary typed application, with no re-typing anywhere.
   let cnd ← NT.mk (α := Bool) "cnd"
 
   let g ← s.mkGrammar (BVars.empty.push x |>.push y) start (NTs.push cnd [])
-  let g ← g.addRule start x.toTerm
-  let g ← g.addRule start y.toTerm
+  let g ← g.addRule start x
+  let g ← g.addRule start y
   let g ← g.addRule start (← smt! if cnd then start else start)
   let g ← g.addRule cnd (← smt! start ≤ start)
 

@@ -77,23 +77,23 @@ def infer [Ω] : Env (Option (Term (Int → Int → Bool))) := do
   miner ← miner.scanTypedTerm init_0
   miner ← miner.scanTypedTerm next_0_1
   miner ← miner.scanTypedTerm p_1
-  let int_mod ← smt! sv1.x % sv1.y = 3
+  let int_mod ← smt! 3 % 3 = 3
   miner ← miner.scanTypedTerm int_mod
 
   let some g ← miner.extractTypedGrammar (Int → Int → Bool)
     | throwInternal "failed to extract grammar"
   println! "grammar:\n{g}\n"
   let str ← s.synthFun "STR" g
-  let str_0 ← str.apply2 sv0.x.get sv0.y.get
-  let str_1 ← str.apply2 sv1.x.get sv1.y.get
+  let str_0 ← smt! str sv0.x sv0.y
+  let str_1 ← smt! str sv1.x sv1.y
 
-  let c1 ← init_0.implies str_0
+  let c1 ← smt! init_0 → str_0
   -- println! "c1: {c1}"
   s.addSygusConstraint c1
-  let c2 ← (← str_0.and next_0_1).implies str_1
+  let c2 ← smt! str_0 ∧ next_0_1 → str_1
   -- println! "c1: {c2}"
   s.addSygusConstraint c2
-  let c3 ← str_1.implies p_1
+  let c3 ← smt! str_1 → p_1
   -- println! "c1: {c3}"
   s.addSygusConstraint c3
 
