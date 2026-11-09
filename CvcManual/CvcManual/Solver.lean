@@ -244,9 +244,9 @@ Defining a function symbol in a solver is very similar to building a lambda: the
 
   let (i, j) := (← BVar.mk "i", ← BVar.mk "j")
   let bVars := BVars.empty.push i |>.push j
-  let saturatingMaxDef ← (smt!
+  let saturatingMaxDef ← smt!
     let max ← if j ≤ i then i else j;
-    if max < ub then max else ub)
+    if max < ub then max else ub
   println! "saturatingMaxDef := {saturatingMaxDef}"
 
   let sMax ← solver.defineFun

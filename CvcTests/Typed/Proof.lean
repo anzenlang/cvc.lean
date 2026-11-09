@@ -175,7 +175,7 @@ total form agrees         : true
   s.setOption "proof-granularity" "dsl-rewrite"
   -- proving `x + 0 ≠ x` unsat goes through rewriting, so the tree has rewrite steps in it
   let x ← s.declareConstAs Int "x"
-  (smt! x + 0 ≠ x) >>= s.assert
+  smt! x + 0 ≠ x >>= s.assert
 
   let proofs ← s.checkSat (ifUnsat := do return ← s.getUnsatProof)
   let all := proofs.flatMap (steps 100 ·)
@@ -297,9 +297,9 @@ def congruence : Env Solver := do
   s.setOption "produce-proofs" "true"
   let f ← Term.mkSymbolAs (Int → Int) "f"
   let x ← Term.mkSymbolAs Int "x"
-  (smt! x ≥ 1) >>= s.assert
-  (smt! x ≤ 1) >>= s.assert
-  (smt! f x ≠ f 1) >>= s.assert
+  smt! x ≥ 1 >>= s.assert
+  smt! x ≤ 1 >>= s.assert
+  smt! f x ≠ f 1 >>= s.assert
   return s
 
 /-- info: views agree with the sort-erased ones : true
